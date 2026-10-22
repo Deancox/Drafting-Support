@@ -1,0 +1,17 @@
+# Python / tooling
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+
+# Client drawings and anything made from them stay out of the repository
+input/
+Terms/
+extracted/
+/*.pdf
+*.dwg
+
+# Run outputs: reports, the QA register and the review database (the checker's decisions)
+reports/
+*.sqlite
+QA_Register*.xlsx

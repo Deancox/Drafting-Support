@@ -1,0 +1,77 @@
+# Project configuration for the Controls Drawing QA Platform.
+# Edited by the checker; read at the start of every run.
+
+[project]
+code = "401103"
+name = "Sample package"
+
+[ingest]
+# Input types left out of the review: read and listed, but not checked or used by other checks.
+# Empty = all four (PLC, CBD, TERM, EQUIP) are reviewed. Per run, use the command line instead:
+#   python -m drawing_qa run --input input/Main --exclude term
+# (--include puts back a type listed here.)
+unchecked_types = []
+
+# Input subfolder name -> document type. Matching is case-insensitive.
+[ingest.folders]
+plc = "PLC"
+cableblocks = "CBD"
+cableblock = "CBD"
+cbd = "CBD"
+terminations = "TERM"
+termination = "TERM"
+terms = "TERM"
+# Electrical equipment list (Excel, CSV or PDF). Listed in the run manifest; its reader comes
+# once the client's list format is known.
+equipmentlist = "EQUIP"
+equipment = "EQUIP"
+equiplist = "EQUIP"
+eel = "EQUIP"
+
+[pdf]
+# A page with fewer words than this, and at least one image, is treated as raster (needs OCR).
+min_words_for_vector = 5
+# AutoCAD plots SHX fonts as geometry but embeds the text as annotations with these titles.
+shx_annotation_titles = ["AutoCAD SHX Text"]
+
+[identifiers]
+# Package naming conventions (GAME_PLAN.md "Engineering conventions").
+# Patterns are regular-expression fragments; they are combined into full-token patterns.
+prefix = "[A-Z]{1,4}"
+ffi = "[A-Z]{2}"
+# Two digits per the convention; three-digit sheets also occur (R-TH157V0, K-CD011M4).
+sheet = "\\d{2,3}"
+grid = "[A-Z]\\d"
+# Known values. Empty list = accept any value that matches the pattern.
+prefixes = []
+ffis = []
+areas = ["LTL", "RCL", "SPL", "EER1", "SH", "ES"]
+# Panel suffixes after "<AREA>-" (to confirm).
+panel_types = ["PLC"]
+# Device prefixes for equipment inside the panel (K relays, Q breakers): not expected on cable block diagrams.
+panel_device_prefixes = ["K", "Q"]
+
+# Which drawing each First Field Identifier belongs to. A tag or wire is checked
+# against <drawing>-<sheet> of its FFI's drawing. "EXTERNAL" = a separate package we
+# don't have: its references are listed in the report as separate documents.
+[identifiers.ffi_drawings]
+TN = "401103"
+TV = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
+TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
+
+# Designations that have been renamed. Any drawing still using the old one is
+# an incorrect reference; the finding recommends the replacement.
+[identifiers.superseded]
+"LTL-AUT1" = "LTL-PLC"   # AUT renamed to PLC (confirmed by checker 2026-10-21)
+
+[spelling]
+# Words one letter away from a common word in the package that are spelled correctly.
+known_words = ["CLOSE", "LATER", "LOWER", "POWER", "TOWER", "WATER", "LEVEL"]
+
+[placeholders]
+# Exact tokens that always indicate incomplete drafting.
+tokens = ["XXXX", "XXX", "TNXXXX", "PXXXXX", "CXXXXX", "HOLD", "AUT1"]
+# Phrases matched against whole text lines.
+phrases = ["REF TERM XXX"]
+# Lines containing these phrases are not reported for HOLD (to confirm with checker).
+hold_exceptions = []

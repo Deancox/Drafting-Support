@@ -1,0 +1,190 @@
+"""Project configuration, loaded from config/project.toml."""
+
+from __future__ import annotations
+
+import hashlib
+import tomllib
+from datetime import date
+from pathlib import Path
+
+from pydantic import BaseModel, Field
+
+from drawing_qa.model.enums import DocType
+
+DEFAULT_FOLDERS: dict[str, DocType] = {
+    "plc": DocType.PLC,
+    "cableblocks": DocType.CBD,
+    "cableblock": DocType.CBD,
+    "cbd": DocType.CBD,
+    "terminations": DocType.TERM,
+    "termination": DocType.TERM,
+    "terms": DocType.TERM,
+    "equipmentlist": DocType.EQUIP,
+    "equipment": DocType.EQUIP,
+    "equiplist": DocType.EQUIP,
+    "eel": DocType.EQUIP,
+}
+
+
+class IngestConfig(BaseModel):
+    folders: dict[str, DocType] = Field(default_factory=lambda: dict(DEFAULT_FOLDERS))
+    # Document types left out of the review (e.g. drawings that are not up to date). Their files are
+    # still read and listed, but produce no findings and are not used by other checks or traces.
+    # The command line adds to this with --exclude and removes from it with --include.
+    unchecked_types: list[DocType] = Field(default_factory=list)
+
+
+class PdfConfig(BaseModel):
+    min_words_for_vector: int = 5
+    shx_annotation_titles: list[str] = Field(default_factory=lambda: ["AutoCAD SHX Text"])
+
+
+class IdentifierConfig(BaseModel):
+    prefix: str = r"[A-Z]{1,4}"
+    ffi: str = r"[A-Z]{2}"
+    sheet: str = r"\d{2}"
+    grid: str = r"[A-Z]\d"
+    prefixes: list[str] = Field(default_factory=list)
+    ffis: list[str] = Field(default_factory=list)
+    areas: list[str] = Field(default_factory=list)
+    panel_types: list[str] = Field(default_factory=lambda: ["PLC"])
+    # Device prefixes for equipment inside the panel (relays, breakers): not expected on cable block diagrams.
+    panel_device_prefixes: list[str] = Field(default_factory=lambda: ["K", "Q"])
+    # FFI -> the drawing number whose sheets that FFI's tags and wires live on.
+    # TN -> 401103: S-TN23N2 is drawn on 401103 sheet 023. Use "EXTERNAL" for an FFI from a
+    # separate package that is not supplied (its references are listed, not checked).
+    # Empty map: any sheet number is looked up across the PLC folder (older behaviour).
+    ffi_drawings: dict[str, str] = Field(default_factory=dict)
+    # Old designation -> current one, e.g. LTL-AUT1 -> LTL-PLC. Occurrences of the old
+    # key are still recorded as written, flagged with the replacement.
+    superseded: dict[str, str] = Field(default_factory=dict)
+
+
+class PlaceholderConfig(BaseModel):
+    tokens: list[str] = Field(
+        default_factory=lambda: ["XXXX", "XXX", "TNXXXX", "PXXXXX", "CXXXXX", "HOLD", "AUT1"]
+    )
+    phrases: list[str] = Field(default_factory=lambda: ["REF TERM XXX"])
+    hold_exceptions: list[str] = Field(default_factory=list)
+
+
+class TitleBlockConfig(BaseModel):
+    # Title block region as fractions of the page (bottom-right corner).
+    x_min: float = 0.45
+    y_min: float = 0.80
+    # Furthest a value may sit from its label, in PDF points.
+    max_value_distance: float = 60.0
+    # Sheets whose descriptor contains one of these are reference material (legends,
+    # symbol keys, title and index pages). Their example tags are not checked as devices.
+    reference_descriptors: list[str] = Field(
+        default_factory=lambda: ["GRAPHICS SYMBOLS", "LEGEND", "TITLE PAGE", "INDEX", "COVER SHEET"]
+    )
+    # Descriptor keyword -> document type, checked in order.
+    descriptor_types: dict[str, DocType] = Field(
+        default_factory=lambda: {
+            "TERMINATION": DocType.TERM,
+            "BLOCK DIAGRAM": DocType.CBD,
+            "SCHEMATIC": DocType.PLC,
+        }
+    )
+
+
+class GridConfig(BaseModel):
+    # Row labels sit within this fraction of the page width from the left edge;
+    # column labels within this fraction of the page height from the top.
+    margin: float = 0.06
+    min_labels: int = 3
+
+
+class ModuleSpec(BaseModel):
+    type: str  # DI, DO, AI, AO
+    channels: int
+    safety: bool = False
+
+
+class PlcConfig(BaseModel):
+    # Module catalogue: part number -> what it is. Used to check capacity and type.
+    modules: dict[str, ModuleSpec] = Field(
+        default_factory=lambda: {
+            "1734-IB8": ModuleSpec(type="DI", channels=8),
+            "1734-IB8S": ModuleSpec(type="DI", channels=8, safety=True),
+            "1734-OB8": ModuleSpec(type="DO", channels=8),
+            "1734-OB8S": ModuleSpec(type="DO", channels=8, safety=True),
+            "1734-IE4C": ModuleSpec(type="AI", channels=4),
+            "1734-IE8C": ModuleSpec(type="AI", channels=8),
+            "1734-OE4C": ModuleSpec(type="AO", channels=4),
+        }
+    )
+    # Expected form of the POINTS line on slot sheets: <rack>.S<slot>.<type>.<first>..<last>
+    points_format: str = r"^[A-Z0-9]+\.S\d+\.(DI|DO|AI|AO)\.\d{2}\.\.\d{2}$"
+    # Rack name -> the panel that holds it. Unlisted racks default to <rack>-PLC (LTL -> LTL-PLC).
+    rack_panels: dict[str, str] = Field(default_factory=dict)
+
+
+class SpellingConfig(BaseModel):
+    """A word used at most `max_rare` times that is one letter away from a word used at least
+    `min_common` times in the same package is reported (STOBE vs STROBE). Real words that happen
+    to be one letter from a common one go in `known_words`."""
+
+    min_length: int = 5
+    max_rare: int = 2
+    min_common: int = 3
+    known_words: list[str] = Field(default_factory=lambda: ["CLOSE", "LATER", "LOWER", "POWER", "TOWER", "WATER", "LEVEL"])
+
+
+class RuleSetting(BaseModel):
+    enabled: bool = True
+    severity: str | None = None  # overrides the rule's default
+
+
+class Waiver(BaseModel):
+    """A known, accepted exception (config/waivers.toml): findings of `rule` whose subject matches
+    `subject` are marked WAIVED. Patterns use * and ?, e.g. rule "COMP-*", subject "SH-*"."""
+
+    id: str
+    rule: str
+    subject: str = "*"
+    reason: str
+    approved_by: str = ""
+    expires: date | None = None  # not applied after this date
+
+
+class ProjectInfo(BaseModel):
+    code: str = ""
+    name: str = ""
+
+
+class Settings(BaseModel):
+    project: ProjectInfo = Field(default_factory=ProjectInfo)
+    ingest: IngestConfig = Field(default_factory=IngestConfig)
+    pdf: PdfConfig = Field(default_factory=PdfConfig)
+    identifiers: IdentifierConfig = Field(default_factory=IdentifierConfig)
+    placeholders: PlaceholderConfig = Field(default_factory=PlaceholderConfig)
+    title_block: TitleBlockConfig = Field(default_factory=TitleBlockConfig)
+    grid: GridConfig = Field(default_factory=GridConfig)
+    plc: PlcConfig = Field(default_factory=PlcConfig)
+    spelling: SpellingConfig = Field(default_factory=SpellingConfig)
+    rules: dict[str, RuleSetting] = Field(default_factory=dict)  # from rules.toml beside the project config
+    waivers: list[Waiver] = Field(default_factory=list)  # from waivers.toml beside the project config
+    config_hash: str = ""
+
+    @classmethod
+    def load(cls, path: Path | None) -> Settings:
+        """Load settings from a TOML file (and rules.toml next to it); defaults apply when path is None."""
+        if path is None:
+            return cls()
+        raw = path.read_bytes()
+        data = tomllib.loads(raw.decode("utf-8"))
+        rules_path = path.with_name("rules.toml")
+        if rules_path.is_file():
+            rules_raw = rules_path.read_bytes()
+            data["rules"] = tomllib.loads(rules_raw.decode("utf-8")).get("rules", {})
+            raw += rules_raw
+        waivers_path = path.with_name("waivers.toml")
+        if waivers_path.is_file():
+            waivers_raw = waivers_path.read_bytes()
+            data["waivers"] = tomllib.loads(waivers_raw.decode("utf-8")).get("waiver", [])
+            raw += waivers_raw
+        settings = cls.model_validate(data)
+        settings.config_hash = hashlib.sha256(raw).hexdigest()[:16]
+        return settings

@@ -1,0 +1,16 @@
+# Waivers: known, accepted exceptions. Read with config/project.toml at the start of every run.
+#
+# Every finding of `rule` whose subject (the tag, channel or text in the register's "Tag / item"
+# column) matches `subject` is marked WAIVED in the QA register, with "Waiver <id>: <reason>" as the
+# comment. Patterns use * and ? (rule "COMP-*", subject "SH-*"). A decision you enter yourself in the
+# register takes precedence. After `expires` the waiver is listed but no longer applied.
+#
+# For a one-off exception, set the finding's Decision to WAIVED in the register instead.
+#
+# [[waiver]]
+# id = "W-001"
+# rule = "COMP-002"
+# subject = "K-TN32*"
+# reason = "Interface to the RCL package; wired to the PLC there"
+# approved_by = "DC"
+# expires = 2027-06-30
