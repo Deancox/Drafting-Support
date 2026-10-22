@@ -9,6 +9,7 @@ from pathlib import Path
 
 from drawing_qa import __version__
 from drawing_qa.config import DEFAULT_FOLDERS, Settings
+from drawing_qa.ingest.ffi import describe
 from drawing_qa.model.enums import DocType, IssueCode
 from drawing_qa.pipeline import run_pipeline
 from drawing_qa.report.writer import write_outputs
@@ -91,6 +92,10 @@ def main(argv: list[str] | None = None) -> int:
     if unreadable:
         print(f"  WARNING: {len(unreadable)} sheet(s) have no readable text (plotted without SHX text notes): "
               "re-plot them from AutoCAD with PDFSHX = 1. They are listed under Parse issues in report.md")
+    for issue in (i for i in result.issues if i.code is IssueCode.FFI_MAPPING):
+        print(f"  WARNING: {issue.message}")
+    if result.ffi_map:
+        print("  FFIs: " + describe(result.ffi_map))
     reviewed = [t.value for t in _INPUT_TYPES if t not in settings.ingest.unchecked_types]
     left_out = [t.value for t in settings.ingest.unchecked_types]
     print(f"  reviewed: {', '.join(reviewed) or 'nothing'}" + (f"; left out: {', '.join(left_out)}" if left_out else ""))

@@ -18,6 +18,7 @@ _COVERAGE_ISSUES = {
     IssueCode.PARSER_ERROR,
     IssueCode.EMPTY_FOLDER,
     IssueCode.NO_SHX_TEXT,
+    IssueCode.FFI_MAPPING,
     IssueCode.NO_GRID,
 }
 _SEVERITIES = [Severity.CRITICAL, Severity.MAJOR, Severity.MINOR, Severity.INFO]

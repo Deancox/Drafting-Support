@@ -82,6 +82,7 @@ class IssueCode(StrEnum):
     NEEDS_OCR = "NEEDS_OCR"
     EMPTY_PAGE = "EMPTY_PAGE"
     NO_SHX_TEXT = "NO_SHX_TEXT"  # drawn sheet whose text cannot be read: re-plot with PDFSHX=1
+    FFI_MAPPING = "FFI_MAPPING"  # the FFI -> drawing mapping disagrees with the sheets, or points outside the package
     PARSER_ERROR = "PARSER_ERROR"
     NO_TEMPLATE = "NO_TEMPLATE"
     DUPLICATE_SHEET = "DUPLICATE_SHEET"

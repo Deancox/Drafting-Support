@@ -15,12 +15,14 @@ from pathlib import Path
 from drawing_qa import __version__
 from drawing_qa.config import Settings
 from drawing_qa.ingest.discovery import discover
+from drawing_qa.ingest.ffi import describe, resolve_ffis
 from drawing_qa.graph import build_graph
 from drawing_qa.linker import link
 from drawing_qa.model.enums import DocType, ExtractionMethod, IssueCode, PageKind, StageStatus
 from drawing_qa.model.run import RunInfo, RunResult, StageResult
 from drawing_qa.model.source import Drawing, Issue
 from drawing_qa.parsers.base import ParseContext
+from drawing_qa.parsers.plc.wires import sheet_ffi
 from drawing_qa.parsers.registry import build_parsers
 from drawing_qa.parsers.titleblock import drawing_for_page
 from drawing_qa.pdf.extract import extract_page, open_pdf
@@ -51,6 +53,10 @@ def run_pipeline(input_root: Path, settings: Settings, ocr: OcrEngine | None = N
     result.stages.append(StageResult(name="ingest", status=StageStatus.DONE, note=f"{len(discovery.files)} PDF(s) found"))
 
     _parse(discovery.files, settings, ocr, result)
+    # Which drawing each FFI belongs to, learned from the schematic sheets' FFI box (ingest/ffi.py).
+    settings, result.ffi_map, ffi_issues = resolve_ffis(settings, result.drawings, result.claims)
+    result.issues.extend(ffi_issues)
+    result.stages.append(StageResult(name="ffi", status=StageStatus.DONE, note=describe(result.ffi_map)))
     _link_and_trace(settings, result)
     _run_rules(settings, result)
     result.info.finished_at = datetime.now(UTC)
@@ -112,6 +118,7 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
                 for page in doc:
                     content = extract_page(page, min_words, ocr, settings.pdf.shx_annotation_titles, settings.pdf.min_drawing_bytes)
                     drawing = drawing_for_page(record.path, record.doc_type, content, doc.page_count, settings)
+                    drawing.ffi = sheet_ffi(content)
                     result.drawings.append(drawing)
                     unreadable = _unreadable_text(content, drawing)
                     if unreadable:

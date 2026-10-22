@@ -54,6 +54,10 @@ panel_device_prefixes = ["K", "Q"]
 # Which drawing each First Field Identifier belongs to. A tag or wire is checked
 # against <drawing>-<sheet> of its FFI's drawing. "EXTERNAL" = a separate package we
 # don't have: its references are listed in the report as separate documents.
+# The run also learns this from each schematic sheet's "WIRE NUMBER / FIRST FIELD
+# IDENTIFIER" box: an FFI shown on a supplied drawing's schematics maps to that drawing
+# even if this list says otherwise (with a warning to update it). This list is what
+# decides FFIs no supplied sheet shows, such as separate packages (EXTERNAL).
 [identifiers.ffi_drawings]
 TN = "401103"
 TV = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)

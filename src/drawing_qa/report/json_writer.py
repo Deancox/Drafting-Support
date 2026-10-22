@@ -25,6 +25,7 @@ def write_review(result: RunResult, summary: RunSummary, out_dir: Path) -> Path:
             "schema_version": SCHEMA_VERSION,
             "run": result.info.model_dump(mode="json"),
             "stages": [s.model_dump(mode="json") for s in result.stages],
+            "ffi_map": result.ffi_map,
             "rule_runs": [r.model_dump(mode="json") for r in result.rule_runs],
             "summary": summary.model_dump(mode="json"),
             "files": [f.model_dump(mode="json") for f in result.files],

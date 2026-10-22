@@ -97,3 +97,4 @@ class RunResult(BaseModel):
     coverage: list[CoverageRow] = Field(default_factory=list)
     review: ReviewSummary | None = None
     left_out: list[str] = Field(default_factory=list)  # input types left out of the review (--exclude / config)
+    ffi_map: dict[str, dict[str, str]] = Field(default_factory=dict)  # FFI -> {drawing, source} used for this run

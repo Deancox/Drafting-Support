@@ -381,7 +381,7 @@ html { scroll-behavior: smooth; }
             </g>
           </svg>
         </div>
-        <figcaption><b>A tag is also an address.</b> Because the name encodes where the device is drawn, a reference to <code>S-TN36D4</code> on any drawing can be checked against sheet 036 of drawing 401103. Which drawing an FFI belongs to is set in <code>[identifiers.ffi_drawings]</code>; FFIs marked <code>EXTERNAL</code> (TV, TH) belong to packages that are not supplied and are only listed (DRW-009).</figcaption>
+        <figcaption><b>A tag is also an address.</b> Because the name encodes where the device is drawn, a reference to <code>S-TN36D4</code> on any drawing can be checked against sheet 036 of drawing 401103. Which drawing an FFI belongs to is <b>learned from the package</b>: every schematic sheet shows its FFI in the "WIRE NUMBER / FIRST FIELD IDENTIFIER" box, so sheets of 401103 showing TN mean TN tags live on 401103. <code>[identifiers.ffi_drawings]</code> in the config decides only FFIs no supplied sheet shows: <code>EXTERNAL</code> for a separate package (TV and TH on the sample package), which is only listed (DRW-009). If the config disagrees with the sheets, or maps an FFI the package uses to a drawing that is not supplied, the run warns, because otherwise those tags would quietly go unchecked. Every run prints the mapping it used, e.g. <code>TN -&gt; 401103 (sheets, config)</code>.</figcaption>
       </figure>
       <div class="table-wrap"><table>
         <thead><tr><th>Kind</th><th>Written as</th><th>Canonical key</th><th>Notes</th></tr></thead>
