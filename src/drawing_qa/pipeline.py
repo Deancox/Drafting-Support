@@ -76,7 +76,7 @@ def _link_and_trace(settings: Settings, result: RunResult) -> None:
     if conflicted:
         note += f" ({conflicted} conflicted)"
     if DocType.TERM not in parsed:
-        note += "; JB terminal hops wait for the termination parser"
+        note += "; JB terminal hops not sourced (termination drawings left out of the review)"
     result.stages.append(StageResult(name="trace", status=StageStatus.DONE, note=note))
 
 

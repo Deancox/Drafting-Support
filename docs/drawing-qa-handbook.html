@@ -1,0 +1,994 @@
+<!doctype html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'></head><body><title>Drawing QA Handbook</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a drawing sheet. Title block up top, a sticky contents rail on wide screens, one reading column. Red is the checker's pen: it marks findings and disagreements only. */
+:root {
+  --paper: #fbfbf8;
+  --panel: #f1f2ee;
+  --ink: #1d2328;
+  --dim: #5b646c;
+  --rule: #cfd3cf;
+  --line: #37414a;
+  --redline: #c4262e;
+  --redline-soft: #f7e3e2;
+  --wire: #1f5f8b;
+  --wire-soft: #e1ecf4;
+  --ok: #2e6b43;
+  --ok-soft: #e2efe5;
+  --warn: #8a5a00;
+  --warn-soft: #f6ecd6;
+  --display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #15191c; --panel: #1d2226; --ink: #e4e7e8; --dim: #9aa3a9; --rule: #343b40; --line: #b9c2c8;
+    --redline: #ff6b6b; --redline-soft: #3a2224; --wire: #7fb8e2; --wire-soft: #1d2d39;
+    --ok: #7fcf98; --ok-soft: #1c2f23; --warn: #e9b955; --warn-soft: #33291a; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #15191c; --panel: #1d2226; --ink: #e4e7e8; --dim: #9aa3a9; --rule: #343b40; --line: #b9c2c8;
+  --redline: #ff6b6b; --redline-soft: #3a2224; --wire: #7fb8e2; --wire-soft: #1d2d39;
+  --ok: #7fcf98; --ok-soft: #1c2f23; --warn: #e9b955; --warn-soft: #33291a; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16.5px; line-height: 1.6; }
+.sheet { max-width: 1180px; margin: 0 auto; padding-block: 28px 80px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 48px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); gap: 0; } .toc { display: none; } }
+main { min-width: 0; max-width: 760px; }
+h1, h2, h3 { font-family: var(--display); font-weight: 600; line-height: 1.15; text-wrap: balance; letter-spacing: 0.01em; }
+h1 { font-size: clamp(2.4rem, 5vw, 3.4rem); margin: 0; font-weight: 700; }
+h2 { font-size: 2rem; margin: 3.2rem 0 0.6rem; padding-top: 1.2rem; border-top: 2px solid var(--line); display: flex; gap: 0.6rem; align-items: baseline; }
+h2 .no { font-family: var(--mono); font-size: 0.95rem; font-weight: 500; color: var(--dim); letter-spacing: 0; }
+h3 { font-size: 1.35rem; margin: 2rem 0 0.4rem; }
+p, li { max-width: 68ch; }
+p { margin: 0.6rem 0; }
+a { color: var(--wire); }
+code, .mono { font-family: var(--mono); font-size: 0.86em; }
+code { background: var(--panel); padding: 0.08em 0.35em; border-radius: 3px; }
+pre { background: var(--panel); border: 1px solid var(--rule); border-radius: 4px; padding: 14px 16px; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.5; margin: 1rem 0; }
+pre code { background: none; padding: 0; font-size: inherit; }
+.lede { font-size: 1.15rem; color: var(--ink); max-width: 64ch; }
+.dim { color: var(--dim); }
+small, .small { font-size: 0.86rem; }
+ul, ol { padding-left: 1.3rem; }
+li { margin: 0.25rem 0; }
+
+/* Title block: the subject's own document convention. */
+.titleblock { display: grid; grid-template-columns: minmax(0, 1fr) auto; border: 2px solid var(--line); margin-bottom: 36px; }
+.titleblock .name { padding: 22px 24px; border-right: 2px solid var(--line); min-width: 0; }
+.titleblock .name p { margin: 0.5rem 0 0; color: var(--dim); max-width: 60ch; }
+.titleblock .cells { display: grid; grid-template-columns: repeat(2, minmax(110px, auto)); }
+.titleblock .cell { padding: 8px 14px; border-bottom: 1px solid var(--rule); border-left: 1px solid var(--rule); }
+.titleblock .cell:nth-child(odd) { border-left: 0; }
+.titleblock .cell:nth-last-child(-n+2) { border-bottom: 0; }
+.titleblock .k { display: block; font-family: var(--display); text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.72rem; color: var(--dim); }
+.titleblock .v { font-family: var(--mono); font-size: 0.95rem; }
+@media (max-width: 640px) { .titleblock { grid-template-columns: minmax(0, 1fr); } .titleblock .name { border-right: 0; border-bottom: 2px solid var(--line); } }
+
+.toc { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); font-size: 0.9rem; max-height: calc(100vh - 40px); overflow-y: auto; }
+.toc .k { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.1em; font-size: 0.75rem; color: var(--dim); }
+.toc ol { list-style: none; padding: 0; margin: 0.5rem 0 0; display: grid; gap: 2px; }
+.toc a { color: var(--ink); text-decoration: none; display: grid; grid-template-columns: 2.1em 1fr; padding: 3px 0; }
+.toc a span { font-family: var(--mono); color: var(--dim); font-size: 0.8rem; padding-top: 2px; }
+.toc a:hover, .toc a:focus-visible { color: var(--wire); }
+a:focus-visible { outline: 2px solid var(--wire); outline-offset: 2px; }
+
+figure { margin: 1.6rem 0; }
+.fig { border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); padding: 14px; overflow-x: auto; color: var(--line); }
+.fig svg { display: block; width: 100%; height: auto; min-width: 560px; }
+.fig.narrow svg { min-width: 0; }
+figcaption { font-size: 0.9rem; color: var(--dim); margin-top: 0.5rem; max-width: 68ch; }
+figcaption b { color: var(--ink); font-weight: 600; }
+svg text { font-family: var(--body); fill: currentColor; }
+svg .t-mono { font-family: var(--mono); }
+svg .t-disp { font-family: var(--display); font-weight: 600; }
+svg .box { fill: var(--paper); stroke: currentColor; stroke-width: 1.4; }
+svg .box-soft { fill: var(--paper); stroke: var(--rule); stroke-width: 1.2; }
+svg .box-wire { fill: var(--wire-soft); stroke: var(--wire); stroke-width: 1.4; }
+svg .box-red { fill: var(--redline-soft); stroke: var(--redline); stroke-width: 1.6; }
+svg .box-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.4; }
+svg .box-warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.4; }
+svg .ln { stroke: currentColor; stroke-width: 1.4; fill: none; }
+svg .ln-dim { stroke: var(--dim); stroke-width: 1.1; fill: none; }
+svg .ln-red { stroke: var(--redline); stroke-width: 2; fill: none; }
+svg .ln-wire { stroke: var(--wire); stroke-width: 2.4; fill: none; }
+svg .ln-thin { stroke: var(--line); stroke-width: 0.8; fill: none; }
+svg .dash { stroke-dasharray: 8 3 2 3; }
+svg .dot { stroke-dasharray: 3 3; }
+svg .red { fill: var(--redline); }
+svg .wire { fill: var(--wire); }
+svg .ok { fill: var(--ok); }
+svg .warn { fill: var(--warn); }
+svg .dimfill { fill: var(--dim); }
+svg .head { fill: currentColor; }
+
+.table-wrap { overflow-x: auto; margin: 1rem 0; border: 1px solid var(--rule); border-radius: 4px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--rule); }
+thead th { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.78rem; color: var(--dim); background: var(--panel); font-weight: 600; }
+tr.cat th { background: var(--panel); font-family: var(--display); font-size: 1rem; letter-spacing: 0.02em; color: var(--ink); }
+tr.parked td { color: var(--dim); }
+td.mono { white-space: nowrap; }
+.pill { display: inline-block; font-family: var(--display); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.7rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--rule); color: var(--dim); vertical-align: 2px; }
+.pill.red { color: var(--redline); border-color: var(--redline); }
+.pill.ok { color: var(--ok); border-color: var(--ok); }
+.pill.wire { color: var(--wire); border-color: var(--wire); }
+.pill.warn { color: var(--warn); border-color: var(--warn); }
+
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0; border: 1px solid var(--rule); border-radius: 4px; margin: 1.2rem 0; }
+.stat { padding: 12px 14px; border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); }
+.stat b { display: block; font-family: var(--display); font-size: 1.7rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 0.82rem; color: var(--dim); }
+
+.note { border-left: 3px solid var(--wire); background: var(--wire-soft); padding: 10px 14px; margin: 1.2rem 0; border-radius: 0 4px 4px 0; }
+.note.red { border-left-color: var(--redline); background: var(--redline-soft); }
+.note p { margin: 0.3rem 0; }
+.note b:first-child { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.06em; font-size: 0.8rem; }
+
+.steps { counter-reset: s; list-style: none; padding: 0; display: grid; gap: 10px; margin: 1rem 0; }
+.steps li { counter-increment: s; display: grid; grid-template-columns: 2.2rem minmax(0, 1fr); gap: 8px; max-width: none; }
+.steps li::before { content: counter(s); font-family: var(--mono); font-size: 0.8rem; border: 1px solid var(--line); border-radius: 50%; width: 1.7rem; height: 1.7rem; display: grid; place-items: center; margin-top: 2px; }
+
+.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+@media (max-width: 640px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.card { border: 1px solid var(--rule); border-radius: 4px; padding: 12px 14px; background: var(--paper); min-width: 0; }
+.card h4 { margin: 0 0 0.3rem; font-family: var(--display); font-size: 1.1rem; font-weight: 600; }
+.card p { margin: 0.3rem 0; font-size: 0.93rem; }
+
+dl.gloss { display: grid; grid-template-columns: minmax(120px, 190px) minmax(0, 1fr); gap: 6px 18px; margin: 1rem 0; }
+dl.gloss dt { font-weight: 600; font-family: var(--display); font-size: 1.05rem; }
+dl.gloss dd { margin: 0; }
+@media (max-width: 560px) { dl.gloss { grid-template-columns: minmax(0, 1fr); } dl.gloss dd { margin-bottom: 8px; } }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+html { scroll-behavior: smooth; }
+</style>
+
+<div class="sheet">
+  <header class="titleblock">
+    <div class="name">
+      <h1>Drawing QA Handbook</h1>
+      <p>How the Controls Drawing QA platform reads a controls drawing package (PLC schematics, cable block diagrams, termination drawings), follows every PLC signal through them, and reports what does not agree. Written for engineers, drafters and checkers who need to understand exactly what it does before trusting its findings.</p>
+    </div>
+    <div class="cells">
+      <div class="cell"><span class="k">Project</span><span class="v">07.11 Shiploader</span></div>
+      <div class="cell"><span class="k">Package</span><span class="v">401103 / 401310</span></div>
+      <div class="cell"><span class="k">Software</span><span class="v">drawing_qa 0.1.0</span></div>
+      <div class="cell"><span class="k">Rules</span><span class="v">49 built · 3 parked</span></div>
+      <div class="cell"><span class="k">Tests</span><span class="v">271 passing</span></div>
+      <div class="cell"><span class="k">Date</span><span class="v">2026-10-22</span></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="toc" aria-label="Contents">
+      <div class="k">Contents</div>
+      <ol>
+        <li><a href="#purpose"><span>01</span>What it is for</a></li>
+        <li><a href="#pipeline"><span>02</span>The pipeline</a></li>
+        <li><a href="#inputs"><span>03</span>Inputs</a></li>
+        <li><a href="#reading"><span>04</span>Reading a sheet</a></li>
+        <li><a href="#identifiers"><span>05</span>Identifiers</a></li>
+        <li><a href="#claims"><span>06</span>Claims</a></li>
+        <li><a href="#parsers"><span>07</span>The three readers</a></li>
+        <li><a href="#linking"><span>08</span>Linking</a></li>
+        <li><a href="#traces"><span>09</span>Signal traces</a></li>
+        <li><a href="#rules"><span>10</span>The rule engine</a></li>
+        <li><a href="#findings"><span>11</span>Findings</a></li>
+        <li><a href="#review"><span>12</span>Review and carry-forward</a></li>
+        <li><a href="#outputs"><span>13</span>Outputs</a></li>
+        <li><a href="#running"><span>14</span>Running it</a></li>
+        <li><a href="#accuracy"><span>15</span>Accuracy</a></li>
+        <li><a href="#limits"><span>16</span>Limits</a></li>
+        <li><a href="#catalogue"><span>17</span>Rule catalogue</a></li>
+        <li><a href="#glossary"><span>18</span>Glossary</a></li>
+      </ol>
+    </nav>
+
+    <main>
+      <p class="lede">The platform does the cross-checking a checker does by hand: is this tag drawn on its home sheet, does the JB on the schematic match the JB on the cable block diagram, does the termination drawing send this device to the PLC slot the schematic shows. It reads every sheet, turns what it reads into facts with a location, joins the facts into one model of the system, and runs rules over that model. Every finding names the sheet and grid cell so a person can find it, judge it, and fix the drawing.</p>
+
+      <div class="stats" aria-label="Sample package figures">
+        <div class="stat"><b>60</b><span>sheets in the sample package</span></div>
+        <div class="stat"><b>6,211</b><span>facts read (PLC + CBD)</span></div>
+        <div class="stat"><b>231</b><span>signal traces built</span></div>
+        <div class="stat"><b>74%</b><span>field traces traced end to end</span></div>
+        <div class="stat"><b>182</b><span>findings, each with sheet and grid</span></div>
+      </div>
+      <p class="small dim">Figures from a run of the sample package with the termination drawings left out (<code>--exclude term,equip</code>), as the checker currently runs it.</p>
+
+      <!-- 01 -->
+      <h2 id="purpose"><span class="no">01</span>What it is for</h2>
+      <p>A controls package describes one system three ways. The <b>PLC schematics</b> show each I/O module and, row by row, the field device on each channel, its wire numbers and the junction box (JB) it goes through. The <b>cable block diagrams</b> (CBDs) show the cables: which device is in which enclosure and which cable runs from each JB to the PLC panel. The <b>termination drawings</b> show each JB's terminal strip: which wire lands on which terminal, which device it serves, and which panel slot it goes to.</p>
+      <p>The three descriptions are drawn by hand and drift apart. A device gets copied to a new sheet and keeps its old tag. A JB is renamed on one drawing but not another. A cable number is left as <code>CXXXXX</code>. The platform finds those disagreements.</p>
+      <div class="note">
+        <p><b>Ground rules</b></p>
+        <p><b>Read-only.</b> It never changes a drawing. PDFs are opened read-only and never saved; every run records each input file's SHA-256 fingerprint.</p>
+        <p><b>Code decides.</b> Every check is a rule written as code with tests, so the same drawings always give the same findings. No AI is used anywhere in the current build.</p>
+        <p><b>Every finding quotes its evidence:</b> drawing, sheet, grid cell and the text exactly as drawn.</p>
+        <p><b>A person decides.</b> The checker confirms, rejects or defers each finding in an Excel register, and those decisions carry forward to later runs.</p>
+      </div>
+
+      <!-- 02 -->
+      <h2 id="pipeline"><span class="no">02</span>The pipeline</h2>
+      <p>One command runs seven stages in order. Each stage only adds to what the previous one produced, and each records what it did (or why it could not) in the run's stage table, so a report always says plainly what was and was not checked.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 900 330" role="img" aria-label="Pipeline: input folders are ingested, each sheet is read by its document type's reader into claims, claims are linked into an engineering model, signal traces are built through the model, rules run over claims, model and traces, the checker's decisions are applied from the QA register, and four outputs are written. The register feeds decisions back into the next run.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
+              <marker id="a1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="red"/></marker>
+            </defs>
+            <!-- inputs -->
+            <rect x="10" y="40" width="120" height="150" class="box-soft"/>
+            <text x="70" y="30" text-anchor="middle" class="t-disp" font-size="13">input/Main/</text>
+            <text x="22" y="66" font-size="12" class="t-mono">PLC/</text>
+            <text x="22" y="96" font-size="12" class="t-mono">CableBlocks/</text>
+            <text x="22" y="126" font-size="12" class="t-mono">Terminations/</text>
+            <text x="22" y="156" font-size="12" class="t-mono">EquipmentList/</text>
+            <text x="22" y="178" font-size="10.5" class="dimfill">any can be left out</text>
+            <!-- stages row -->
+            <g font-size="13">
+              <rect x="160" y="85" width="92" height="60" class="box"/><text x="206" y="110" text-anchor="middle" class="t-disp" font-size="15">1 Ingest</text><text x="206" y="128" text-anchor="middle" font-size="10.5" class="dimfill">find, hash, type</text>
+              <rect x="280" y="85" width="92" height="60" class="box"/><text x="326" y="110" text-anchor="middle" class="t-disp" font-size="15">2 Read</text><text x="326" y="128" text-anchor="middle" font-size="10.5" class="dimfill">3 readers</text>
+              <rect x="400" y="85" width="92" height="60" class="box"/><text x="446" y="110" text-anchor="middle" class="t-disp" font-size="15">3 Link</text><text x="446" y="128" text-anchor="middle" font-size="10.5" class="dimfill">nodes + edges</text>
+              <rect x="520" y="85" width="92" height="60" class="box"/><text x="566" y="110" text-anchor="middle" class="t-disp" font-size="15">4 Trace</text><text x="566" y="128" text-anchor="middle" font-size="10.5" class="dimfill">per channel</text>
+              <rect x="640" y="85" width="92" height="60" class="box-red"/><text x="686" y="110" text-anchor="middle" class="t-disp" font-size="15">5 Rules</text><text x="686" y="128" text-anchor="middle" font-size="10.5" class="dimfill">findings</text>
+              <rect x="760" y="85" width="130" height="60" class="box"/><text x="825" y="110" text-anchor="middle" class="t-disp" font-size="15">6 Review</text><text x="825" y="128" text-anchor="middle" font-size="10.5" class="dimfill">apply decisions</text>
+            </g>
+            <line x1="130" y1="115" x2="156" y2="115" class="ln" marker-end="url(#a1)"/>
+            <line x1="252" y1="115" x2="276" y2="115" class="ln" marker-end="url(#a1)"/>
+            <line x1="372" y1="115" x2="396" y2="115" class="ln" marker-end="url(#a1)"/>
+            <line x1="492" y1="115" x2="516" y2="115" class="ln" marker-end="url(#a1)"/>
+            <line x1="612" y1="115" x2="636" y2="115" class="ln" marker-end="url(#a1)"/>
+            <line x1="732" y1="115" x2="756" y2="115" class="ln" marker-end="url(#a1)"/>
+            <!-- products under stages -->
+            <g font-size="11" class="t-mono">
+              <text x="206" y="70" text-anchor="middle" class="dimfill">InputFile</text>
+              <text x="326" y="70" text-anchor="middle" class="dimfill">Claim</text>
+              <text x="446" y="70" text-anchor="middle" class="dimfill">Node, Edge</text>
+              <text x="566" y="70" text-anchor="middle" class="dimfill">SignalTrace</text>
+              <text x="686" y="70" text-anchor="middle" class="dimfill">Finding</text>
+              <text x="825" y="70" text-anchor="middle" class="dimfill">decision on Finding</text>
+            </g>
+            <!-- rules read everything -->
+            <path d="M326 145 V170 H686 V149" class="ln-dim dot" marker-end="url(#a1)"/>
+            <path d="M446 145 V170" class="ln-dim dot"/>
+            <path d="M566 145 V170" class="ln-dim dot"/>
+            <text x="506" y="186" text-anchor="middle" font-size="10.5" class="dimfill">rules read claims, model and traces</text>
+            <!-- outputs -->
+            <rect x="640" y="230" width="250" height="88" class="box-soft"/>
+            <text x="652" y="222" class="t-disp" font-size="13">7 Outputs  reports/Main/</text>
+            <g font-size="11.5" class="t-mono">
+              <text x="652" y="250">QA_Register.xlsx</text>
+              <text x="652" y="268">report.md</text>
+              <text x="652" y="286">findings.json · review.json</text>
+              <text x="652" y="306" class="dimfill">qa_review.sqlite (decisions)</text>
+            </g>
+            <line x1="825" y1="145" x2="825" y2="226" class="ln" marker-end="url(#a1)"/>
+            <!-- feedback loop -->
+            <path d="M640 260 H560 Q540 260 540 240 V215 Q540 200 560 200 H760 Q790 200 795 170 L800 149" class="ln-red" marker-end="url(#a1r)"/>
+            <text x="548" y="290" font-size="11" class="red">checker's decisions</text>
+            <text x="548" y="304" font-size="11" class="red">read at the next run</text>
+          </svg>
+        </div>
+        <figcaption><b>Seven stages, one direction, one loop.</b> Each stage hands its product to the next. The only loop is the red one: decisions the checker types into the register are read back at the start of the next run's review stage.</figcaption>
+      </figure>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Stage</th><th>Code</th><th>What it produces</th></tr></thead>
+        <tbody>
+          <tr><td>1 Ingest</td><td class="mono">ingest/discovery.py</td><td>The list of input files, each with its document type (from its folder), size and SHA-256. Problems (unknown folder, unreadable file, duplicate copy) become <i>issues</i>, not findings.</td></tr>
+          <tr><td>2 Read</td><td class="mono">pdf/, parsers/</td><td>Per sheet: title block, grid frame, and <i>claims</i>: small facts with their exact position.</td></tr>
+          <tr><td>3 Link</td><td class="mono">linker/, graph/</td><td>One engineering model: a node per device, wire, JB, panel, module, channel and terminal, with typed edges between them.</td></tr>
+          <tr><td>4 Trace</td><td class="mono">traces/</td><td>A signal trace per PLC channel, from the field device to the channel, plus orphan traces and coverage figures.</td></tr>
+          <tr><td>5 Rules</td><td class="mono">rules/</td><td>Findings, plus an audit of every rule: ran, skipped (and why) or failed.</td></tr>
+          <tr><td>6 Review</td><td class="mono">review/</td><td>The checker's decision put on every finding; what is new; what is no longer raised.</td></tr>
+          <tr><td>7 Outputs</td><td class="mono">report/</td><td>The register, the readable report and two JSON files.</td></tr>
+        </tbody>
+      </table></div>
+
+      <!-- 03 -->
+      <h2 id="inputs"><span class="no">03</span>Inputs</h2>
+      <p>A package is one folder with up to four subfolders. The folder name decides the document type; matching ignores case and accepts aliases set in <code>config/project.toml</code>.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Folder</th><th>Type</th><th>Accepted files</th><th>Read as</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">PLC/</td><td>PLC</td><td>PDF</td><td>Schematic sheets: rack layout, one I/O module per slot sheet</td></tr>
+          <tr><td class="mono">CableBlocks/ · CBD/</td><td>CBD</td><td>PDF</td><td>Cable block diagrams: enclosures, devices, cables</td></tr>
+          <tr><td class="mono">Terminations/ · Terms/</td><td>TERM</td><td>PDF</td><td>JB terminal strips and PLC slot terminal strips</td></tr>
+          <tr><td class="mono">EquipmentList/ · EEL/</td><td>EQUIP</td><td>xlsx, xls, csv, PDF</td><td>Listed only (its reader is parked with M8)</td></tr>
+        </tbody>
+      </table></div>
+      <p>All four types are reviewed by default. Any type can be <b>left out of a run</b> with <code>--exclude</code>, for example termination drawings that are not up to the new standard. A left-out type is still found, fingerprinted and listed, but nothing is checked against it, no other check uses it, and the rules that need it are skipped with that reason. A missing folder for a left-out type is not a warning.</p>
+      <ol class="steps">
+        <li><span><b>Validate the root.</b> The folder must exist; a missing type folder is a warning, because a partial package is still worth checking.</span></li>
+        <li><span><b>Map folders to types</b>; files outside the four folders, other file types and Office lock files (<code>~$…</code>) are listed and ignored.</span></li>
+        <li><span><b>Fingerprint</b> every file (SHA-256). Two identical files are a <code>DUPLICATE_FILE</code> issue and the copy is skipped.</span></li>
+        <li><span><b>Open each PDF</b> read-only. An encrypted or corrupt file is an <code>UNREADABLE_FILE</code> issue; the run carries on.</span></li>
+        <li><span><b>One page, one sheet.</b> Each page becomes a <i>Drawing</i> with its drawing number, sheet and revision from the title block.</span></li>
+      </ol>
+
+      <!-- 04 -->
+      <h2 id="reading"><span class="no">04</span>Reading a sheet</h2>
+      <h3>Where the text is</h3>
+      <p>The client's PDFs have <b>no text layer</b>. AutoCAD plots its SHX fonts as line geometry, so ordinary PDF text extraction finds nothing. But AutoCAD also embeds every piece of text as an invisible annotation titled <code>AutoCAD SHX Text</code>, holding the text and its box. The reader takes the words from those annotations, which gives exact text and position with no OCR. A page with no text and an image is classed as a scan and flagged <code>NEEDS_OCR</code> (OCR is parked).</p>
+      <h3>Title block</h3>
+      <p>The title block in the bottom-right corner is read by its labels: the value nearest each label (<code>Drawing N°</code>, <code>Sheet N°</code>, <code>Rev N°</code>, the status such as <code>PRELIMINARY</code>, the title lines). The descriptor line (<code>SCHEMATIC DIAGRAM</code>, <code>CABLING BLOCK DIAGRAM</code>, <code>TERMINATION DIAGRAM</code>) is checked against the folder (DRW-004). Legend, symbol and index sheets are recognised by their descriptor and left out of the checks, because their example tags are not real content.</p>
+      <h3>Grid frame</h3>
+      <p>Every finding gives a grid cell. The reader finds the border labels: row letters down the left edge (A to Z, skipping I and O) and column numbers across the top (0 to 9). Any point on the sheet maps to the cell whose row and column centres are nearest.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 640 300" role="img" aria-label="A sheet's grid frame: row letters down the left skip I and O, column numbers run across the top; a word's centre falls in one cell, here D4, which every finding quotes.">
+            <rect x="60" y="40" width="540" height="240" class="ln-thin"/>
+            <g font-size="12" class="t-mono">
+              <text x="95" y="30" text-anchor="middle">0</text><text x="149" y="30" text-anchor="middle">1</text><text x="203" y="30" text-anchor="middle">2</text><text x="257" y="30" text-anchor="middle">3</text><text x="311" y="30" text-anchor="middle">4</text><text x="365" y="30" text-anchor="middle">5</text><text x="419" y="30" text-anchor="middle">6</text><text x="473" y="30" text-anchor="middle">7</text><text x="527" y="30" text-anchor="middle">8</text><text x="581" y="30" text-anchor="middle">9</text>
+              <text x="44" y="64">A</text><text x="44" y="94">B</text><text x="44" y="124">C</text><text x="44" y="154">D</text><text x="44" y="184">E</text><text x="44" y="214">F</text><text x="44" y="244">G</text><text x="44" y="272">H</text>
+            </g>
+            <g class="ln-dim dot">
+              <line x1="122" y1="40" x2="122" y2="280"/><line x1="176" y1="40" x2="176" y2="280"/><line x1="230" y1="40" x2="230" y2="280"/><line x1="284" y1="40" x2="284" y2="280"/><line x1="338" y1="40" x2="338" y2="280"/><line x1="392" y1="40" x2="392" y2="280"/><line x1="446" y1="40" x2="446" y2="280"/><line x1="500" y1="40" x2="500" y2="280"/><line x1="554" y1="40" x2="554" y2="280"/>
+              <line x1="60" y1="75" x2="600" y2="75"/><line x1="60" y1="105" x2="600" y2="105"/><line x1="60" y1="135" x2="600" y2="135"/><line x1="60" y1="165" x2="600" y2="165"/><line x1="60" y1="195" x2="600" y2="195"/><line x1="60" y1="225" x2="600" y2="225"/><line x1="60" y1="255" x2="600" y2="255"/>
+            </g>
+            <rect x="284" y="135" width="54" height="30" class="box-wire"/>
+            <rect x="290" y="143" width="44" height="14" class="box" />
+            <text x="312" y="154" text-anchor="middle" font-size="9.5" class="t-mono">S-TN36D4</text>
+            <circle cx="312" cy="150" r="2.2" class="red"/>
+            <path d="M338 150 H420 V118" class="ln-dim" />
+            <text x="426" y="113" font-size="12">word centre → cell <tspan class="t-mono" font-weight="600">D4</tspan></text>
+            <text x="64" y="296" font-size="10.5" class="dimfill">rows skip I and O · a finding reads "401103 sh 036 grid D4"</text>
+          </svg>
+        </div>
+        <figcaption><b>Grid cells are how people find things.</b> The frame labels on the border are read on every sheet; a word is placed by its centre. The client's tags also encode a grid cell (next section), which lets the platform check that a tag sits where its name says.</figcaption>
+      </figure>
+      <p>Sheets that are identical copies of one already read (same drawing number, sheet and content hash, as in a merged schematic set) are skipped with a <code>DUPLICATE_SHEET</code> issue so nothing is counted twice. Copies with the same number but different content are both kept and reported (DRW-007).</p>
+
+      <!-- 05 -->
+      <h2 id="identifiers"><span class="no">05</span>Identifiers</h2>
+      <p>The package follows a location-coded naming convention, and the identifier grammar (<code>common/identifiers.py</code>) is what lets the platform tell a device tag from a wire number from a JB, and know where each should be drawn.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 720 250" role="img" aria-label="Device tag S-TN36D4 broken into prefix S (switch), first field identifier TN, sheet 36 and grid D4: the tag is drawn on drawing 401103 sheet 036 near grid D4. Wire TN36D6 has the same structure without a prefix.">
+            <g class="t-mono" font-size="38" text-anchor="middle">
+              <text x="120" y="80">S</text><text x="160" y="80" class="dimfill">-</text><text x="225" y="80" class="wire">TN</text><text x="320" y="80">36</text><text x="415" y="80" class="red">D4</text>
+            </g>
+            <g class="ln-dim">
+              <line x1="105" y1="92" x2="135" y2="92"/><line x1="200" y1="92" x2="250" y2="92"/><line x1="295" y1="92" x2="345" y2="92"/><line x1="390" y1="92" x2="440" y2="92"/>
+            </g>
+            <g font-size="12.5" text-anchor="middle">
+              <text x="120" y="112" class="t-disp" font-size="14">Prefix</text><text x="120" y="128" class="dimfill">S switch</text><text x="120" y="143" class="dimfill">H lamp, U transmitter</text><text x="120" y="158" class="dimfill">K relay, Q breaker</text>
+              <text x="225" y="112" class="t-disp" font-size="14">FFI</text><text x="225" y="128" class="dimfill">first field identifier</text><text x="225" y="143" class="dimfill">TN → drawing 401103</text><text x="225" y="158" class="dimfill">TV, TH → other packages</text>
+              <text x="320" y="112" class="t-disp" font-size="14">Sheet</text><text x="320" y="128" class="dimfill">its home sheet</text><text x="320" y="143" class="dimfill">036 (2 or 3 digits)</text>
+              <text x="415" y="112" class="t-disp" font-size="14">Grid</text><text x="415" y="128" class="dimfill">its home cell</text><text x="415" y="143" class="dimfill">row D, column 4</text>
+            </g>
+            <rect x="500" y="40" width="200" height="120" class="box-soft"/>
+            <text x="512" y="62" class="t-disp" font-size="14">So the tag says:</text>
+            <text x="512" y="84" font-size="12">drawn on <tspan class="t-mono">401103</tspan></text>
+            <text x="512" y="102" font-size="12">sheet <tspan class="t-mono">036</tspan>, near grid <tspan class="t-mono">D4</tspan></text>
+            <text x="512" y="128" font-size="11" class="dimfill">TAG-003 checks the sheet,</text>
+            <text x="512" y="144" font-size="11" class="dimfill">TAG-004 checks the cell</text>
+            <g class="t-mono" font-size="15">
+              <text x="40" y="206">TN36D6</text><text x="140" y="206" class="dimfill">wire: FFI + sheet + grid of its number</text>
+              <text x="40" y="232">D6 · 15D5</text><text x="140" y="232" class="dimfill">schematic short forms: TN36D6 on sheet 036; TN15D5 from sheet 015</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>A tag is also an address.</b> Because the name encodes where the device is drawn, a reference to <code>S-TN36D4</code> on any drawing can be checked against sheet 036 of drawing 401103. Which drawing an FFI belongs to is set in <code>[identifiers.ffi_drawings]</code>; FFIs marked <code>EXTERNAL</code> (TV, TH) belong to packages that are not supplied and are only listed (DRW-009).</figcaption>
+      </figure>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Kind</th><th>Written as</th><th>Canonical key</th><th>Notes</th></tr></thead>
+        <tbody>
+          <tr><td>Device</td><td class="mono">S-TN36D4</td><td class="mono">S-TN36D4</td><td><code>&lt;Prefix&gt;-&lt;FFI&gt;&lt;Sheet&gt;&lt;Grid&gt;</code>. A tag-like word that does not fit (<code>H-TN51F</code>) is kept and flagged by TAG-001.</td></tr>
+          <tr><td>Wire</td><td class="mono">TN36D6, D6, 15D5</td><td class="mono">TN36D6</td><td>Short forms are expanded using the sheet's own number and the FFI shown in the sheet's wire-number legend. A short form must sit near the cell it names.</td></tr>
+          <tr><td>Junction box</td><td class="mono">=K07.11+LTL-JB1</td><td class="mono">LTL-JB1</td><td>IEC designation: <code>=function+location</code>. Spelling variants (<code>LTL-JB-1</code>) map to one key and are flagged by TAG-006.</td></tr>
+          <tr><td>Location</td><td class="mono">=K07.11+LTL-LCS1</td><td class="mono">LTL-LCS1</td><td>Local control stations and other field locations in a configured area (LTL, RCL, SPL, SH, ES, EER1).</td></tr>
+          <tr><td>Panel</td><td class="mono">=K07.11+LTL-PLC</td><td class="mono">LTL-PLC</td><td>Area + a configured panel type. A superseded name (<code>LTL-AUT1</code>) is linked to its replacement and still reported (DRW-006).</td></tr>
+          <tr><td>Terminal</td><td class="mono">LTL-JB1:5</td><td class="mono">LTL-JB1:5</td><td>JB key, colon, terminal number. Built by the termination reader for each strip row.</td></tr>
+          <tr><td>Placeholder</td><td class="mono">CXXXXX, TNXXXX, HOLD</td><td>(as written)</td><td>Runs of X, configured tokens and phrases. Never an identifier; reported by the PLACEHOLDER rules.</td></tr>
+        </tbody>
+      </table></div>
+
+      <!-- 06 -->
+      <h2 id="claims"><span class="no">06</span>Claims: the evidence layer</h2>
+      <p>The readers never decide whether a drawing is right. They write down what they see as <b>claims</b>: one fact, from one place, on one sheet, read by one reader. Claims are never edited after they are made. Everything downstream (the model, the traces, the findings) is built from claims and points back to them, which is how every finding can quote its evidence.</p>
+      <pre><code>{
+  "id":           "PLC/401103-036.pdf#p1/c00163",
+  "parser":       "PLC",
+  "method":       "SHX_ANNOTATION",
+  "subject_type": "PLC_CHANNEL",  "subject_key": "LTL/S13/CH00",
+  "predicate":    "WIRED_TO",
+  "object_type":  "DEVICE",       "object_key":  "S-TN36D4",
+  "source": { "drawing_id": "PLC/401103-036.pdf#p1",
+              "bbox": [479, 87, 528, 103],
+              "raw_text": "S-TN36D4", "grid_cell": "B4" }
+}</code></pre>
+      <p class="small">Read as: "on schematic 036, the channel row LTL/S13/CH00 has device S-TN36D4 drawn in it, at grid B4". The main predicates:</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Predicate</th><th>Meaning</th><th>From</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">OCCURS</td><td>An identifier is written here (device, wire, JB, panel, terminal)</td><td>every sheet</td></tr>
+          <tr><td class="mono">PLACEHOLDER</td><td>Unfinished drafting: <code>CXXXXX</code>, <code>HOLD</code>, <code>REF TERM XXX</code></td><td>every sheet</td></tr>
+          <tr><td class="mono">INSTALLED_IN · SLOT_SHEET</td><td>A module is in rack slot n; the rack layout says slot n is drawn on sheet m</td><td>PLC</td></tr>
+          <tr><td class="mono">HAS_CHANNEL · WIRED_TO</td><td>A module has channel CHnn; that channel's row shows this device, wire or JB</td><td>PLC</td></tr>
+          <tr><td class="mono">ROUTE_LEGEND</td><td>The sheet's LEGEND box lists this location</td><td>PLC</td></tr>
+          <tr><td class="mono">IN_ENCLOSURE · ROUTED</td><td>A device is drawn in this JB / LCS; a cable runs between two of them, with its spec and number</td><td>CBD</td></tr>
+          <tr><td class="mono">LANDS_ON · REFERS_TO_DEVICE</td><td>A wire lands on this JB terminal (or module terminal); the terminal serves this device</td><td>TERM</td></tr>
+          <tr><td class="mono">DESTINED_PANEL · DESTINED_FOR</td><td>A JB terminal goes to this panel and PLC slot; a slot's wiring goes out to this JB</td><td>TERM</td></tr>
+          <tr><td class="mono">HAS_SPEC · CONNECTS</td><td>A JB's multicore cores and spares; the wire at a field device's own terminal</td><td>TERM</td></tr>
+          <tr><td class="mono">CROSS_REF · CONTACT_REF · WORD</td><td>A reference to another drawing; a relay contact-table pointer (<code>43/D4</code>); a plain word for the spelling check</td><td>every sheet</td></tr>
+        </tbody>
+      </table></div>
+
+      <!-- 07 -->
+      <h2 id="parsers"><span class="no">07</span>The three readers</h2>
+      <p>Each document type has its own parser. Every parser first runs the shared <b>occurrence reader</b> (every identifier, placeholder and word on the sheet, with its cell), then the first <b>template reader</b> that recognises the sheet's layout. A sheet no template recognises still keeps its identifiers, and the report says so (<code>NO_TEMPLATE</code>).</p>
+
+      <h3>PLC schematics</h3>
+      <p><b>Rack layout sheet:</b> slot numbers across the top, the module in each slot, and the schematic sheet each slot is drawn on. <b>Slot sheets:</b> one I/O module per sheet. The header gives the part number (<code>1734-IB8S</code>), the rack and slot, and the POINTS line (<code>LTL.S13.DI.00..07</code>). Below it, one row per channel.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 760 210" role="img" aria-label="A schematic channel row: the 2-digit address 00 starts the row; the device tag, wire number D6 expanded to TN36D6, the JB LTL-JB2 and the description all fall in that row, giving four WIRED_TO claims for channel LTL/S13/CH00.">
+            <defs><marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <rect x="20" y="40" width="720" height="64" class="box-wire"/>
+            <text x="28" y="32" font-size="11" class="dimfill">one channel row on sheet 036 (slot 13)</text>
+            <g class="t-mono" font-size="14">
+              <text x="60" y="78" text-anchor="middle">S-TN36D4</text>
+              <text x="230" y="78" text-anchor="middle">D6</text>
+              <text x="380" y="78" text-anchor="middle">LTL-JB2</text>
+              <text x="520" y="78" text-anchor="middle">IN-0</text>
+              <text x="590" y="78" text-anchor="middle" font-weight="600">00</text>
+            </g>
+            <text x="620" y="70" font-size="11">LONG TRAVEL BRAKE</text>
+            <text x="620" y="86" font-size="11">RELEASED SWITCH</text>
+            <circle cx="60" cy="95" r="3" class="ln"/>
+            <line x1="63" y1="95" x2="560" y2="95" class="ln-thin"/>
+            <g font-size="11" class="dimfill" text-anchor="middle">
+              <text x="60" y="122">device</text><text x="230" y="122">wire (short)</text><text x="380" y="122">JB</text><text x="520" y="122">module terminal</text><text x="590" y="122">address</text><text x="680" y="122">description</text>
+            </g>
+            <g class="t-mono" font-size="11.5">
+              <text x="20" y="160">WIRED_TO LTL/S13/CH00 → DEVICE S-TN36D4</text>
+              <text x="20" y="178">WIRED_TO LTL/S13/CH00 → WIRE TN36D6</text>
+              <text x="400" y="160">WIRED_TO LTL/S13/CH00 → JUNCTION_BOX LTL-JB2</text>
+              <text x="400" y="178">HAS_CHANNEL LTL/S13 → CH00 (+ description)</text>
+            </g>
+            <line x1="590" y1="110" x2="590" y2="140" class="ln-dim" marker-end="url(#a2)"/>
+          </svg>
+        </div>
+        <figcaption><b>Rows are found from the address column.</b> Only 2-digit addresses inside the POINTS range are channels. JBs and descriptions are placed in a row by position. Devices and same-sheet wires are placed by the grid row their own name encodes, which is more reliable than position because labels sit one or two rows above their symbol. A row with no device inherits one from the nearest channel with the same description heading (a dual-channel safety device's second contact), marked <i>inferred</i>.</figcaption>
+      </figure>
+      <p>Every schematic sheet's <b>LEGEND</b> box is read too: the JBs and locations the sheet routes through, each with its full designation. PATH-004 compares it with the JBs actually used in the sheet's channel rows.</p>
+
+      <h3>Cable block diagrams</h3>
+      <p>CBDs are read from their <b>drawn lines</b>, not only their text, using the client's CAD line weights.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 760 230" role="img" aria-label="Cable block diagram reading: enclosures are dash-dot 0.24 point outlines with a designation inside; cables are 0.96 point runs; a device tag inside or beside an enclosure belongs to it; a cable run is rejoined across its label box; the result is a route S-TN36D4 to LTL-JB1 to LTL-PLC.">
+            <defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <text x="40" y="50" class="t-mono" font-size="12">S-TN36D4</text>
+            <rect x="34" y="58" width="74" height="30" class="ln-thin"/>
+            <rect x="260" y="30" width="150" height="150" class="ln dash"/>
+            <text x="335" y="52" text-anchor="middle" class="t-mono" font-size="11.5">=K07.11+LTL-JB1</text>
+            <rect x="580" y="30" width="150" height="170" class="ln dash"/>
+            <text x="655" y="52" text-anchor="middle" class="t-mono" font-size="11.5">=K07.11+LTL-PLC</text>
+            <line x1="108" y1="73" x2="260" y2="73" class="ln-wire"/>
+            <line x1="410" y1="110" x2="455" y2="110" class="ln-wire"/>
+            <rect x="455" y="96" width="70" height="28" class="ln-thin"/>
+            <text x="490" y="108" text-anchor="middle" font-size="9.5" class="t-mono">12C+E 1.5mm²</text>
+            <text x="490" y="120" text-anchor="middle" font-size="9.5" class="t-mono">CXXXXX</text>
+            <line x1="525" y1="110" x2="580" y2="110" class="ln-wire"/>
+            <g font-size="11" class="dimfill">
+              <text x="268" y="196">enclosure: dash-dot 0.24 pt outline</text>
+              <text x="120" y="96">cable: 0.96 pt run</text>
+              <text x="440" y="146">label box: run rejoined across it,</text>
+              <text x="440" y="160">spec and cable number attached</text>
+            </g>
+            <text x="40" y="222" class="t-mono" font-size="12">route: S-TN36D4 → LTL-JB1 → LTL-PLC</text>
+          </svg>
+        </div>
+        <figcaption><b>Lines become a cable network.</b> Enclosures come from dash-dot outlines (plus wall pairs, stacked boxes split apart, and solid boxes that hold a designation). A device belongs to the enclosure its tag is inside or touching. Cables are cut where they cross an enclosure wall, so two cables either side of a narrow JB are not read as one. A cable whose ends reach no enclosure, device or label is dropped.</figcaption>
+      </figure>
+
+      <h3>Termination drawings</h3>
+      <p>Two layouts are recognised. <b>JB termination diagrams</b> show each JB's terminal strip; <b>PLC slot termination diagrams</b> show each module's terminals and where each group goes out.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 760 260" role="img" aria-label="A JB termination diagram: on the left a destination label for the PLC panel slot DI 13 with a thin bracket spanning terminals 5 and 6; in the middle the JB strip under =K07.11+LTL-JB1 with a device block S-TN36D4 over rows 5 TN15D5 and 6 TN36D6; on the right the field device. Each row becomes claims: the wire lands on the terminal, the terminal serves the device and goes to module LTL/S13.">
+            <defs><marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <g font-size="11" class="t-mono">
+              <text x="20" y="80">=K07.11+LTL-AUT1</text>
+              <text x="20" y="96" class="dimfill">LAND LEG REMOTE I/O PANEL</text>
+              <text x="20" y="112">DI SLOT 13</text>
+            </g>
+            <line x1="186" y1="62" x2="186" y2="132" class="ln" />
+            <text x="160" y="152" font-size="10.5" class="dimfill">bracket: which rows go here</text>
+            <line x1="186" y1="80" x2="300" y2="80" class="ln-thin"/><line x1="186" y1="110" x2="300" y2="110" class="ln-thin"/>
+            <rect x="200" y="20" width="96" height="22" class="ln-thin"/><text x="248" y="35" text-anchor="middle" font-size="10" class="t-mono">50C+E · 10 SPARES</text>
+            <text x="350" y="20" class="t-mono" font-size="12">=K07.11+LTL-JB1</text>
+            <rect x="330" y="30" width="140" height="190" class="ln dash"/>
+            <rect x="345" y="45" width="110" height="20" class="box"/><text x="400" y="60" text-anchor="middle" class="t-mono" font-size="11.5">S-TN36D4</text>
+            <rect x="345" y="70" width="28" height="20" class="box"/><text x="359" y="84" text-anchor="middle" class="t-mono" font-size="11">5</text>
+            <rect x="373" y="70" width="82" height="20" class="box"/><text x="414" y="84" text-anchor="middle" class="t-mono" font-size="11">TN15D5</text>
+            <rect x="345" y="98" width="28" height="20" class="box"/><text x="359" y="112" text-anchor="middle" class="t-mono" font-size="11">6</text>
+            <rect x="373" y="98" width="82" height="20" class="box"/><text x="414" y="112" text-anchor="middle" class="t-mono" font-size="11">TN36D6</text>
+            <text x="345" y="140" font-size="10.5" class="dimfill">header box: the device</text>
+            <text x="345" y="154" font-size="10.5" class="dimfill">rows: terminal | wire</text>
+            <line x1="455" y1="80" x2="560" y2="80" class="ln"/><line x1="455" y1="108" x2="560" y2="108" class="ln"/>
+            <rect x="560" y="60" width="160" height="70" class="ln-thin"/>
+            <text x="640" y="82" text-anchor="middle" class="t-mono" font-size="11.5">S-TN36D4</text>
+            <text x="640" y="102" text-anchor="middle" font-size="10.5" class="dimfill">LONG TRAVEL MOTOR</text>
+            <text x="640" y="116" text-anchor="middle" font-size="10.5" class="dimfill">BRAKE RELEASED</text>
+            <g class="t-mono" font-size="11">
+              <text x="20" y="200">LANDS_ON          TN36D6 → LTL-JB1:6</text>
+              <text x="20" y="216">REFERS_TO_DEVICE  LTL-JB1:6 → S-TN36D4</text>
+              <text x="20" y="232">DESTINED_FOR      LTL-JB1:6 → LTL/S13</text>
+              <text x="20" y="248">DESTINED_PANEL    LTL-JB1:6 → LTL-AUT1 (= LTL-PLC)</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>A strip row is a number box beside a wire box.</b> The row's device is the header box above it. Its destination is the panel label whose thin bracket spans it, and <code>DI SLOT 13</code> gives the PLC module. The multicore's cores and spares are read for the core-count check. Screen (<code>SCR</code>) and <code>SPARE</code> rows count as terminals; equipment boxed inside a JB with its own small strip (a motor isolator) is numbered on its own. On slot sheets, each module terminal's wire is read, and the "EXTERNAL WIRING TO =K07.11+LTL-JB4 (REF. TERM. SHT 0202)" bracket says which JB each group goes to and which sheet shows it.</figcaption>
+      </figure>
+
+      <!-- 08 -->
+      <h2 id="linking"><span class="no">08</span>Linking: one model of the system</h2>
+      <p>The linker turns thousands of claims into one <b>engineering model</b>. Every distinct thing (by type and canonical key) becomes one <b>node</b>, however many sheets mention it. Every relationship becomes a typed <b>edge</b> that keeps the IDs of the claims behind it. A node seen by two or more drawing types is <i>corroborated</i>; one seen by one type is <i>single source</i>; one implied by another (a JB implied by a terminal key, a panel by a rack) is <i>derived</i>. The model is loaded into a networkx graph for path searches.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 760 300" role="img" aria-label="Engineering model around channel LTL/S13/CH00: from the schematic, edges to device S-TN36D4, wire TN36D6, JB LTL-JB2 and module LTL/S13 in panel LTL-PLC; from the CBD, the device is cabled through LTL-JB1 to LTL-PLC; from the terminations, terminal LTL-JB1:6 serves the device, carries the wire and goes to LTL/S13. The schematic says LTL-JB2, the other two say LTL-JB1.">
+            <defs><marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <!-- nodes -->
+            <g font-size="11.5" class="t-mono" text-anchor="middle">
+              <rect x="300" y="20" width="150" height="30" class="box"/><text x="375" y="40">CH LTL/S13/CH00</text>
+              <rect x="560" y="20" width="110" height="30" class="box"/><text x="615" y="40">MOD LTL/S13</text>
+              <rect x="560" y="120" width="110" height="30" class="box"/><text x="615" y="140">PNL LTL-PLC</text>
+              <rect x="40" y="120" width="130" height="30" class="box"/><text x="105" y="140">DEV S-TN36D4</text>
+              <rect x="40" y="230" width="130" height="30" class="box"/><text x="105" y="250">WIRE TN36D6</text>
+              <rect x="300" y="120" width="110" height="30" class="box-red"/><text x="355" y="140">JB LTL-JB2</text>
+              <rect x="300" y="190" width="110" height="30" class="box"/><text x="355" y="210">JB LTL-JB1</text>
+              <rect x="300" y="250" width="110" height="30" class="box"/><text x="355" y="270">TRM LTL-JB1:6</text>
+            </g>
+            <!-- schematic edges -->
+            <g class="ln">
+              <line x1="450" y1="35" x2="556" y2="35" marker-end="url(#a5)"/>
+              <line x1="615" y1="50" x2="615" y2="116" marker-end="url(#a5)"/>
+              <line x1="300" y1="42" x2="140" y2="118" marker-end="url(#a5)"/>
+              <line x1="320" y1="50" x2="105" y2="226" marker-end="url(#a5)"/>
+              <line x1="365" y1="50" x2="360" y2="116" class="ln-red" marker-end="url(#a5)"/>
+            </g>
+            <!-- CBD route -->
+            <path d="M170 140 Q230 175 296 200" class="ln-wire" marker-end="url(#a5)"/>
+            <path d="M410 205 Q520 190 560 150" class="ln-wire" marker-end="url(#a5)"/>
+            <!-- termination edges -->
+            <g class="ln dot">
+              <line x1="300" y1="265" x2="174" y2="145" marker-end="url(#a5)"/>
+              <line x1="300" y1="270" x2="174" y2="250" marker-end="url(#a5)"/>
+              <line x1="355" y1="250" x2="355" y2="224" marker-end="url(#a5)"/>
+              <path d="M410 265 Q620 270 620 54" marker-end="url(#a5)"/>
+            </g>
+            <g font-size="10.5">
+              <text x="470" y="30" class="dimfill">CHANNEL_MODULE</text>
+              <text x="622" y="90" class="dimfill">MODULE_PANEL</text>
+              <text x="190" y="72" class="dimfill">CHANNEL_DEVICE</text>
+              <text x="372" y="96" class="red">CHANNEL_JB</text>
+              <text x="200" y="196" class="wire">ROUTE (CBD)</text>
+              <text x="470" y="210" class="wire">ROUTE (CBD)</text>
+              <text x="430" y="252" class="dimfill">DESTINED_FOR (TERM)</text>
+              <text x="190" y="232" class="dimfill">TERMINAL_DEVICE</text>
+            </g>
+            <g font-size="10.5">
+              <line x1="560" y1="230" x2="590" y2="230" class="ln"/><text x="596" y="234">schematic</text>
+              <line x1="560" y1="250" x2="590" y2="250" class="ln-wire"/><text x="596" y="254">cable block diagram</text>
+              <line x1="560" y1="270" x2="590" y2="270" class="ln dot"/><text x="596" y="274">termination drawing</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Three drawings, one model, and one disagreement.</b> For channel LTL/S13/CH00, the schematic (solid) puts S-TN36D4 through LTL-JB2. The CBD cables it through LTL-JB1, and the termination drawing lands it on LTL-JB1:6. Because all three meet in one model, the disagreement becomes visible: this is confirmed answer-key issue AK-016, reported by PATH-002.</figcaption>
+      </figure>
+      <p>Two details matter. A <b>superseded name</b> such as <code>LTL-AUT1</code> is linked to its replacement <code>LTL-PLC</code>, so traces are not broken by a stale name, while the original spelling is kept and DRW-006 still reports it. Slot termination sheets name a module only by slot (<code>S12</code>); the linker resolves it to the rack's module when only one rack has that slot.</p>
+
+      <!-- 09 -->
+      <h2 id="traces"><span class="no">09</span>Signal traces</h2>
+      <p>A <b>signal trace</b> follows one PLC signal through the system. One is built per PLC channel, walking backward from the channel through the model. Each step is a <b>hop</b> with a value and a status.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 860 250" role="img" aria-label="Trace for LTL/S13/CH00: device S-TN36D4 found, wire TN36D6 found, JB terminal not sourced because terminations are left out, JB LTL-JB2 found, panel LTL-PLC found, slot LTL/S13 found, channel found. Below, the CBD route goes via LTL-JB1, which disagrees with the JB hop, so the trace is conflicted and PATH-002 reports it.">
+            <defs><marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <g font-size="11" text-anchor="middle">
+              <g><rect x="10" y="40" width="108" height="66" class="box-ok"/><text x="64" y="58" class="t-disp" font-size="12.5">1 DEVICE</text><text x="64" y="78" class="t-mono">S-TN36D4</text><text x="64" y="96" class="ok">found</text></g>
+              <g><rect x="130" y="40" width="108" height="66" class="box-ok"/><text x="184" y="58" class="t-disp" font-size="12.5">2 WIRE</text><text x="184" y="78" class="t-mono">TN36D6</text><text x="184" y="96" class="ok">found</text></g>
+              <g><rect x="250" y="40" width="108" height="66" class="box-warn"/><text x="304" y="58" class="t-disp" font-size="12.5">3 JB TERMINAL</text><text x="304" y="78" class="t-mono">·</text><text x="304" y="96" class="warn">not sourced</text></g>
+              <g><rect x="370" y="40" width="108" height="66" class="box-red"/><text x="424" y="58" class="t-disp" font-size="12.5">4 JB</text><text x="424" y="78" class="t-mono">LTL-JB2</text><text x="424" y="96" class="red">found · conflicted</text></g>
+              <g><rect x="490" y="40" width="108" height="66" class="box-ok"/><text x="544" y="58" class="t-disp" font-size="12.5">5 PANEL</text><text x="544" y="78" class="t-mono">LTL-PLC</text><text x="544" y="96" class="ok">found</text></g>
+              <g><rect x="610" y="40" width="108" height="66" class="box-ok"/><text x="664" y="58" class="t-disp" font-size="12.5">6 SLOT</text><text x="664" y="78" class="t-mono">LTL/S13</text><text x="664" y="96" class="ok">found</text></g>
+              <g><rect x="730" y="40" width="120" height="66" class="box-ok"/><text x="790" y="58" class="t-disp" font-size="12.5">7 CHANNEL</text><text x="790" y="78" class="t-mono">LTL/S13/CH00</text><text x="790" y="96" class="ok">found</text></g>
+            </g>
+            <g class="ln-dim"><line x1="118" y1="73" x2="130" y2="73"/><line x1="238" y1="73" x2="250" y2="73"/><line x1="358" y1="73" x2="370" y2="73"/><line x1="478" y1="73" x2="490" y2="73"/><line x1="598" y1="73" x2="610" y2="73"/><line x1="718" y1="73" x2="730" y2="73"/></g>
+            <text x="10" y="26" font-size="11.5" class="dimfill">schematic channel row, sheet 036 · "LONG TRAVEL BRAKE / RELEASED SWITCH - LTL BRAKE 9"</text>
+            <!-- CBD route -->
+            <text x="10" y="150" font-size="11.5" class="dimfill">cable block diagram 015, shortest cable route from the device to its panel</text>
+            <g font-size="11.5" class="t-mono" text-anchor="middle">
+              <rect x="10" y="162" width="108" height="30" class="box-wire"/><text x="64" y="182">S-TN36D4</text>
+              <rect x="370" y="162" width="108" height="30" class="box-wire"/><text x="424" y="182">LTL-JB1</text>
+              <rect x="490" y="162" width="108" height="30" class="box-wire"/><text x="544" y="182">LTL-PLC</text>
+            </g>
+            <line x1="118" y1="177" x2="366" y2="177" class="ln-wire" marker-end="url(#a6)"/>
+            <line x1="478" y1="177" x2="486" y2="177" class="ln-wire"/>
+            <line x1="424" y1="110" x2="424" y2="158" class="ln-red"/>
+            <text x="432" y="138" font-size="11.5" class="red">JB2 ≠ JB1 → PATH-002 (AK-016)</text>
+            <text x="10" y="228" font-size="11.5">Trace status: <tspan font-weight="600">PARTIAL</tspan> (only the JB terminal is missing, and only because terminations are left out) · <tspan class="red">conflicted</tspan></text>
+          </svg>
+        </div>
+        <figcaption><b>Seven hops, each with a value and a status.</b> With the termination drawings included, hop 3 would read <code>LTL-JB1:5, LTL-JB1:6</code>, and PATH-002's message would add that the termination drawings agree with the CBD.</figcaption>
+      </figure>
+      <div class="two">
+        <div class="card"><h4>Hop statuses</h4>
+          <p><span class="pill ok">found</span> the drawings show it.</p>
+          <p><span class="pill wire">inferred</span> device taken from the same-description channel on the same module.</p>
+          <p><span class="pill red">missing</span> the supplied drawings should show it and do not: a gap.</p>
+          <p><span class="pill warn">not sourced</span> only a document type that is left out or not supplied could show it. Never a gap.</p>
+        </div>
+        <div class="card"><h4>Trace statuses</h4>
+          <p><b>Complete:</b> every hop found.</p>
+          <p><b>Partial:</b> reaches a channel, some hop missing or not sourced.</p>
+          <p><b>Orphan:</b> a device on a CBD that no channel reaches.</p>
+          <p><b>Spare / Internal:</b> a spare channel; a channel with no field device or JB (supply monitoring).</p>
+          <p><b>Conflicted</b> (flag): two drawings disagree on a hop.</p>
+        </div>
+      </div>
+      <p>Special cases the builder handles: a device cabled straight to the panel on the CBD has no JB, and that is correct (<i>direct to panel</i>); every device in a row is reached, not only the first (a relay and its contact share a row); a device tag on a CBD under a wrong name is never taken as proof of a cable.</p>
+      <h3>Coverage</h3>
+      <p>Coverage summarises the traces per area, panel, PLC slot and JB / location. A field trace counts as <b>traced</b> when it is complete, or complete except hops that are only not sourced, and no two drawings disagree on it. On the sample package (terminations left out): <b>118 of 159</b> field traces are traced (74%); 7 have a gap, 23 are orphans and 11 are conflicted. Spare and internal channels are left out of the count.</p>
+
+      <!-- 10 -->
+      <h2 id="rules"><span class="no">10</span>The rule engine</h2>
+      <p>Each check is a <b>rule</b>: a small class with an ID (<code>TAG-003</code>), a title, a category, a default severity, a description, and a list of what it <b>requires</b>. The engine runs every registered rule against a read-only view of the run.</p>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 760 220" role="img" aria-label="For each rule: if rules.toml disables it, it is skipped; if what it requires is not available, such as terminations when they are left out, it is skipped with that reason; otherwise it is evaluated and its findings created through the finding builder; an exception marks only that rule failed.">
+            <defs><marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <g font-size="12" text-anchor="middle">
+              <rect x="10" y="80" width="110" height="44" class="box"/><text x="65" y="100" class="t-disp" font-size="14">each rule</text><text x="65" y="116" font-size="10.5" class="dimfill">sorted by ID</text>
+              <rect x="160" y="80" width="130" height="44" class="box"/><text x="225" y="100">enabled in</text><text x="225" y="116" class="t-mono" font-size="11">rules.toml?</text>
+              <rect x="330" y="80" width="140" height="44" class="box"/><text x="400" y="100">requirements</text><text x="400" y="116">available?</text>
+              <rect x="510" y="80" width="110" height="44" class="box-red"/><text x="565" y="100">evaluate</text><text x="565" y="116" font-size="10.5">FindingBuilder</text>
+              <rect x="660" y="80" width="90" height="44" class="box"/><text x="705" y="106">findings</text>
+              <rect x="160" y="170" width="130" height="34" class="box-soft"/><text x="225" y="191" font-size="11">skipped: disabled</text>
+              <rect x="330" y="170" width="140" height="34" class="box-soft"/><text x="400" y="186" font-size="11">skipped: "Needs</text><text x="400" y="199" font-size="11">TERMINATIONS"</text>
+              <rect x="510" y="170" width="110" height="34" class="box-soft"/><text x="565" y="191" font-size="11">failed: error kept</text>
+            </g>
+            <g class="ln">
+              <line x1="120" y1="102" x2="156" y2="102" marker-end="url(#a7)"/>
+              <line x1="290" y1="102" x2="326" y2="102" marker-end="url(#a7)"/>
+              <line x1="470" y1="102" x2="506" y2="102" marker-end="url(#a7)"/>
+              <line x1="620" y1="102" x2="656" y2="102" marker-end="url(#a7)"/>
+              <line x1="225" y1="124" x2="225" y2="166" marker-end="url(#a7)"/>
+              <line x1="400" y1="124" x2="400" y2="166" marker-end="url(#a7)"/>
+              <line x1="565" y1="124" x2="565" y2="166" class="ln-dim dot" marker-end="url(#a7)"/>
+            </g>
+            <g font-size="10.5" class="dimfill"><text x="295" y="96">yes</text><text x="475" y="96">yes</text><text x="230" y="150">no</text><text x="405" y="150">no</text><text x="570" y="150">exception</text></g>
+            <g font-size="11" class="dimfill">
+              <text x="330" y="30">requirements: CLAIMS · GRID · GRAPH ·</text>
+              <text x="330" y="46">TRACES · TERMINATIONS</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Nothing is silently passed.</b> A rule that cannot run because its data is missing is <i>skipped with a reason</i>, never counted as clean, and a rule that crashes is marked <i>failed</i> without stopping the others. Every rule's outcome (ran with n findings, skipped and why, failed) is in the run audit and in the register's Key tab.</figcaption>
+      </figure>
+      <p>Rules see only checked sheets. Legend and symbol sheets, and every sheet of a left-out document type, are filtered out of the view before any rule runs. Rules iterate in sorted order and build messages from templates, so the same input always gives identical findings.</p>
+      <p>The 49 built rules fall into nine categories (the full list is in <a href="#catalogue">section 17</a>):</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Category</th><th>Asks</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td>TAG</td><td>Is each tag well formed, on its home sheet, at its grid?</td><td>TAG-003: <code>H-TN51W8</code> on CBD 014; sheet 051 has <code>H-TN51W7</code></td></tr>
+          <tr><td>WIRE</td><td>Is each wire number well formed, on its home sheet, unique, continuous?</td><td>WIRE-002: <code>TN16D0</code> used on 046; sheet 016 has <code>TN16D1</code></td></tr>
+          <tr><td>PLC</td><td>Do rack layout, slot sheets, POINTS lines and terminations agree?</td><td>PLC-008: <code>LTL.S12DI.00..07</code> is missing a dot</td></tr>
+          <tr><td>PATH</td><td>Do schematic JBs, CBD cable routes and legends agree?</td><td>PATH-002: S-TN36D4 via LTL-JB2 vs LTL-JB1</td></tr>
+          <tr><td>TERM</td><td>Are JB terminal strips complete, unique and correctly referenced?</td><td>TERM-003: slot sheet cites SHT 202 for LTL-JB1, which is on 203</td></tr>
+          <tr><td>DEV</td><td>Is each device terminated where its JB is drawn?</td><td>DEV-003</td></tr>
+          <tr><td>DRW</td><td>Are title blocks, revisions, cross-references and spelling right?</td><td>DRW-010: <code>STOBE</code> beside 8 uses of <code>STROBE</code></td></tr>
+          <tr><td>PLACEHOLDER</td><td>Is unfinished drafting left on the sheet?</td><td>PLACEHOLDER-002: <code>CXXXXX</code> cable numbers</td></tr>
+          <tr><td>COMP</td><td>Is every signal traced from device to channel, without gaps, orphans or branches?</td><td>COMP-004: <code>S-TN23T4</code> copied onto cow catcher contact 2</td></tr>
+        </tbody>
+      </table></div>
+      <p>Severity is CRITICAL, MAJOR, MINOR or INFO. Each rule has a default; <code>config/rules.toml</code> can change a rule's severity or turn it off. Placeholder rules are MAJOR on issued sheets (FOR CONSTRUCTION, AS BUILT) and MINOR on preliminary ones.</p>
+
+      <!-- 11 -->
+      <h2 id="findings"><span class="no">11</span>Findings and fingerprints</h2>
+      <p>Rules create findings only through the <b>finding builder</b>, which fills in everything a reviewer needs and computes the fingerprint.</p>
+      <pre><code>F00006  PATH-002  MAJOR  DETERMINISTIC
+subject      DEVICE S-TN36D4
+message      S-TN36D4 (LTL/S13/CH00): the schematic shows it via LTL-JB2,
+             the cable block diagram routes it via LTL-JB1
+recommend    Make the schematic and the cable block diagram agree on the JB
+evidence  A  401103 sh 036 grid C7  "00"   (the channel row)
+fingerprint  983b06b120a4      status  OPEN until reviewed (confirmed as AK-016)</code></pre>
+      <h3>The fingerprint</h3>
+      <p>A finding's ID (<code>F00006</code>) is just its place in this run's sorted list. Its <b>fingerprint</b> is its identity across runs and revisions:</p>
+      <figure>
+        <div class="fig narrow">
+          <svg viewBox="0 0 720 150" role="img" aria-label="Fingerprint: the first 12 hex digits of a SHA-1 over the rule ID, subject type and key, a rule-specific discriminator and the sorted evidence locations as drawing, sheet, grid and text; run IDs, coordinates and revision letters are left out.">
+            <defs><marker id="a8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <g font-size="11.5" class="t-mono">
+              <rect x="10" y="20" width="100" height="30" class="box"/><text x="60" y="40" text-anchor="middle">PATH-002</text>
+              <rect x="118" y="20" width="148" height="30" class="box"/><text x="192" y="40" text-anchor="middle">DEVICE S-TN36D4</text>
+              <rect x="274" y="20" width="158" height="30" class="box"/><text x="353" y="40" text-anchor="middle">LTL-JB2|LTL-JB1</text>
+              <rect x="440" y="20" width="270" height="30" class="box"/><text x="575" y="40" text-anchor="middle">401103/036/C7/00</text>
+            </g>
+            <g font-size="10.5" class="dimfill" text-anchor="middle">
+              <text x="60" y="66">rule</text><text x="192" y="66">subject</text><text x="353" y="66">discriminator</text><text x="575" y="66">evidence: drawing/sheet/grid/text</text>
+            </g>
+            <line x1="360" y1="74" x2="360" y2="100" class="ln" marker-end="url(#a8)"/>
+            <text x="360" y="122" text-anchor="middle" class="t-mono" font-size="14">sha1(…)[:12] = 983b06b120a4</text>
+            <text x="360" y="142" text-anchor="middle" font-size="10.5" class="dimfill">not included: run ID, PDF coordinates, revision letter</text>
+          </svg>
+        </div>
+        <figcaption><b>Same problem, same fingerprint.</b> Because it uses names and grid cells rather than run IDs, coordinates or the revision letter, the same problem gets the same fingerprint on every run and in the next revision. That is what lets a checker's decision follow a finding. If the evidence changes (the tag is renamed, the text moves to another cell), it is a new fingerprint and needs a fresh decision. Two identical findings in one cell (two <code>CXXXXX</code> labels in the same cell) are numbered <code>-2</code>, <code>-3</code> in reading order so each keeps its own decision.</figcaption>
+      </figure>
+
+      <!-- 12 -->
+      <h2 id="review"><span class="no">12</span>Review and carry-forward</h2>
+      <p>The checker records decisions in <code>QA_Register.xlsx</code>, in the four yellow columns: <b>Decision</b>, <b>Checker comment</b>, <b>Reviewed by</b>, <b>Date</b>. Everything else in the register is rewritten every run.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Decision</th><th>Meaning</th><th>On later runs</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill">OPEN</span></td><td>Not reviewed (default)</td><td>Shown normally</td></tr>
+          <tr><td><span class="pill ok">CONFIRMED</span></td><td>A real problem</td><td>Stays on the register until the drawing is fixed</td></tr>
+          <tr><td><span class="pill">FALSE_POSITIVE</span></td><td>Not a problem</td><td>Greyed out and struck through, with the comment, until the evidence changes</td></tr>
+          <tr><td><span class="pill">FIXED</span></td><td>Fixed in the drawings</td><td>Greyed; once no longer raised, it drops off</td></tr>
+          <tr><td><span class="pill">WAIVED</span></td><td>A known exception, accepted</td><td>Greyed</td></tr>
+          <tr><td><span class="pill warn">DEFERRED</span></td><td>Decide later</td><td>Shown, marked grey</td></tr>
+        </tbody>
+      </table></div>
+      <figure>
+        <div class="fig">
+          <svg viewBox="0 0 800 270" role="img" aria-label="Carry-forward: run 1 writes the register; the checker types decisions and saves; run 2 reads the yellow columns from the Findings and No Longer Raised tabs, appends changed decisions to qa_review.sqlite, records which fingerprints it raised, applies the latest decision per fingerprint to each finding, then writes the register again with the decisions filled in.">
+            <defs><marker id="a9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker><marker id="a9r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="red"/></marker></defs>
+            <g font-size="12" text-anchor="middle">
+              <rect x="20" y="30" width="150" height="50" class="box"/><text x="95" y="52" class="t-disp" font-size="14">Run 1</text><text x="95" y="70" font-size="11">writes the register</text>
+              <rect x="250" y="30" width="170" height="50" class="box-warn"/><text x="335" y="52" class="t-disp" font-size="14">Checker</text><text x="335" y="70" font-size="11">fills yellow columns, saves</text>
+              <rect x="500" y="30" width="150" height="50" class="box"/><text x="575" y="52" class="t-disp" font-size="14">Run 2</text><text x="575" y="70" font-size="11">review stage</text>
+            </g>
+            <line x1="170" y1="55" x2="246" y2="55" class="ln" marker-end="url(#a9)"/>
+            <line x1="420" y1="55" x2="496" y2="55" class="ln-red" marker-end="url(#a9r)"/>
+            <text x="458" y="46" text-anchor="middle" font-size="10.5" class="red">QA_Register.xlsx</text>
+            <g font-size="11.5">
+              <rect x="500" y="100" width="290" height="150" class="box-soft"/>
+              <text x="512" y="122">1  read Decision columns (both tabs)</text>
+              <text x="512" y="144">2  append changes to <tspan class="t-mono">qa_review.sqlite</tspan></text>
+              <text x="512" y="166">3  record fingerprints raised this run</text>
+              <text x="512" y="188">4  per finding: own decision → waiver → OPEN</text>
+              <text x="512" y="210">5  list what is no longer raised</text>
+              <text x="512" y="232">6  write the register, decisions filled in</text>
+            </g>
+            <line x1="575" y1="80" x2="575" y2="96" class="ln" marker-end="url(#a9)"/>
+            <rect x="200" y="150" width="230" height="80" class="box-wire"/>
+            <text x="315" y="172" text-anchor="middle" class="t-mono" font-size="12">qa_review.sqlite</text>
+            <text x="315" y="192" text-anchor="middle" font-size="11">reviews: append-only history</text>
+            <text x="315" y="208" text-anchor="middle" font-size="11">runs · findings_seen</text>
+            <line x1="496" y1="144" x2="434" y2="170" class="ln" marker-end="url(#a9)"/>
+            <line x1="434" y1="200" x2="496" y2="188" class="ln" marker-end="url(#a9)"/>
+            <text x="20" y="130" font-size="11" class="dimfill">The database keeps every decision ever</text>
+            <text x="20" y="146" font-size="11" class="dimfill">entered, so a lost or deleted register</text>
+            <text x="20" y="162" font-size="11" class="dimfill">loses nothing; the latest row per</text>
+            <text x="20" y="178" font-size="11" class="dimfill">fingerprint is the current decision.</text>
+          </svg>
+        </div>
+        <figcaption><b>Decisions follow fingerprints, not row numbers.</b> The reader finds the yellow columns by header name, so columns can be hidden or resized. Decision text is forgiving (<code>false positive</code> is read as FALSE_POSITIVE); an unrecognised entry is reported and the previous decision stands. Clearing a decision reopens the finding.</figcaption>
+      </figure>
+      <h3>Edge cases handled</h3>
+      <ul>
+        <li><b>Register open in Excel.</b> The run cannot overwrite a locked file, so it writes <code>QA_Register-&lt;run id&gt;.xlsx</code> and warns. The next run reads both (the most recently saved wins) and moves the copy to <code>register_history/</code>.</li>
+        <li><b>No Longer Raised.</b> Findings the previous run raised but this run does not are listed once. Any with a decision other than FIXED stay listed until the checker marks them FIXED there, so a fix is confirmed rather than assumed.</li>
+        <li><b>Waivers.</b> <code>config/waivers.toml</code> holds known, accepted exceptions: an ID, a rule pattern, a subject pattern (<code>*</code>, <code>?</code>), a reason, an approver and an optional expiry. Matching findings show as WAIVED with "Waiver W-001: …". The checker's own decision wins. Expired waivers are listed but not applied, and a waiver that matches nothing is named in the run notes. Removing a waiver reopens its findings.</li>
+        <li><b>Changing which inputs are reviewed</b> between runs into the same folder makes findings from the dropped type appear as no longer raised. Keep one <code>--exclude</code> setting per output folder.</li>
+      </ul>
+
+      <!-- 13 -->
+      <h2 id="outputs"><span class="no">13</span>Outputs</h2>
+      <p>Every run writes to the output folder (default <code>reports/&lt;input folder name&gt;/</code>):</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>File</th><th>For</th><th>Contents</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">QA_Register.xlsx</td><td>The checker</td><td><b>Findings</b>: one row per occurrence with tag, PLC channel, issue, the location on each document type in full (<code>401103 sh 036 C7</code>), recommendation, the yellow decision columns, first-seen date and fingerprint. <b>Tag Index</b>: every field device and where it is drawn, with schematic JB beside CBD route (mismatches highlighted). <b>No Longer Raised</b>, <b>Summary</b> (counts by category, severity and decision, as formulas), <b>Coverage</b>, <b>Waivers</b>, and <b>Key</b> (how to use it, what each decision means, and every rule with its result this run).</td></tr>
+          <tr><td class="mono">report.md</td><td>Anyone</td><td>Run summary and review status, findings by rule, every finding with its decision (large groups such as placeholders summarised by sheet), the trace table, coverage, the PLC I/O table, the input summary and parse issues.</td></tr>
+          <tr><td class="mono">findings.json</td><td>Other tools</td><td>Every finding with fingerprint, evidence, decision and first-seen date; summary counts.</td></tr>
+          <tr><td class="mono">review.json</td><td>Audit, deeper review</td><td>Run metadata (ID, tool version, config hash), the input manifest with SHA-256, every sheet, every claim, the model, the traces, coverage, the rule audit and the issues.</td></tr>
+          <tr><td class="mono">qa_review.sqlite</td><td>The platform</td><td>The decision history and which fingerprints each run raised. Back this folder up: it is not in git.</td></tr>
+        </tbody>
+      </table></div>
+      <p>Each JSON file carries a <code>schema_version</code> and is built from the same validated pydantic models the platform uses internally.</p>
+
+      <!-- 14 -->
+      <h2 id="running"><span class="no">14</span>Running it</h2>
+      <pre><code># one-time setup
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"
+
+# review a package (all four input types)
+.venv/Scripts/python -m drawing_qa run --input input/Main
+
+# as the checker runs the sample package today
+.venv/Scripts/python -m drawing_qa run --input input/Main --exclude term,equip
+
+# run the tests
+.venv/Scripts/python -m pytest</code></pre>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Option</th><th>Does</th></tr></thead>
+        <tbody>
+          <tr><td class="mono">--input FOLDER</td><td>The package folder (required)</td></tr>
+          <tr><td class="mono">--output FOLDER</td><td>Where outputs go; default <code>reports/&lt;input folder name&gt;</code></td></tr>
+          <tr><td class="mono">--config FILE</td><td>Project config; default <code>config/project.toml</code> (with <code>rules.toml</code> and <code>waivers.toml</code> beside it)</td></tr>
+          <tr><td class="mono">--exclude TYPE</td><td>Leave a type out: <code>plc</code>, <code>cbd</code>, <code>term</code>, <code>equip</code>, or a folder name. Repeat or comma-separate</td></tr>
+          <tr><td class="mono">--include TYPE</td><td>Put back a type the config leaves out</td></tr>
+          <tr><td class="mono">-v</td><td>Detailed logging</td></tr>
+        </tbody>
+      </table></div>
+      <h3>Configuration</h3>
+      <div class="two">
+        <div class="card"><h4>config/project.toml</h4>
+          <p><code>[ingest]</code> folder aliases, types left out by default.</p>
+          <p><code>[identifiers]</code> tag pattern parts, known areas (LTL, RCL, SPL, SH, ES, EER1), panel types, panel-device prefixes (K, Q), <code>ffi_drawings</code> (TN → 401103, TV/TH → EXTERNAL), <code>superseded</code> (LTL-AUT1 → LTL-PLC).</p>
+          <p><code>[placeholders]</code> tokens and phrases; <code>[spelling]</code> known real words.</p>
+        </div>
+        <div class="card"><h4>rules.toml · waivers.toml</h4>
+          <p><code>rules.toml</code>: per rule, <code>enabled</code> and <code>severity</code>.</p>
+          <p><code>waivers.toml</code>: <code>[[waiver]]</code> entries with id, rule, subject, reason, approved_by, expires.</p>
+          <p>All three files feed the run's <b>config hash</b>, recorded in every <code>review.json</code>, so a result can always be tied to the settings that produced it.</p>
+        </div>
+      </div>
+      <h3>Where the code is</h3>
+      <pre><code>src/drawing_qa/
+  cli.py  pipeline.py  config.py
+  ingest/      discovery: folders, types, SHA-256
+  pdf/         SHX annotation text, segments, page kind
+  parsers/     occurrences.py, titleblock.py
+    plc/         rack_layout, slot_sheet, wires (short forms), legend
+    cbd/         geometry (boxes, cables), routing
+    termination/ jb_strip, slot_strip
+  common/      identifier grammar, grid, placeholders, tags
+  linker/  graph/  traces/ (builder, coverage)
+  rules/       engine, registry, context, findings, catalogue,
+               tag wire plc path term dev drw placeholder comp
+  review/      store (SQLite), register_reader, waivers
+  report/      register (Excel), markdown, json_writer
+tests/         271 tests on synthetic sheets + the answer key</code></pre>
+
+      <!-- 15 -->
+      <h2 id="accuracy"><span class="no">15</span>How accuracy is measured</h2>
+      <p>Findings are only worth having if they are right. Every rule is tested two ways.</p>
+      <ul>
+        <li><b>Synthetic sheets.</b> Tests build small PDFs inside the test itself, laid out like the client's (same grid frame, title block, SHX annotations and line weights), with one deliberate fault. Each rule has a pass case and a fail case. These never depend on client drawings.</li>
+        <li><b>The answer key.</b> Issues the checker has confirmed as real in the sample package are numbered <b>AK-001</b> to <b>AK-023</b>, each with a test that requires the platform to report it. Confirmed correct drafting that must <i>not</i> be reported is numbered <b>AK-N02</b> to <b>AK-N07</b>. A code change that loses one of them fails the tests.</li>
+      </ul>
+      <figure>
+        <div class="fig narrow">
+          <svg viewBox="0 0 720 130" role="img" aria-label="A new finding becomes a candidate C-nn; the checker confirms it, making it answer-key entry AK-nn with a regression test, or rejects it as correct drafting, making it AK-Nnn, or it turns out to be a platform bug and is withdrawn and the code is fixed.">
+            <defs><marker id="a10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker></defs>
+            <g font-size="12" text-anchor="middle">
+              <rect x="10" y="45" width="120" height="40" class="box"/><text x="70" y="62">new finding</text><text x="70" y="77" font-size="10.5" class="dimfill">candidate C-nn</text>
+              <rect x="190" y="45" width="100" height="40" class="box-warn"/><text x="240" y="70">checker</text>
+              <rect x="360" y="5" width="350" height="34" class="box-ok"/><text x="535" y="27">confirmed → AK-nn + test: must always be reported</text>
+              <rect x="360" y="48" width="350" height="34" class="box"/><text x="535" y="70">correct drafting → AK-Nnn + test: never reported</text>
+              <rect x="360" y="91" width="350" height="34" class="box-red"/><text x="535" y="113">platform bug → withdrawn, code fixed, test added</text>
+            </g>
+            <line x1="130" y1="65" x2="186" y2="65" class="ln" marker-end="url(#a10)"/>
+            <path d="M290 58 L356 24" class="ln" marker-end="url(#a10)"/>
+            <path d="M290 65 L356 65" class="ln" marker-end="url(#a10)"/>
+            <path d="M290 72 L356 106" class="ln" marker-end="url(#a10)"/>
+          </svg>
+        </div>
+        <figcaption><b>Every candidate ends somewhere.</b> Examples from the sample package: C-35 (sheet 051's legend lists <code>LTL-SH8</code> where the rows use <code>SH-LCS8</code>) became AK-022. C-17 and C-37 were platform bugs (only the first device in a row was counted; a long legend was cut short); both were fixed and withdrawn.</figcaption>
+      </figure>
+
+      <!-- 16 -->
+      <h2 id="limits"><span class="no">16</span>Limits</h2>
+      <ul>
+        <li><b>Built for this client's drafting standard.</b> CBD cables are 0.96 pt runs and enclosures are 0.24 pt dash-dot outlines; another drafting house may use other weights. Template readers recognise this package's layouts; a new layout gets identifiers only and a <code>NO_TEMPLATE</code> issue.</li>
+        <li><b>Termination drawings.</b> The readers are built against the sample package's current, old-standard termination sheets and must be re-checked when the new-standard sheets arrive. Their candidates (C-29 to C-34) are on hold until then. Wire numbers at the field device's own terminals are read but not checked, because which device a terminal belongs to is unreliable where device boxes are stacked.</li>
+        <li><b>Positions are inferred from text.</b> Tag positions are label positions; labels sit one or two rows above their symbol, and the checks allow for that.</li>
+        <li><b>Short wire numbers</b> on schematics are accepted only near the cell they name; relay terminal labels <code>T1</code>/<code>T2</code> can pass that test by coincidence (harmless, as nothing references them).</li>
+        <li><b>Scanned sheets</b> are flagged, not read.</li>
+        <li><b>Parked work</b>, kept in the plan but not being built: M6 OCR and AI assist (PLC-002 description matching), M7 Word report and revision-to-revision comparison, M8 the electrical equipment list (DEV-001, DEV-002 and a full equipment list output).</li>
+      </ul>
+
+      <!-- 17 -->
+      <h2 id="catalogue"><span class="no">17</span>Rule catalogue</h2>
+      <p>Generated from the code: every built rule's own title, description, default severity and what it needs to run (beyond claims). Parked rules are greyed.</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Rule</th><th>Check</th><th>Severity</th><th>Needs</th></tr></thead>
+        <tbody>
+<tr class="cat"><th colspan="4">Tag Validation</th></tr>
+<tr><td class="mono">TAG-001</td><td><b>Device Tag Format</b><br><span class="dim">Tag-like text that does not fit &lt;Prefix&gt;-&lt;FFI&gt;&lt;Sheet&gt;&lt;Grid&gt; (devices) or &lt;AREA&gt;-JB&lt;n&gt; (junction boxes).</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">TAG-002</td><td><b>Known Prefix / FFI</b><br><span class="dim">Device prefix or first field identifier not in the configured lists (no output while the lists are empty).</span></td><td>MINOR</td><td>claims</td></tr>
+<tr><td class="mono">TAG-003</td><td><b>Sheet Validation</b><br><span class="dim">A device tag is referenced, its home sheet is in the package, but the tag is not on that sheet.</span></td><td>MAJOR</td><td>grid</td></tr>
+<tr><td class="mono">TAG-004</td><td><b>Grid Validation</b><br><span class="dim">On its home sheet, the tag label is not near the grid cell its tag encodes. Labels are drawn above their symbol, so up to 2 rows above and 1 column either side is accepted. Uses the label position until symbol positions are read (M3).</span></td><td>MINOR</td><td>grid</td></tr>
+<tr><td class="mono">TAG-005</td><td><b>Duplicate Device Tag</b><br><span class="dim">A device tag drawn as a device on its home sheet and again, as a device, on another schematic sheet: its label sits where its own grid reference says, as a copied device would, rather than elsewhere as a reference. Typically a copied sheet that was not renumbered (S-TN27D2 on sheets 027 and 028).</span></td><td>MAJOR</td><td>grid</td></tr>
+<tr><td class="mono">TAG-006</td><td><b>Identifier Spelling Variant</b><br><span class="dim">An identifier written differently from its canonical form (e.g. SPL-JB-1 for SPL-JB1).</span></td><td>MINOR</td><td>claims</td></tr>
+<tr><td class="mono">TAG-007</td><td><b>Auxiliary Contact Pointer</b><br><span class="dim">A relay coil&#x27;s contact table entry (&#x27;43/D4&#x27; under K-TN19F1 on sheet 019) must point to an auxiliary contact labelled with the coil tag (K-TN19F1) near grid D4 of sheet 043. A contact labelled with the coil sheet plus its own grid (K-TN19D4) is wrong (checker, C-05).</span></td><td>MAJOR</td><td>grid</td></tr>
+<tr class="cat"><th colspan="4">Wire Validation</th></tr>
+<tr><td class="mono">WIRE-001</td><td><b>Wire Number Format</b><br><span class="dim">Text that starts like a wire number of this package (a known FFI and a digit) but does not fit &lt;FFI&gt;&lt;Sheet&gt;&lt;Grid&gt;, e.g. TN36D (grid digit missing) or TN3D6 (one-digit sheet).</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">WIRE-002</td><td><b>Wire Home Sheet</b><br><span class="dim">A wire number is used, its home sheet (the sheet it encodes) is in the package, but that sheet does not show it. Same check as TAG-003, for wires.</span></td><td>MAJOR</td><td>grid</td></tr>
+<tr><td class="mono">WIRE-003</td><td><b>Duplicate Wire Number</b><br><span class="dim">One wire number used for two different signals: in the channel rows of two PLC channels on the schematics, or on terminals of two different PLC modules on the slot termination sheets. Commons and supplies shared by one module&#x27;s terminals, and wires looped from device to device in a JB, are not reported.</span></td><td>MAJOR</td><td>linked model</td></tr>
+<tr><td class="mono">WIRE-004</td><td><b>Wire Continuity</b><br><span class="dim">A wire number the schematic channel row shows for a device that its JB terminals on the termination drawing do not have.</span></td><td>MAJOR</td><td>linked model, terminations, traces</td></tr>
+<tr class="cat"><th colspan="4">PLC Validation</th></tr>
+<tr><td class="mono">PLC-001</td><td><b>Channel Match</b><br><span class="dim">The schematics and the termination drawings put a device, or a wire, on different PLC slots: the device&#x27;s JB terminals go to another slot than its schematic channel, or a slot termination sheet lands a wire on a module whose schematic channels do not have it.</span></td><td>MAJOR</td><td>linked model, terminations, traces</td></tr>
+<tr class="parked"><td class="mono">PLC-002</td><td><b>Description Match</b> <span class="pill">parked</span><br><span class="dim">PLC description matches the device description (exact, then AI-assisted). Waits for AI description matching (M6).</span></td><td>&ndash;</td><td>&ndash;</td></tr>
+<tr><td class="mono">PLC-003</td><td><b>Duplicate Channel Allocation</b><br><span class="dim">A channel drawn on two sheets, or one device wired to channels on standard (non-safety) modules more than once. Dual-channel safety devices on safety modules are expected and not reported.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">PLC-004</td><td><b>Safety Module Consistency</b><br><span class="dim">A safety module (part number ending S, e.g. 1734-IB8S) on a sheet not titled SAFETY, or the reverse.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">PLC-005</td><td><b>Module Capacity</b><br><span class="dim">POINTS range or channel rows exceed the module&#x27;s channel count from the part number.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">PLC-006</td><td><b>Module Type Match</b><br><span class="dim">The rack layout and the slot sheet disagree on the module, or the slot sheet&#x27;s POINTS type disagrees with its part number.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">PLC-007</td><td><b>Slot / Sheet Consistency</b><br><span class="dim">The slot number on a slot sheet (title, RACK line, POINTS) must agree, and the rack layout&#x27;s sheet reference for each slot must be that sheet, once.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">PLC-008</td><td><b>POINTS Notation</b><br><span class="dim">The slot sheet POINTS line does not follow &lt;rack&gt;.S&lt;slot&gt;.&lt;type&gt;.&lt;first&gt;..&lt;last&gt; (e.g. LTL.S13.DI.00..07).</span></td><td>MINOR</td><td>claims</td></tr>
+<tr><td class="mono">PLC-009</td><td><b>Panel / Slot Consistency</b><br><span class="dim">A JB terminal&#x27;s destination on the termination drawing (&#x27;LTL-PLC ... DI SLOT 12&#x27;) names a slot that panel does not have, or a module of a different I/O type.</span></td><td>MAJOR</td><td>linked model, terminations</td></tr>
+<tr class="cat"><th colspan="4">Path Validation</th></tr>
+<tr><td class="mono">PATH-001</td><td><b>Route Exists</b><br><span class="dim">A field device shown on a cable block diagram with no cable route from it to its PLC panel.</span></td><td>MINOR</td><td>linked model, traces</td></tr>
+<tr><td class="mono">PATH-002</td><td><b>JB Consistency</b><br><span class="dim">The schematic channel row and the cable block diagram route the same device through different JBs / field locations.</span></td><td>MAJOR</td><td>linked model, traces</td></tr>
+<tr><td class="mono">PATH-003</td><td><b>Route Endpoint Match</b><br><span class="dim">The termination drawings send a JB&#x27;s terminals to a panel, both are on the cable block diagrams, but the cable block diagrams show no cable route between them.</span></td><td>MINOR</td><td>linked model, terminations</td></tr>
+<tr><td class="mono">PATH-004</td><td><b>Route Legend Match</b><br><span class="dim">A schematic sheet&#x27;s LEGEND box does not match its channel rows: a JB / field location the rows route through is not in the legend (or the legend is empty), or a legend entry names a location found nowhere else in the package (MAJOR, with a near-match from the rows).</span></td><td>MINOR</td><td>linked model</td></tr>
+<tr><td class="mono">PATH-005</td><td><b>Core Count</b><br><span class="dim">A JB&#x27;s multicore to the panel has fewer cores than terminals using it (MAJOR), or its stated spare count does not equal cores minus cores used (MINOR).</span></td><td>MAJOR</td><td>linked model, terminations</td></tr>
+<tr class="cat"><th colspan="4">Termination Validation</th></tr>
+<tr><td class="mono">TERM-001</td><td><b>Terminal Allocation</b><br><span class="dim">A JB terminal with no wire number, or not under any device block. Placeholder wire numbers (TNXXXX) are reported by PLACEHOLDER-002 instead.</span></td><td>MINOR</td><td>linked model, terminations</td></tr>
+<tr><td class="mono">TERM-002</td><td><b>Duplicate Terminal</b><br><span class="dim">One JB terminal number drawn twice with different wires or devices (on one sheet or across sheets). Equipment boxed inside the JB with its own small strip (a motor isolator) is numbered on its own.</span></td><td>MAJOR</td><td>linked model, terminations</td></tr>
+<tr><td class="mono">TERM-003</td><td><b>Terminal Reference</b><br><span class="dim">A PLC slot termination sheet sends wiring to a JB &#x27;REF. TERM. SHT nnnn&#x27;, but that sheet does not show the JB&#x27;s terminal strip; or a &lt;JB&gt;:&lt;terminal&gt; reference names a terminal its JB&#x27;s strip does not have.</span></td><td>MINOR</td><td>linked model, terminations</td></tr>
+<tr><td class="mono">TERM-004</td><td><b>Terminal Sequence</b><br><span class="dim">Gaps in a JB&#x27;s terminal numbering, across all its termination sheets.</span></td><td>MINOR</td><td>linked model, terminations</td></tr>
+<tr class="cat"><th colspan="4">Device Validation</th></tr>
+<tr class="parked"><td class="mono">DEV-001</td><td><b>Device Presence</b> <span class="pill">parked</span><br><span class="dim">Appears in every document type the document matrix expects. Waits for equipment list (M8).</span></td><td>&ndash;</td><td>&ndash;</td></tr>
+<tr class="parked"><td class="mono">DEV-002</td><td><b>Device Attribute Consistency</b> <span class="pill">parked</span><br><span class="dim">Same type, description and signal across sources. Waits for equipment list (M8).</span></td><td>&ndash;</td><td>&ndash;</td></tr>
+<tr><td class="mono">DEV-003</td><td><b>Device Terminated</b><br><span class="dim">A field device on a PLC channel whose JB&#x27;s termination drawing is supplied (the JB in its schematic channel row, or the enclosure the cable block diagram draws it in), but no terminal on it serves the device.</span></td><td>MINOR</td><td>linked model, terminations, traces</td></tr>
+<tr class="cat"><th colspan="4">Drawing Validation</th></tr>
+<tr><td class="mono">DRW-001</td><td><b>Cross-Reference Exists</b><br><span class="dim">A sheet reference such as &#x27;(SHT 35)&#x27; or &#x27;(CONT. SHT 204)&#x27; points to a sheet that is not in the package.</span></td><td>MINOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-002</td><td><b>Revision / Status Consistency</b><br><span class="dim">Sheets of one drawing number at the same revision show different drawing statuses.</span></td><td>MINOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-003</td><td><b>Title Block Complete</b><br><span class="dim">Drawing number, sheet, revision, title or status could not be found in the title block.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-004</td><td><b>Folder / Type Match</b><br><span class="dim">The title block describes a different drawing type from the input folder it was found in.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-005</td><td><b>Tag Home Sheet Supplied</b><br><span class="dim">Device tags point to a home sheet that is not in the package, so they cannot be validated.</span></td><td>INFO</td><td>claims</td></tr>
+<tr><td class="mono">DRW-006</td><td><b>Superseded Designation</b><br><span class="dim">A designation that has been renamed (config [identifiers.superseded]) is still used.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-007</td><td><b>Conflicting Sheet Copies</b><br><span class="dim">Two files carry the same drawing number and sheet in their title blocks but their content differs.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-008</td><td><b>File Name / Title Block Match</b><br><span class="dim">The file is named &lt;drawing&gt;-&lt;sheet&gt;.pdf but its title block says a different drawing or sheet.</span></td><td>MAJOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-009</td><td><b>Separate Document Reference</b><br><span class="dim">Tags and wires whose FFI belongs to a separate package (config [identifiers.ffi_drawings] = EXTERNAL) are listed as references to that document and not checked. An FFI with no mapping is reported so it can be added.</span></td><td>INFO</td><td>claims</td></tr>
+<tr><td class="mono">DRW-010</td><td><b>Spelling</b><br><span class="dim">A word used rarely in the package that is one letter away from a word used often in it, e.g. &#x27;STOBE&#x27; once next to &#x27;STROBE&#x27; eight times. Correct words that trip it go in [spelling] known_words.</span></td><td>MINOR</td><td>claims</td></tr>
+<tr class="cat"><th colspan="4">Placeholder Validation</th></tr>
+<tr><td class="mono">PLACEHOLDER-001</td><td><b>XXXX Detection</b><br><span class="dim">XXX, XXXX or any run of X standing alone.</span></td><td>MAJOR issued / MINOR prelim.</td><td>claims</td></tr>
+<tr><td class="mono">PLACEHOLDER-002</td><td><b>Identifier Placeholder</b><br><span class="dim">TNXXXX, PXXXXX, CXXXXX and identifiers whose number is X (S-TNXXXX, SPL-JBX, SPL-JB1:XX).</span></td><td>MAJOR issued / MINOR prelim.</td><td>claims</td></tr>
+<tr><td class="mono">PLACEHOLDER-003</td><td><b>REF TERM XXX</b><br><span class="dim">Termination reference left as &#x27;REF TERM XXX&#x27;.</span></td><td>MAJOR issued / MINOR prelim.</td><td>claims</td></tr>
+<tr><td class="mono">PLACEHOLDER-004</td><td><b>HOLD</b><br><span class="dim">HOLD marker on the drawing.</span></td><td>MAJOR issued / MINOR prelim.</td><td>claims</td></tr>
+<tr><td class="mono">PLACEHOLDER-005</td><td><b>AUT1</b><br><span class="dim">AUT1 marker. Inside a superseded designation (LTL-AUT1) it is reported by DRW-006 instead.</span></td><td>MAJOR issued / MINOR prelim.</td><td>claims</td></tr>
+<tr class="cat"><th colspan="4">Completeness Validation</th></tr>
+<tr><td class="mono">COMP-001</td><td><b>Incomplete Signal Trace</b><br><span class="dim">A channel&#x27;s trace is missing a hop the supplied drawings should show: the device tag (MAJOR), the field wire, or the JB / field location in the channel row.</span></td><td>MAJOR / MINOR</td><td>linked model, traces</td></tr>
+<tr><td class="mono">COMP-002</td><td><b>Orphan Field Device</b><br><span class="dim">A device on a cable block diagram, drawn on its home sheet, that no PLC channel trace reaches. Devices not on their home sheet are reported by TAG-003 instead.</span></td><td>MAJOR</td><td>linked model, traces</td></tr>
+<tr><td class="mono">COMP-003</td><td><b>Conflicted Trace</b><br><span class="dim">Two drawings disagree on a hop of a channel&#x27;s trace and no more specific rule reports it: the cable block diagram cables the device to a different panel from the one its PLC slot is in, or the termination drawings land it in a different JB from the schematic. (A JB the schematic and the CBD disagree on is PATH-002; a PLC slot the terminations disagree on is PLC-001.)</span></td><td>MAJOR</td><td>linked model, traces</td></tr>
+<tr><td class="mono">COMP-004</td><td><b>Branching</b><br><span class="dim">One device on safety-module channels with different descriptions (a dual-channel device is expected on two channels with the same description; standard modules are PLC-003), or two field devices in one channel row (MINOR: confirm one is an interposing device such as an isolator).</span></td><td>MAJOR</td><td>linked model, traces</td></tr>
+<tr><td class="mono">COMP-005</td><td><b>Field Device Not on CBD</b><br><span class="dim">A field device in a channel trace whose JB / field location is on the supplied cable block diagrams, but the device itself is not. Skipped when the CBD shows a near-identical tag (TAG-003 reports that).</span></td><td>MINOR</td><td>linked model, traces</td></tr>
+        </tbody>
+      </table></div>
+
+      <!-- 18 -->
+      <h2 id="glossary"><span class="no">18</span>Glossary</h2>
+      <dl class="gloss">
+        <dt>Answer key (AK)</dt><dd>Issues the checker confirmed as real (AK-nnn) or as correct drafting (AK-Nnn), each held by a test.</dd>
+        <dt>Candidate (C-nn)</dt><dd>A finding raised for the checker's ruling, before it is confirmed, rejected or withdrawn.</dd>
+        <dt>CBD</dt><dd>Cable block diagram: enclosures, devices and the cables between them.</dd>
+        <dt>Claim</dt><dd>One fact from one place on one sheet, read by one reader. Never edited; everything else points back to claims.</dd>
+        <dt>Corroborated</dt><dd>A node or edge seen by two or more document types.</dd>
+        <dt>Designation</dt><dd>IEC location name, <code>=K07.11+LTL-JB1</code>: function after <code>=</code>, location after <code>+</code>.</dd>
+        <dt>Edge</dt><dd>A typed link between two nodes (CHANNEL_DEVICE, ROUTE, TERMINAL_DEVICE…), keeping the claims behind it.</dd>
+        <dt>FFI</dt><dd>First field identifier: the two letters (TN) that tie a tag or wire number to a drawing.</dd>
+        <dt>Fingerprint</dt><dd>A finding's identity across runs and revisions, built from names and grid cells, not run IDs or coordinates.</dd>
+        <dt>Hop</dt><dd>One step of a signal trace: device, wire, JB terminal, JB, panel, slot, channel.</dd>
+        <dt>JB · LCS</dt><dd>Junction box; local control station. Both are field locations a signal passes through.</dd>
+        <dt>Left out</dt><dd>An input type excluded from a run with <code>--exclude</code>: listed, not checked.</dd>
+        <dt>Node</dt><dd>One thing in the engineering model (a device, wire, JB, panel, module, channel or terminal), however many sheets show it.</dd>
+        <dt>Not sourced</dt><dd>A hop only a left-out or unsupplied document type could show. Never counted as a gap.</dd>
+        <dt>Orphan</dt><dd>A device on a CBD that no PLC channel reaches.</dd>
+        <dt>Register</dt><dd><code>QA_Register.xlsx</code>, where the checker records decisions.</dd>
+        <dt>SHX annotation</dt><dd>The invisible AutoCAD note holding each piece of plotted text; the source of all text the platform reads.</dd>
+        <dt>Signal trace</dt><dd>The path of one PLC signal from field device to channel, across all drawings.</dd>
+        <dt>Superseded</dt><dd>An old designation with a configured replacement (<code>LTL-AUT1</code> → <code>LTL-PLC</code>): linked through, still reported.</dd>
+        <dt>Waiver</dt><dd>A known, accepted exception in <code>waivers.toml</code>, matched by rule and subject pattern.</dd>
+      </dl>
+    </main>
+  </div>
+</div>
+</body></html>
