@@ -120,8 +120,13 @@ class PlcConfig(BaseModel):
     )
     # Expected form of the POINTS line on slot sheets: <rack>.S<slot>.<type>.<first>..<last>
     points_format: str = r"^[A-Z0-9]+\.S\d+\.(DI|DO|AI|AO)\.\d{2}\.\.\d{2}$"
-    # Rack name -> the panel that holds it. Unlisted racks default to <rack>-PLC (LTL -> LTL-PLC).
+    # Rack name -> the panel that holds it. Unlisted racks default to <rack>-PLC (LTL -> LTL-PLC); the run
+    # warns when that default names a panel no drawing shows.
     rack_panels: dict[str, str] = Field(default_factory=dict)
+    # The project / area text that starts every channel description ("07.11 SHIPLOADER / LONG TRAVEL ...").
+    # Left unset, it is detected: the first description line shared by at least half of the channels.
+    # Set "" for none.
+    description_prefix: str | None = None
 
 
 class CbdConfig(BaseModel):

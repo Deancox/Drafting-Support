@@ -92,7 +92,7 @@ def main(argv: list[str] | None = None) -> int:
     if unreadable:
         print(f"  WARNING: {len(unreadable)} sheet(s) have no readable text (plotted without SHX text notes): "
               "re-plot them from AutoCAD with PDFSHX = 1. They are listed under Parse issues in report.md")
-    for issue in (i for i in result.issues if i.code is IssueCode.FFI_MAPPING):
+    for issue in (i for i in result.issues if i.code in (IssueCode.FFI_MAPPING, IssueCode.PANEL_MAPPING)):
         print(f"  WARNING: {issue.message}")
     if result.ffi_map:
         print("  FFIs: " + describe(result.ffi_map))

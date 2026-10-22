@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+from drawing_qa.common.descriptions import detect_prefix
 from drawing_qa.common.identifiers import IdentifierGrammar
 from drawing_qa.config import Settings
 from drawing_qa.model.claims import Claim
@@ -218,6 +219,11 @@ class Linker:
         return edge
 
     def _finish(self) -> None:
+        configured = self.settings.plc.description_prefix
+        self.model.description_prefix = (
+            configured.strip().upper() if configured is not None
+            else detect_prefix(n.attrs.get("description", "") for n in self.model.nodes.values() if n.type == "PLC_CHANNEL")
+        )
         for item in list(self.model.nodes.values()) + self.model.edges:
             item.parsers.sort()
             if len(item.parsers) >= 2:

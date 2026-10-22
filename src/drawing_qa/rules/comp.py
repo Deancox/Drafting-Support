@@ -17,6 +17,7 @@ from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
 from drawing_qa.rules.findings import FindingBuilder
 from drawing_qa.rules.registry import rule
+from drawing_qa.common.descriptions import without_prefix
 from drawing_qa.traces.builder import description_heading
 
 _NEEDS_TRACES = frozenset({Requirement.CLAIMS, Requirement.GRAPH, Requirement.TRACES})
@@ -71,7 +72,7 @@ class IncompleteTrace(Rule):
                 continue
             claim = _claim(ctx, t)
             where = make.where(claim.source) if claim else t.channel
-            heading = t.description.replace("07.11 SHIPLOADER / ", "")[:70]
+            heading = without_prefix(t.description, ctx.model.description_prefix)[:70]
             if "DEVICE" in t.gaps:
                 sheet = _sheet_number(ctx, t)
                 candidates = sorted(o.device for o in orphans if o.device and sheet is not None and _tag_sheet(o.device) == sheet)
@@ -255,15 +256,15 @@ class Branching(Rule):
             for d in _found_devices(t):
                 by_device.setdefault(d, []).append(t)
         for device, ts in sorted(by_device.items()):
-            headings = {description_heading(t.description) for t in ts}
+            headings = {description_heading(t.description, ctx.model.description_prefix) for t in ts}
             if len(ts) < 2 or len(headings) < 2 or not all(_safety_module(ctx, t) for t in ts):
                 continue  # one channel, a dual-channel pair, or a standard module (PLC-003)
             home = _tag_sheet(device)
             odd = [t for t in ts if home is not None and _sheet_number(ctx, t) != home] or ts[1:]
-            listed = "; ".join(f"{t.channel} ({description_heading(t.description).title()}, {', '.join(t.sheets)})" for t in ts)
+            listed = "; ".join(f"{t.channel} ({description_heading(t.description, ctx.model.description_prefix).title()}, {', '.join(t.sheets)})" for t in ts)
             hints = []
             for t in odd:
-                twin = _same_heading_neighbour(channel_traces, t)
+                twin = _same_heading_neighbour(channel_traces, t, ctx.model.description_prefix)
                 hints.append(f"{t.channel}: its neighbour {twin.channel} with the same description has {twin.device}"
                              if twin else f"{t.channel}: tag the device drawn there")
             yield make(
@@ -283,7 +284,7 @@ class Branching(Rule):
             yield make(
                 subject_type="PLC_CHANNEL",
                 subject_key=t.channel,
-                message=(f"{t.channel} ({description_heading(t.description).title()}, {', '.join(t.sheets)}) has "
+                message=(f"{t.channel} ({description_heading(t.description, ctx.model.description_prefix).title()}, {', '.join(t.sheets)}) has "
                          f"{len(field)} field devices in its row: {', '.join(field)}"),
                 evidence=[claim] if claim else [],
                 severity=Severity.MINOR,
@@ -298,14 +299,14 @@ def _safety_module(ctx: RuleContext, t: SignalTrace) -> bool:
     return bool(node and node.attrs.get("safety"))
 
 
-def _same_heading_neighbour(traces: list[SignalTrace], t: SignalTrace) -> SignalTrace | None:
+def _same_heading_neighbour(traces: list[SignalTrace], t: SignalTrace, prefix: str) -> SignalTrace | None:
     """The nearest other channel on the same module with the same description heading and a different device."""
     module, _, number = t.channel.rpartition("/CH")
-    heading = description_heading(t.description)
+    heading = description_heading(t.description, prefix)
     candidates = [
         o for o in traces
         if o is not t and o.channel.rpartition("/CH")[0] == module and o.device and o.device != t.device
-        and description_heading(o.description) == heading
+        and description_heading(o.description, prefix) == heading
     ]
     return min(candidates, key=lambda o: abs(int(o.channel.rpartition("/CH")[2]) - int(number)), default=None)
 

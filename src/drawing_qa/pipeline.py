@@ -68,8 +68,10 @@ def _link_and_trace(settings: Settings, result: RunResult) -> None:
     result.model = link(result.claims, result.drawings, settings, skip)
     edges = len(result.model.edges)
     result.stages.append(
-        StageResult(name="link", status=StageStatus.DONE, note=f"{len(result.model.nodes)} nodes, {edges} edges")
+        StageResult(name="link", status=StageStatus.DONE, note=f"{len(result.model.nodes)} nodes, {edges} edges; "
+                    f"channel description prefix: {result.model.description_prefix or 'none'}")
     )
+    result.issues.extend(_unseen_panels(result.model, settings))
     graph = build_graph(result.model)
     # Hops only an excluded or not-yet-parsed document type can give are "not sourced", never gaps.
     parsed = {t for t, p in build_parsers().items() if p.built_content} - set(settings.ingest.unchecked_types)
@@ -84,6 +86,29 @@ def _link_and_trace(settings: Settings, result: RunResult) -> None:
     if DocType.TERM not in parsed:
         note += "; JB terminal hops not sourced (termination drawings left out of the review)"
     result.stages.append(StageResult(name="trace", status=StageStatus.DONE, note=note))
+
+
+def _unseen_panels(model, settings: Settings) -> list[Issue]:
+    """Racks placed in a panel that no drawing shows: the <rack>-PLC default guessed wrong (MCC1 -> MCC1-PLC
+    when the drawings say MCC-PLC). Traces would end at a panel nothing else refers to."""
+    racks: dict[str, set[str]] = {}
+    for e in model.edges:
+        if e.type == "MODULE_PANEL":
+            panel = model.nodes[e.dst]
+            rack = model.nodes[e.src].attrs.get("rack")
+            if rack and not panel.parsers:  # derived only: no drawing shows this panel
+                racks.setdefault(panel.key, set()).add(rack)
+    shown = sorted(n.key for n in model.nodes.values() if n.type == "PANEL" and n.parsers)
+    issues = []
+    for panel, rack_names in sorted(racks.items()):
+        names = ", ".join(sorted(rack_names))
+        issues.append(Issue(
+            code=IssueCode.PANEL_MAPPING,
+            message=(f"Rack {names} is assumed to be in panel {panel}, which no drawing shows"
+                     + (f" (the drawings show {', '.join(shown)})" if shown else "")
+                     + f". Set the rack's panel under [plc.rack_panels] in the config, e.g. {sorted(rack_names)[0]} = \"{shown[0] if shown else '<panel>'}\""),
+        ))
+    return issues
 
 
 def _run_rules(settings: Settings, result: RunResult) -> None:

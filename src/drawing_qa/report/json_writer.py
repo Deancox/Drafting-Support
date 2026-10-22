@@ -37,6 +37,7 @@ def write_review(result: RunResult, summary: RunSummary, out_dir: Path) -> Path:
             "model": {
                 "nodes": [n.model_dump(mode="json") for n in result.model.nodes.values()],
                 "edges": [e.model_dump(mode="json") for e in result.model.edges],
+                "description_prefix": result.model.description_prefix,
             },
             "traces": [t.model_dump(mode="json") for t in result.traces],
             "coverage": [{**r.model_dump(mode="json"), "traced_pct": round(r.traced_pct, 3)} for r in result.coverage],

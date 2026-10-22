@@ -29,15 +29,12 @@ from drawing_qa.model.engineering import (
     TraceHop,
     TraceStatus,
 )
+from drawing_qa.common.descriptions import heading
 from drawing_qa.model.enums import DocType
 
-_AREA_PREFIX = "07.11 SHIPLOADER"
-
-
-def description_heading(description: str) -> str:
-    """First line of a channel description after the plant prefix, e.g. 'LONG TRAVEL SKEW EAST'."""
-    lines = [ln.strip() for ln in description.split(" / ") if ln.strip() and ln.strip().upper() != _AREA_PREFIX]
-    return lines[0].upper() if lines else ""
+def description_heading(description: str, prefix: str = "") -> str:
+    """First line of a channel description after the project prefix, e.g. 'LONG TRAVEL SKEW EAST'."""
+    return heading(description, prefix)
 
 
 def _terminal_order(node_id: str) -> tuple:
@@ -96,7 +93,8 @@ class TraceBuilder:
         }
 
     def _inherit(self, n: Node, rows: dict, by_module: dict) -> tuple[list[str], str]:
-        heading = description_heading(n.attrs.get("description", ""))
+        prefix = self.model.description_prefix
+        heading = description_heading(n.attrs.get("description", ""), prefix)
         if not heading:
             return [], ""
         mine = n.attrs.get("channel", 0)
@@ -105,7 +103,7 @@ class TraceBuilder:
             other = self.model.nodes[other_id]
             if other_id == n.id or not rows[other_id]["devices"]:
                 continue
-            if description_heading(other.attrs.get("description", "")) == heading:
+            if description_heading(other.attrs.get("description", ""), prefix) == heading:
                 candidates.append((abs(other.attrs.get("channel", 0) - mine), other))
         if not candidates:
             return [], ""

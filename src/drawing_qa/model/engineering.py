@@ -39,6 +39,8 @@ class Edge(BaseModel):
 class EngineeringModel(BaseModel):
     nodes: dict[str, Node] = Field(default_factory=dict)
     edges: list[Edge] = Field(default_factory=list)
+    # Text that starts the package's channel descriptions ("07.11 SHIPLOADER"); see descriptions.py.
+    description_prefix: str = ""
 
 
 class TraceStatus(StrEnum):

@@ -20,6 +20,7 @@ from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.datavalidation import DataValidation
 
+from drawing_qa.common.descriptions import without_prefix
 from drawing_qa.model.enums import Decision, DocType, Predicate
 from drawing_qa.model.run import RunResult
 from drawing_qa.model.source import Drawing, SourceRef
@@ -198,7 +199,7 @@ def _tag_index_sheet(wb: Workbook, result: RunResult, idx: _Index, tag_col: str,
             continue
         occurs = idx.occurs.get(t.device, {})
         jb = next((h.values for h in t.hops if h.hop == "JB"), [])
-        heading = t.description.replace("07.11 SHIPLOADER / ", "").replace(" / ", " - ")
+        heading = without_prefix(t.description, result.model.description_prefix).replace(" / ", " - ")
         via = ", ".join(t.cbd_via) or ("direct" if t.cbd_route else "-")
         rows.append([
             t.device, t.channel or "(none: orphan)", heading, t.status.value,

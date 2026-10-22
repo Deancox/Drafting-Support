@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from drawing_qa.common.descriptions import without_prefix
 from drawing_qa.model.enums import Decision, IssueCode, Severity, StageStatus
 from drawing_qa.model.findings import Finding
 from drawing_qa.model.run import RunResult
@@ -19,6 +20,7 @@ _COVERAGE_ISSUES = {
     IssueCode.EMPTY_FOLDER,
     IssueCode.NO_SHX_TEXT,
     IssueCode.FFI_MAPPING,
+    IssueCode.PANEL_MAPPING,
     IssueCode.NO_GRID,
 }
 _SEVERITIES = [Severity.CRITICAL, Severity.MAJOR, Severity.MINOR, Severity.INFO]
@@ -94,7 +96,7 @@ def _traces(result: RunResult, w) -> None:
             on_cbd = " → ".join(t.cbd_route)
         else:
             on_cbd = "" if t.on_cbd is None else ("on CBD, no route" if t.on_cbd else "not on CBD")
-        desc = t.description.replace("07.11 SHIPLOADER / ", "").replace("|", "/")[:60]
+        desc = without_prefix(t.description, result.model.description_prefix).replace("|", "/")[:60]
         w(f"| {t.key} | {t.status.value.title()} | {hop(t, 'DEVICE') or t.device or ''} | {hop(t, 'WIRE')} | {hop(t, 'JB_TERMINAL')} | {hop(t, 'JB')} | "
           f"{hop(t, 'PANEL')} | {hop(t, 'SLOT')} | {on_cbd} | {desc} |")
     w("")
