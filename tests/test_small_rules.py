@@ -60,6 +60,14 @@ def test_path_004_legend_matches_rows(tmp_path, cfg):
     assert by_rule(run_pipeline(tmp_path, cfg), "PATH-004") == []
 
 
+def test_path_004_long_legend_is_read_to_the_end(tmp_path, cfg):
+    """Like sheet 022: eight entries, the one the rows use last."""
+    entries = [(f"=K07.11+LTL-LCS{n}", f"LTL-LCS{n}") for n in range(1, 8)] + [("=K07.11+LTL-JB3", "LTL-JB3")]
+    schematic_with_legend(tmp_path, "LTL-JB3", entries)
+    findings = by_rule(run_pipeline(tmp_path, cfg), "PATH-004")
+    assert not [f for f in findings if "does not list" in f.message or "is empty" in f.message]  # LTL-JB3 was read
+
+
 def test_path_004_empty_legend(tmp_path, cfg):
     schematic_with_legend(tmp_path, "LTL-JB3", [])
     findings = by_rule(run_pipeline(tmp_path, cfg), "PATH-004")

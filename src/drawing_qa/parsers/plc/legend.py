@@ -15,7 +15,7 @@ from drawing_qa.parsers.base import DrawingParser, ParseContext
 from drawing_qa.pdf.extract import PageContent
 
 _WIDTH = 160.0  # pt right of the LEGEND heading
-_DEPTH = 110.0  # pt below it
+_GAP = 30.0  # the box ends at the first vertical gap wider than this (the revision table below it)
 _KINDS = (EntityType.JUNCTION_BOX, EntityType.LOCATION, EntityType.PANEL)
 
 
@@ -29,10 +29,14 @@ def read_legend(page: PageContent, drawing: Drawing, ctx: ParseContext, parser: 
                          subject_type=subject_type, subject_key=key, predicate=Predicate.ROUTE_LEGEND,
                          method=ExtractionMethod.TEMPLATE, value=value)
 
-    box = [
-        ln for ln in page.lines
-        if -5 <= ln.bbox[0] - heading.bbox[0] < _WIDTH and 0 < ln.bbox[1] - heading.bbox[1] < _DEPTH
-    ]
+    column = sorted((ln for ln in page.lines if -5 <= ln.bbox[0] - heading.bbox[0] < _WIDTH and ln.bbox[1] > heading.bbox[1]),
+                    key=lambda ln: ln.bbox[1])
+    box, bottom = [], heading.bbox[3]
+    for ln in column:  # entries run on down the column, however many there are (sheet 022 has eight)
+        if ln.bbox[1] - bottom > _GAP:
+            break
+        box.append(ln)
+        bottom = max(bottom, ln.bbox[3])
     out = []
     for ln in box:
         text = ln.text.strip()

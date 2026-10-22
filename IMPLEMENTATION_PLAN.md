@@ -297,6 +297,7 @@ Every run writes three files to the output folder (default `reports/<Area>/`):
 | AK-020 | 2026-10-22 (C-26) | `S-TN37D4`, `S-TN37F4`: schematic 037 via LTL-JB13; CBD 016 on SH-JB3 | 401103 sh 037, 401310 sh 016 | PATH-002 |
 | AK-021 | 2026-10-22 (C-27) | `S-TN23T4` (south rail, LTL/S4/CH06–07, sheet 023) is copied onto LTL/S5/CH01 "cow catcher contact 2" on sheet 024 (G3); it should be `S-TN24D2`, like contact 1 on CH00 | 401103 sh 024 | COMP-004 (MAJOR), suggesting S-TN24D2 |
 | AK-022 | 2026-10-22 (C-35) | Sheet 051's LEGEND lists `=K07.11+LTL-SH8`; the channel rows (and everything else) use `SH-LCS8` | 401103 sh 051 | PATH-004 (MAJOR), suggesting `=K07.11+SH-LCS8` |
+| AK-023 | 2026-10-22 (C-36) | Empty LEGEND box on sheets 021 (rows use LTL-LCS1) and 045 (LTL-JB1, LTL-JB2) | 401103 sh 021, 045 | PATH-004 per sheet |
 | AK-007 | 2026-10-21 (C-07) | Mixed statuses within one revision: 401103 sh 035 CONCEPTUAL, sh 056 PRELIMINARY (rest of rev 0 FOR CONSTRUCTION); 401310 sh 015 AS BUILT (014/016 PRELIMINARY) | Title blocks | DRW-002 |
 
 **Must NOT be reported. These are provisional: assumed by me, not yet confirmed by the checker.**
@@ -364,8 +365,8 @@ Also seen but not reported: sheet 026 has the address `04` drawn twice on top of
 | # | Rule | Issue |
 |---|---|---|
 | C-35 *(confirmed 2026-10-22: now AK-022)* | PATH-004 (MAJOR) | Sheet 051's legend lists `=K07.11+LTL-SH8`; the channel rows use `SH-LCS8` |
-| C-36 | PATH-004 | Empty LEGEND on sheets 021 (rows use LTL-LCS1) and 045 (LTL-JB1, LTL-JB2) |
-| C-37 | PATH-004 | Sheet 022's legend lists LTL-LCS1/2/4/5/6 but not LTL-JB1, LTL-JB2, which its channel rows use |
+| C-36 *(confirmed 2026-10-22: now AK-023)* | PATH-004 | Empty LEGEND on sheets 021 (rows use LTL-LCS1) and 045 (LTL-JB1, LTL-JB2) |
+| C-37 *(withdrawn 2026-10-22: a platform bug)* | PATH-004 | Sheet 022's legend does list LTL-JB2 and LTL-JB1, at the bottom of a long box; the reader only looked 110 pt below the heading. It now reads down the column until the gap above the revision table |
 
 **Known limits in M4 (CBD routing):**
 - Cables are read as 0.96 pt runs and enclosure outlines as 0.24 pt dash-dot lines (the client's CAD standard); another drafting house may use other widths (make them config).

@@ -204,6 +204,18 @@ def test_ak_022_sheet_051_legend_lists_ltl_sh8(result):
     assert len(fs) == 1 and fs[0].severity.value == "MAJOR" and "SH-LCS8" in fs[0].recommendation
 
 
+@pytest.mark.parametrize("sheet", ["401103 sh 021", "401103 sh 045"])
+def test_ak_023_empty_legend(result, sheet):
+    """C-36, confirmed real (2026-10-22): the LEGEND box has no entries although the channel rows use JBs / LCSs."""
+    fs = findings(result, "PATH-004", sheet)
+    assert len(fs) == 1 and "is empty" in fs[0].message
+
+
+def test_c37_sheet_022_long_legend_is_read_in_full(result):
+    """C-37 withdrawn: sheet 022's legend lists eight locations, LTL-JB2 and LTL-JB1 last."""
+    assert findings(result, "PATH-004", "401103 sh 022") == []
+
+
 def test_ak_n06_s_tn25h4_routes_via_sh_jb9(result):
     """C-23 (S-TN25H4), confirmed correct: S-TN25H4 -> SH-JB9 -> LTL-PLC on CBD 016."""
     assert not findings(result, "PATH-001", "S-TN25H4")
