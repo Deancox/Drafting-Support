@@ -123,3 +123,39 @@ def test_unknown_or_contradictory_input_type_is_an_error(sample_package, tmp_pat
     assert _cli_run(sample_package, tmp_path, "--exclude", "drawings")[0] == 2
     assert "unknown input type 'drawings'" in capsys.readouterr().err
     assert _cli_run(sample_package, tmp_path, "--exclude", "term", "--include", "term")[0] == 2
+
+
+# --- sheets plotted without AutoCAD's SHX text notes -------------------------------------
+
+def _line_work(n=400):
+    return [(40 + (i % 50) * 20, 40 + (i // 50) * 60, 50 + (i % 50) * 20, 90 + (i // 50) * 60) for i in range(n)]
+
+
+def test_drawn_sheet_without_text_is_reported_for_replot(tmp_path, make_pdf, settings):
+    make_pdf(tmp_path / "pkg" / "PLC" / "401002-492.pdf", [[]], lines=[_line_work()])
+    result = run_pipeline(tmp_path / "pkg", settings)
+    issues = [i for i in result.issues if i.code is IssueCode.NO_SHX_TEXT]
+    assert len(issues) == 1 and "PDFSHX set to 1" in issues[0].message and "no text at all" in issues[0].message
+    assert IssueCode.EMPTY_PAGE not in [i.code for i in result.issues]
+    assert result.drawings[0].page_kind.value == "NO_TEXT"
+
+
+def test_blank_page_is_still_empty(tmp_path, make_pdf, settings):
+    make_pdf(tmp_path / "pkg" / "PLC" / "blank.pdf", [[]])
+    codes = [i.code for i in run_pipeline(tmp_path / "pkg", settings).issues]
+    assert IssueCode.EMPTY_PAGE in codes and IssueCode.NO_SHX_TEXT not in codes
+
+
+def test_a_few_truetype_words_do_not_make_a_drawn_sheet_readable(tmp_path, make_pdf, settings):
+    words = [(60 + 40 * i, 60, w) for i, w in enumerate(["PORT", "WARATAH", "COAL", "SERVICES", "KOORAGANG", "MRA"])]
+    make_pdf(tmp_path / "pkg" / "PLC" / "401002-490.pdf", [words], lines=[_line_work()])
+    issues = [i for i in run_pipeline(tmp_path / "pkg", settings).issues if i.code is IssueCode.NO_SHX_TEXT]
+    assert len(issues) == 1 and "no title block" in issues[0].message
+
+
+def test_cli_warns_about_unreadable_sheets(tmp_path, make_pdf, capsys):
+    make_pdf(tmp_path / "pkg" / "PLC" / "401002-492.pdf", [[]], lines=[_line_work()])
+    config = tmp_path / "project.toml"
+    config.write_text('[project]\ncode = "T"\n', encoding="utf-8")
+    assert main(["run", "--input", str(tmp_path / "pkg"), "--output", str(tmp_path / "out"), "--config", str(config)]) == 0
+    assert "1 sheet(s) have no readable text" in capsys.readouterr().out

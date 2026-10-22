@@ -14,6 +14,7 @@ class DocType(StrEnum):
 class PageKind(StrEnum):
     VECTOR = "VECTOR"
     RASTER = "RASTER"
+    NO_TEXT = "NO_TEXT"  # drawn (line work) but no readable text: plotted without AutoCAD's SHX text notes
     EMPTY = "EMPTY"
 
 
@@ -80,6 +81,7 @@ class IssueCode(StrEnum):
     UNREADABLE_FILE = "UNREADABLE_FILE"
     NEEDS_OCR = "NEEDS_OCR"
     EMPTY_PAGE = "EMPTY_PAGE"
+    NO_SHX_TEXT = "NO_SHX_TEXT"  # drawn sheet whose text cannot be read: re-plot with PDFSHX=1
     PARSER_ERROR = "PARSER_ERROR"
     NO_TEMPLATE = "NO_TEMPLATE"
     DUPLICATE_SHEET = "DUPLICATE_SHEET"

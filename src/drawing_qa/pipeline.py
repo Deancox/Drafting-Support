@@ -110,10 +110,24 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
             with open_pdf(found.path) as doc:
                 record.page_count = doc.page_count
                 for page in doc:
-                    content = extract_page(page, min_words, ocr, settings.pdf.shx_annotation_titles)
+                    content = extract_page(page, min_words, ocr, settings.pdf.shx_annotation_titles, settings.pdf.min_drawing_bytes)
                     drawing = drawing_for_page(record.path, record.doc_type, content, doc.page_count, settings)
                     result.drawings.append(drawing)
-                    if drawing.grid is None and content.kind is PageKind.VECTOR:
+                    unreadable = _unreadable_text(content, drawing)
+                    if unreadable:
+                        creator = (doc.metadata or {}).get("creator") or "unknown software"
+                        result.issues.append(
+                            Issue(
+                                code=IssueCode.NO_SHX_TEXT,
+                                message=(f"Sheet is drawn but its text cannot be read ({unreadable}); it was plotted without AutoCAD's "
+                                         f"SHX text notes (plotted by {creator}). Re-plot it with PDFSHX set to 1"),
+                                file_path=record.path,
+                                drawing_id=drawing.id,
+                            )
+                        )
+                        if content.kind is PageKind.NO_TEXT:
+                            continue
+                    if drawing.grid is None and content.kind is PageKind.VECTOR and not unreadable:
                         result.issues.append(
                             Issue(
                                 code=IssueCode.NO_GRID,
@@ -167,6 +181,20 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
     if equip:
         notes += f"; EQUIP: {equip} equipment list file(s) listed, not read yet (reader waits for the list format)"
     result.stages.append(StageResult(name="parse", status=StageStatus.DONE, note=notes))
+
+
+def _unreadable_text(content, drawing: Drawing) -> str:
+    """Why a drawn sheet's text cannot be read, or "" when it can.
+
+    The client's sheets carry their text only as AutoCAD "SHX Text" notes; plotted without them
+    (PDFSHX=0), a sheet is all line work. A few TrueType words (a logo, a stamp) do not make it
+    readable: with no SHX notes and no title block found, it is reported too.
+    """
+    if content.kind is PageKind.NO_TEXT:
+        return "no text at all"
+    if content.drawn and content.shx_word_count == 0 and drawing.title_block_method is not ExtractionMethod.TEMPLATE:
+        return f"only {len(content.words)} word(s) and no title block"
+    return ""
 
 
 def _is_duplicate(drawing: Drawing, seen: dict[tuple[str, str], Drawing], result: RunResult) -> bool:

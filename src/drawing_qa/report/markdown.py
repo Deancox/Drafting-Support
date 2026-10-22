@@ -17,6 +17,7 @@ _COVERAGE_ISSUES = {
     IssueCode.NEEDS_OCR,
     IssueCode.PARSER_ERROR,
     IssueCode.EMPTY_FOLDER,
+    IssueCode.NO_SHX_TEXT,
     IssueCode.NO_GRID,
 }
 _SEVERITIES = [Severity.CRITICAL, Severity.MAJOR, Severity.MINOR, Severity.INFO]

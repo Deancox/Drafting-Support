@@ -80,6 +80,8 @@ class PageContent:
     kind: PageKind
     words: list[Word]
     image_count: int = 0
+    shx_word_count: int = 0  # words from AutoCAD SHX text notes
+    drawn: bool = False  # substantial line work on the page
     _segment_loader: Callable[[], list[Segment]] | None = field(default=None, repr=False)
 
     @property
@@ -170,12 +172,23 @@ def _shx_words(page: pymupdf.Page, titles: Sequence[str]) -> list[Word]:
     return words
 
 
-def classify_page(word_count: int, image_count: int, min_words: int) -> PageKind:
+def classify_page(word_count: int, image_count: int, min_words: int, drawn: bool = False) -> PageKind:
+    """drawn: the page has substantial line work (its content stream is large)."""
     if word_count >= min_words:
         return PageKind.VECTOR
     if image_count > 0:
         return PageKind.RASTER
-    return PageKind.VECTOR if word_count > 0 else PageKind.EMPTY
+    if word_count > 0:
+        return PageKind.VECTOR
+    return PageKind.NO_TEXT if drawn else PageKind.EMPTY
+
+
+def _content_bytes(page: pymupdf.Page) -> int:
+    """Size of the page's drawing instructions: cheap, and tells a drawn sheet from a blank one."""
+    try:
+        return len(page.read_contents())
+    except Exception:  # an odd content stream: treat as drawn rather than blank
+        return 1 << 20
 
 
 def extract_page(
@@ -183,14 +196,17 @@ def extract_page(
     min_words: int,
     ocr: OcrEngine | None = None,
     shx_titles: Sequence[str] = ("AutoCAD SHX Text",),
+    min_drawing_bytes: int = 5000,
 ) -> PageContent:
     words = [
         Word(text=w[4], bbox=(w[0], w[1], w[2], w[3]), block=w[5], line=w[6])
         for w in page.get_text("words", sort=True)
     ]
-    words.extend(_shx_words(page, shx_titles))
+    shx = _shx_words(page, shx_titles)
+    words.extend(shx)
     image_count = len(page.get_images(full=False))
-    kind = classify_page(len(words), image_count, min_words)
+    drawn = _content_bytes(page) >= min_drawing_bytes
+    kind = classify_page(len(words), image_count, min_words, drawn)
     if kind is PageKind.RASTER and ocr is not None:
         words = ocr.recognise(page)
     return PageContent(
@@ -200,6 +216,8 @@ def extract_page(
         kind=kind,
         words=words,
         image_count=image_count,
+        shx_word_count=len(shx),
+        drawn=drawn,
         _segment_loader=lambda: _load_segments(page),
     )
 

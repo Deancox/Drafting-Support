@@ -36,6 +36,9 @@ class IngestConfig(BaseModel):
 
 class PdfConfig(BaseModel):
     min_words_for_vector: int = 5
+    # A page whose drawing content is at least this size (bytes) is drawn, not blank. A blank A1
+    # sheet is a few hundred bytes; a plotted controls sheet is hundreds of kilobytes.
+    min_drawing_bytes: int = 5000
     shx_annotation_titles: list[str] = Field(default_factory=lambda: ["AutoCAD SHX Text"])
 
 

@@ -318,6 +318,10 @@ html { scroll-behavior: smooth; }
       <h2 id="reading"><span class="no">04</span>Reading a sheet</h2>
       <h3>Where the text is</h3>
       <p>The client's PDFs have <b>no text layer</b>. AutoCAD plots its SHX fonts as line geometry, so ordinary PDF text extraction finds nothing. But AutoCAD also embeds every piece of text as an invisible annotation titled <code>AutoCAD SHX Text</code>, holding the text and its box. The reader takes the words from those annotations, which gives exact text and position with no OCR. A page with no text and an image is classed as a scan and flagged <code>NEEDS_OCR</code> (OCR is parked).</p>
+      <div class="note red">
+        <p><b>Plotting matters</b></p>
+        <p>The SHX notes are only there if AutoCAD's <code>PDFSHX</code> setting is <b>1</b> when the sheet is plotted. A sheet plotted with it at 0 is all line work: it has nothing to read, so no title block, grid or tags. The platform reports such a sheet as <code>NO_SHX_TEXT</code> ("drawn but its text cannot be read … re-plot it with PDFSHX set to 1", naming the AutoCAD version that plotted it), prints a warning at the end of the run, and checks nothing on it. A few TrueType words (a logo, a stamp) do not count as readable: a drawn sheet with no SHX notes and no title block is reported too. To check a PDF yourself, open its Comments list: it should show many entries titled <i>AutoCAD SHX Text</i>.</p>
+      </div>
       <h3>Title block</h3>
       <p>The title block in the bottom-right corner is read by its labels: the value nearest each label (<code>Drawing N°</code>, <code>Sheet N°</code>, <code>Rev N°</code>, the status such as <code>PRELIMINARY</code>, the title lines). The descriptor line (<code>SCHEMATIC DIAGRAM</code>, <code>CABLING BLOCK DIAGRAM</code>, <code>TERMINATION DIAGRAM</code>) is checked against the folder (DRW-004). Legend, symbol and index sheets are recognised by their descriptor and left out of the checks, because their example tags are not real content.</p>
       <h3>Grid frame</h3>
@@ -890,7 +894,7 @@ tests/         271 tests on synthetic sheets + the answer key</code></pre>
         <li><b>Termination drawings.</b> The readers are built against the sample package's current, old-standard termination sheets and must be re-checked when the new-standard sheets arrive. Their candidates (C-29 to C-34) are on hold until then. Wire numbers at the field device's own terminals are read but not checked, because which device a terminal belongs to is unreliable where device boxes are stacked.</li>
         <li><b>Positions are inferred from text.</b> Tag positions are label positions; labels sit one or two rows above their symbol, and the checks allow for that.</li>
         <li><b>Short wire numbers</b> on schematics are accepted only near the cell they name; relay terminal labels <code>T1</code>/<code>T2</code> can pass that test by coincidence (harmless, as nothing references them).</li>
-        <li><b>Scanned sheets</b> are flagged, not read.</li>
+        <li><b>Scanned sheets</b> are flagged, not read. <b>Sheets plotted without SHX notes</b> (<code>PDFSHX</code> = 0) are flagged <code>NO_SHX_TEXT</code> and must be re-plotted.</li>
         <li><b>Parked work</b>, kept in the plan but not being built: M6 OCR and AI assist (PLC-002 description matching), M7 Word report and revision-to-revision comparison, M8 the electrical equipment list (DEV-001, DEV-002 and a full equipment list output).</li>
       </ul>
 

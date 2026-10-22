@@ -9,7 +9,7 @@ from pathlib import Path
 
 from drawing_qa import __version__
 from drawing_qa.config import DEFAULT_FOLDERS, Settings
-from drawing_qa.model.enums import DocType
+from drawing_qa.model.enums import DocType, IssueCode
 from drawing_qa.pipeline import run_pipeline
 from drawing_qa.report.writer import write_outputs
 from drawing_qa.review import carry_forward
@@ -87,6 +87,10 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Run {result.info.run_id}: {len(result.files)} file(s), {len(result.drawings)} sheet(s), "
           f"{len(result.claims)} claim(s), {len(result.issues)} issue(s)")
+    unreadable = [i for i in result.issues if i.code is IssueCode.NO_SHX_TEXT]
+    if unreadable:
+        print(f"  WARNING: {len(unreadable)} sheet(s) have no readable text (plotted without SHX text notes): "
+              "re-plot them from AutoCAD with PDFSHX = 1. They are listed under Parse issues in report.md")
     reviewed = [t.value for t in _INPUT_TYPES if t not in settings.ingest.unchecked_types]
     left_out = [t.value for t in settings.ingest.unchecked_types]
     print(f"  reviewed: {', '.join(reviewed) or 'nothing'}" + (f"; left out: {', '.join(left_out)}" if left_out else ""))
