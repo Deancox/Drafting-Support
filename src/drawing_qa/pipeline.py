@@ -121,6 +121,7 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
                     drawing.ffi = sheet_ffi(content)
                     result.drawings.append(drawing)
                     unreadable = _unreadable_text(content, drawing)
+                    drawing.text_unreadable = bool(unreadable)
                     if unreadable:
                         creator = (doc.metadata or {}).get("creator") or "unknown software"
                         result.issues.append(

@@ -45,7 +45,7 @@ def test_missing_title_block_falls_back_to_file_name(tmp_path, make_pdf):
     doc, page = _page(tmp_path, make_pdf, [((100, 100, 200, 110), "S-TN23N2")])
     drawing = drawing_for_page("PLC/401103-023.pdf", DocType.PLC, page, 1)
     doc.close()
-    assert drawing.drawing_no == "401103-023"
+    assert (drawing.drawing_no, drawing.sheet) == ("401103", "023")
     assert drawing.title_block_method is ExtractionMethod.FILENAME
     assert set(drawing.missing_title_fields) == {"drawing_no", "sheet", "rev", "title", "status"}
 

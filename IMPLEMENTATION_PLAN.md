@@ -195,7 +195,7 @@ Rule IDs follow `<CATEGORY>-<nnn>`. This replaces the earlier IDs in GAME_PLAN; 
 | DEV-001 | Device Presence | device | Appears in every document type the document matrix expects |
 | DEV-002 | Device Attribute Consistency | device | Same type, description and signal across sources |
 | DEV-003 | Device Terminated ✅ | device | A device on a PLC channel whose JB's termination drawing is supplied, but no terminal on it serves the device (the JB-terminal gap; COMP-001 leaves it to this rule) |
-| DRW-001 | Cross-Reference Exists | occurrence | Referenced drawing / sheet / rev exists in the package |
+| DRW-001 | Cross-Reference Exists | drawing | Sheet references to sheets not in the package: one finding per referenced drawing, listing its missing sheets (a partial package is one fact, not one finding per reference). Sheets present but unreadable (NO_SHX_TEXT) are not missing |
 | DRW-002 | Revision Consistency | drawing | Sheets of one drawing share a rev; references cite the current rev |
 | DRW-003 | Title Block Complete | drawing | Drawing no, sheet, rev and title present |
 | DRW-004 | Folder / Type Match | drawing | Input folder type = title block drawing type |
@@ -338,6 +338,8 @@ Every run writes three files to the output folder (default `reports/<Area>/`):
 
 
 Also seen but not reported: sheet 026 has the address `04` drawn twice on top of itself (a duplicated text object).
+
+**Universality (checker direction 2026-10-23):** the platform must work on any package, so sample-specific assumptions are being removed where they are fundamental limits, not tuned per package. Done: FFI mapping learned from the sheets; CBD line weights in config `[cbd]`; a sheet with no readable text counts as present (DRW-001 / DRW-005 skip it, DRW-003 does not repeat NO_SHX_TEXT); a sheet with no readable title block takes its drawing and sheet from `<drawing>-<sheet>.pdf`; DRW-001 grouped per referenced drawing. Still to do: the channel description prefix `07.11 SHIPLOADER` is hard-coded (dual-channel inference, COMP-004 headings, report text); the rack → panel default `<rack>-PLC` (parked by the checker). Not changed by decision: a schematic / CBD path disagreement is a real catch; renames stay a manual, confirmed `[identifiers.superseded]` entry.
 
 **FFI mapping learned from the sheets (2026-10-23).** Each schematic sheet's "WIRE NUMBER / FIRST FIELD IDENTIFIER" box gives its FFI (`ingest/ffi.py`). An FFI shown on a supplied drawing's schematics maps to that drawing, overriding `[identifiers.ffi_drawings]` with an `FFI_MAPPING` warning when the config disagrees (the 401103 config's `TH = "EXTERNAL"` would otherwise have switched off every tag check on the 401002 package). The config decides only FFIs no supplied sheet shows (`EXTERNAL`); a config drawing number that is not in the package, for an FFI the package's tags use, is also an `FFI_MAPPING` warning. The mapping used is printed every run, kept in the `ffi` stage note and in `review.json` (`ffi_map`). Learned from PLC sheets only, so a misnumbered termination sheet cannot confuse it.
 

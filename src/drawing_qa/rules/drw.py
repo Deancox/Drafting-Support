@@ -27,22 +27,39 @@ class CrossReferenceExists(Rule):
         title="Cross-Reference Exists",
         category=Category.DRW,
         default_severity=Severity.MINOR,
-        description="A sheet reference such as '(SHT 35)' or '(CONT. SHT 204)' points to a sheet that is not in the package.",
+        description=(
+            "Sheet references such as '(SHT 35)' or '(CONT. SHT 204)' that point to sheets not in the package: one finding "
+            "per referenced drawing, listing its missing sheets and where they are referenced. Sheets in the package whose "
+            "text cannot be read (NO_SHX_TEXT) are not missing."
+        ),
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        from drawing_qa.rules.term import ranges
+
+        missing: dict[str, dict[int, list]] = defaultdict(lambda: defaultdict(list))
+        unreadable_numbers = {n for _, n in ctx.unreadable_sheets}
         for c in ctx.claims_of(Predicate.CROSS_REF):
             key = (c.value["drawing_no"], int(c.value["sheet"]))
             # Same drawing number first; otherwise any sheet with that number (e.g. "REF. SCHEM. SHT 015"
             # on a sheet whose own drawing number is wrong is reported by DRW-008, not here).
             if key in ctx.sheets_by_number or key[1] in ctx.sheet_numbers:
                 continue
+            if key in ctx.unreadable_sheets or key[1] in unreadable_numbers:
+                continue
+            missing[key[0]][key[1]].append(c)
+        for drawing_no, sheets in sorted(missing.items()):
+            claims = [c for cs in sheets.values() for c in cs]
+            from_sheets = sorted({ctx.sheet_of(c).label for c in claims})
+            listed = ranges(sorted(sheets))
             yield make(
                 subject_type="DRAWING",
-                subject_key=f"{key[0]} sh {key[1]:03d}",
-                message=f"'{c.source.raw_text}' at {make.where(c.source)} refers to {key[0]} sheet {key[1]:03d}, which is not in the package",
-                evidence=[c],
-                recommendation="Add the sheet to the package or correct the reference",
+                subject_key=drawing_no,
+                message=(f"{len(claims)} reference(s) point to {len(sheets)} sheet(s) of {drawing_no} that are not in the package: "
+                         f"sheet(s) {listed}; referenced from {', '.join(from_sheets[:8])}{' …' if len(from_sheets) > 8 else ''}"),
+                evidence=claims,
+                discriminator=listed,
+                recommendation=f"Add {drawing_no} sheet(s) {listed} to the package, or correct the references",
             )
 
 
@@ -94,7 +111,7 @@ class TitleBlockComplete(Rule):
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
-        for d in ctx.active_drawings:
+        for d in ctx.active_drawings:  # sheets with no readable text are excluded: NO_SHX_TEXT reports them
             if not d.missing_title_fields:
                 continue
             yield make(
@@ -145,7 +162,7 @@ class HomeSheetSupplied(Rule):
         for tag, claims in device_claims(ctx).items():
             sheet = int(claims[0].value["sheet"])
             status, drawing, sheets = ctx.home(claims[0].value["ffi"], sheet)
-            if status == "package" and not sheets:
+            if status == "package" and not sheets and (drawing, sheet) not in ctx.unreadable_sheets:
                 missing[(drawing, sheet)].append(tag)
         for (drawing, sheet), tags in sorted(missing.items(), key=lambda kv: (kv[0][0] or "", kv[0][1])):
             tags.sort()

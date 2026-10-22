@@ -68,6 +68,15 @@ TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10
 [identifiers.superseded]
 "LTL-AUT1" = "LTL-PLC"   # AUT renamed to PLC (confirmed by checker 2026-10-21)
 
+[cbd]
+# Line weights (pt) on cable block diagrams. Cables and enclosure outlines are found by their
+# stroke width; text and symbols are drawn in between. Client standard: cables 0.96, outlines 0.24.
+# Another drafting house may draw them differently: adjust these if CBD cables are not found.
+outline_max_width = 0.3
+cable_min_width = 0.9
+solid_min_width = 0.3
+cable_label_gap = 40.0
+
 [spelling]
 # Words one letter away from a common word in the package that are spelled correctly.
 known_words = ["CLOSE", "LATER", "LOWER", "POWER", "TOWER", "WATER", "LEVEL"]

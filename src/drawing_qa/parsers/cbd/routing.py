@@ -21,10 +21,6 @@ from drawing_qa.parsers.base import DrawingParser, ParseContext, ParseResult, Te
 from drawing_qa.parsers.cbd.geometry import Box, Cable, find_boxes, find_cables, merge_runs, split_at_boxes
 from drawing_qa.pdf.extract import PageContent
 
-THIN_MAX = 0.3  # enclosure outline stroke width
-THICK_MIN = 0.9  # cable stroke width
-SOLID_MIN = 0.3  # solid outline (symbol boxes, some enclosures)
-CABLE_LABEL_GAP = 40.0  # a cable is broken by its label box; rejoin across gaps up to this
 _SPEC = re.compile(r"\b\d+\s*(C|PR|TPR)\b|MM|PVC|FIBRE|SCR", re.I)
 _CABLE_NO = re.compile(r"^[CP][0-9X]{4,}$")
 _ENCLOSURE_KINDS = (EntityType.JUNCTION_BOX, EntityType.LOCATION, EntityType.PANEL)
@@ -55,8 +51,11 @@ class CableRoutingReader(TemplateReader):
         result = ParseResult()
         common = {"parser": parser.doc_type, "parser_version": parser.version, "drawing": drawing, "method": ExtractionMethod.VECTOR}
         limit_y = page.height * 0.84  # above the title block
-        # Letters are stroked at 0.36-0.72 pt; outlines (0.24) and cables (0.96) are not, so stroke width
-        # alone separates them. Removing strokes inside text boxes would also cut outlines that pass a label.
+        # Line weights come from config [cbd] (the client's standard: outlines 0.24 pt, cables 0.96 pt).
+        # Letters are stroked between the two, so stroke width alone separates them. Removing strokes
+        # inside text boxes would also cut outlines that pass a label.
+        w = ctx.settings.cbd
+        THIN_MAX, THICK_MIN, SOLID_MIN = w.outline_max_width, w.cable_min_width, w.solid_min_width
         segs = [
             s
             for s in page.segments
@@ -65,7 +64,7 @@ class CableRoutingReader(TemplateReader):
             and s.length < page.width * 0.7  # not frame / title block lines
         ]
         thin = merge_runs([s for s in segs if s.width <= THIN_MAX], max_gap=6.0)
-        thick = merge_runs([s for s in segs if s.width >= THICK_MIN], max_gap=CABLE_LABEL_GAP)
+        thick = merge_runs([s for s in segs if s.width >= THICK_MIN], max_gap=w.cable_label_gap)
         boxes = find_boxes([r for r in thin if r.length >= 15])
         boxes = self._split_stacked(boxes, thin, prior, drawing)
         # Some enclosures are solid rectangles (LTL-JB3 and SH-JB3 on 401310-016). Solid boxes are also

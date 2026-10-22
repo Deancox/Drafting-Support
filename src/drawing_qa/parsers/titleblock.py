@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import PurePosixPath
 
 from drawing_qa.common.grid import read_grid_frame
@@ -11,6 +12,9 @@ from drawing_qa.config import Settings
 from drawing_qa.model.enums import DocType, ExtractionMethod
 from drawing_qa.model.source import Drawing
 from drawing_qa.pdf.extract import PageContent
+
+
+_NAME = re.compile(r"^(?P<drawing>\d{4,})-(?P<sheet>\d{1,4})$")
 
 
 def drawing_for_page(
@@ -24,6 +28,8 @@ def drawing_for_page(
     tb = read_title_block(page, settings.title_block)
     stem = PurePosixPath(file_path).stem
     fallback_sheet = str(page.page_index + 1) if page_count > 1 else "1"
+    if page_count == 1 and (m := _NAME.match(stem)):  # "401002-490.pdf": drawing 401002, sheet 490
+        stem, fallback_sheet = m["drawing"], m["sheet"]
     content = "\n".join(sorted(line.text for line in page.lines))
     return Drawing(
         id=f"{file_path}#p{page.page_index + 1}",

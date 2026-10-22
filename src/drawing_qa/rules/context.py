@@ -62,8 +62,14 @@ class RuleContext:
 
     @cached_property
     def active_drawings(self) -> list[Drawing]:
-        """Drawings that were read (identical duplicate copies excluded)."""
-        return [d for d in self.drawings if d.duplicate_of is None]
+        """Drawings that were read (identical duplicate copies and sheets with no readable text excluded)."""
+        return [d for d in self.drawings if d.duplicate_of is None and not d.text_unreadable]
+
+    @cached_property
+    def unreadable_sheets(self) -> set[tuple[str, int]]:
+        """(drawing no, sheet number) of sheets that are in the package but have no readable text
+        (NO_SHX_TEXT). They are not missing: references to them are not reported as missing sheets."""
+        return {(d.drawing_no, d.sheet_number) for d in self.drawings if d.text_unreadable and d.sheet_number is not None}
 
     @cached_property
     def sheets_by_number(self) -> dict[tuple[str, int], list[Drawing]]:

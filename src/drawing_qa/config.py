@@ -124,6 +124,17 @@ class PlcConfig(BaseModel):
     rack_panels: dict[str, str] = Field(default_factory=dict)
 
 
+class CbdConfig(BaseModel):
+    """How cable block diagrams are drawn: line weights (pt) that tell cables and enclosure outlines
+    from text and symbols. Defaults are the client's CAD standard (cables 0.96 pt, outlines 0.24 pt);
+    another drafting house may need its own values here."""
+
+    outline_max_width: float = 0.3  # enclosure outlines (dash-dot) are at most this wide
+    cable_min_width: float = 0.9  # cables are at least this wide
+    solid_min_width: float = 0.3  # solid boxes (symbols, some enclosures) are at least this wide
+    cable_label_gap: float = 40.0  # a cable is broken by its label box; rejoin across gaps up to this
+
+
 class SpellingConfig(BaseModel):
     """A word used at most `max_rare` times that is one letter away from a word used at least
     `min_common` times in the same package is reported (STOBE vs STROBE). Real words that happen
@@ -167,6 +178,7 @@ class Settings(BaseModel):
     grid: GridConfig = Field(default_factory=GridConfig)
     plc: PlcConfig = Field(default_factory=PlcConfig)
     spelling: SpellingConfig = Field(default_factory=SpellingConfig)
+    cbd: CbdConfig = Field(default_factory=CbdConfig)
     rules: dict[str, RuleSetting] = Field(default_factory=dict)  # from rules.toml beside the project config
     waivers: list[Waiver] = Field(default_factory=list)  # from waivers.toml beside the project config
     config_hash: str = ""

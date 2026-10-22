@@ -224,7 +224,30 @@ def test_drw_001_cross_reference(tmp_path, cfg):
     add_sheet(tmp_path, "PLC", "036", [(cell_rect("A1"), "(SHT 35)"), (cell_rect("Y1"), "(SHT 37)"), (cell_rect("U9", 150), "EXAMPLE SHEET 011 OF 20")])
     add_sheet(tmp_path, "PLC", "037")
     findings = by_rule(run_pipeline(tmp_path, cfg), "DRW-001")
-    assert [f.subject_key for f in findings] == ["401103 sh 035"]
+    assert [f.subject_key for f in findings] == ["401103"]
+    assert "sheet(s) 35;" in findings[0].message
+
+
+def test_drw_001_groups_by_referenced_drawing(tmp_path, cfg):
+    """A partial package: many references to sheets that are not supplied are one finding per drawing."""
+    refs = [(cell_rect(f"{r}1"), f"(SHT {n})") for r, n in zip("ABCDEF", (30, 31, 32, 33, 38, 30))]
+    add_sheet(tmp_path, "PLC", "036", refs)
+    add_sheet(tmp_path, "PLC", "037", [(cell_rect("A1"), "(SHT 34)")])
+    findings = by_rule(run_pipeline(tmp_path, cfg), "DRW-001")
+    assert len(findings) == 1
+    assert "7 reference(s) point to 6 sheet(s) of 401103" in findings[0].message
+    assert "sheet(s) 30-34, 38;" in findings[0].message
+
+
+def test_unreadable_sheet_is_not_missing_or_an_incomplete_title_block(tmp_path, cfg, make_pdf):
+    """A sheet plotted without SHX text (NO_SHX_TEXT) is in the package: references to it are not
+    missing-sheet findings, and its unread title block is not DRW-003."""
+    add_sheet(tmp_path, "PLC", "036", [(cell_rect("A1"), "(SHT 40)")])
+    lines = [(40 + (i % 50) * 20, 40 + (i // 50) * 60, 50 + (i % 50) * 20, 90 + (i // 50) * 60) for i in range(400)]
+    make_pdf(tmp_path / "PLC" / "401103-040.pdf", [[]], lines=[lines])
+    result = run_pipeline(tmp_path, cfg)
+    assert by_rule(result, "DRW-001") == [] and by_rule(result, "DRW-003") == []
+    assert any(i.code.value == "NO_SHX_TEXT" for i in result.issues)
 
 
 def test_drw_002_status_consistency(tmp_path, cfg):

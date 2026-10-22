@@ -25,8 +25,8 @@ def test_registry_has_one_parser_per_type():
 
 def test_drawing_identity_from_file_name(tmp_path, make_pdf, settings):
     drawing, _ = _parse(tmp_path, make_pdf, settings, [(50, 50, "X")])
-    assert drawing.drawing_no == "401103-203"
-    assert drawing.sheet == "1"
+    assert drawing.drawing_no == "401103"  # <drawing>-<sheet>.pdf when the title block cannot be read
+    assert drawing.sheet == "203"
     assert drawing.id == "Terminations/401103-203.pdf#p1"
 
 

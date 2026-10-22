@@ -349,6 +349,7 @@ html { scroll-behavior: smooth; }
         </div>
         <figcaption><b>Grid cells are how people find things.</b> The frame labels on the border are read on every sheet; a word is placed by its centre. The client's tags also encode a grid cell (next section), which lets the platform check that a tag sits where its name says.</figcaption>
       </figure>
+      <p>A sheet whose title block cannot be read is identified from its file name instead, when it follows <code>&lt;drawing&gt;-&lt;sheet&gt;.pdf</code> (<code>401002-490.pdf</code> is drawing 401002, sheet 490). A sheet with no readable text still counts as <i>in the package</i>: references to it are not reported as missing sheets, and its unread title block is not reported again as incomplete.</p>
       <p>Sheets that are identical copies of one already read (same drawing number, sheet and content hash, as in a merged schematic set) are skipped with a <code>DUPLICATE_SHEET</code> issue so nothing is counted twice. Copies with the same number but different content are both kept and reported (DRW-007).</p>
 
       <!-- 05 -->
@@ -395,6 +396,18 @@ html { scroll-behavior: smooth; }
           <tr><td>Placeholder</td><td class="mono">CXXXXX, TNXXXX, HOLD</td><td>(as written)</td><td>Runs of X, configured tokens and phrases. Never an identifier; reported by the PLACEHOLDER rules.</td></tr>
         </tbody>
       </table></div>
+
+      <h3>Renamed designations</h3>
+      <p>When a designation is renamed during a project, drawings that still use the old name are wrong, but the platform cannot know a rename happened unless it is told. Renames are listed in <code>config/project.toml</code>:</p>
+      <pre><code>[identifiers.superseded]
+"LTL-AUT1" = "LTL-PLC"   # AUT renamed to PLC (confirmed by checker 2026-10-21)
+"MCC-AUT1" = "MCC-PLC"   # example: add a line per old name, once the rename is confirmed</code></pre>
+      <p>For every entry, two things happen on the next run:</p>
+      <ul>
+        <li><b>Each use of the old name is reported</b> by DRW-006, with the replacement as the recommendation ("Replace with =K07.11+LTL-PLC"), at its sheet and grid cell.</li>
+        <li><b>The old name is linked to the new one</b>, so traces, JB terminals and PLC slots still join up: a stale name does not also break every check that follows it. The original spelling is kept as evidence.</li>
+      </ul>
+      <p>Separately, any word in <code>[placeholders] tokens</code> (it includes <code>AUT1</code> on this project) is reported wherever it appears, by PLACEHOLDER-005. That catches an old name before anyone has confirmed what replaces it. A legend that lists an old name the package uses nowhere else is reported by PATH-004. Add a rename only once the checker has confirmed it: until then those two rules keep the old name visible.</p>
 
       <!-- 06 -->
       <h2 id="claims"><span class="no">06</span>Claims: the evidence layer</h2>
@@ -836,6 +849,7 @@ python -m venv .venv
           <p><code>[ingest]</code> folder aliases, types left out by default.</p>
           <p><code>[identifiers]</code> tag pattern parts, known areas (LTL, RCL, SPL, SH, ES, EER1), panel types, panel-device prefixes (K, Q), <code>ffi_drawings</code> (TN → 401103, TV/TH → EXTERNAL), <code>superseded</code> (LTL-AUT1 → LTL-PLC).</p>
           <p><code>[placeholders]</code> tokens and phrases; <code>[spelling]</code> known real words.</p>
+          <p><code>[cbd]</code> the line weights that identify cables (≥ 0.9 pt) and enclosure outlines (≤ 0.3 pt) on cable block diagrams.</p>
         </div>
         <div class="card"><h4>rules.toml · waivers.toml</h4>
           <p><code>rules.toml</code>: per rule, <code>enabled</code> and <code>severity</code>.</p>
@@ -890,7 +904,7 @@ tests/         271 tests on synthetic sheets + the answer key</code></pre>
       <!-- 16 -->
       <h2 id="limits"><span class="no">16</span>Limits</h2>
       <ul>
-        <li><b>Built for this client's drafting standard.</b> CBD cables are 0.96 pt runs and enclosures are 0.24 pt dash-dot outlines; another drafting house may use other weights. Template readers recognise this package's layouts; a new layout gets identifiers only and a <code>NO_TEMPLATE</code> issue.</li>
+        <li><b>Built for this client's drafting standard.</b> CBD cables are 0.96 pt runs and enclosures are 0.24 pt dash-dot outlines; another drafting house's weights are set in <code>[cbd]</code> in the config. Template readers recognise this package's layouts; a new layout gets identifiers only and a <code>NO_TEMPLATE</code> issue.</li>
         <li><b>Termination drawings.</b> The readers are built against the sample package's current, old-standard termination sheets and must be re-checked when the new-standard sheets arrive. Their candidates (C-29 to C-34) are on hold until then. Wire numbers at the field device's own terminals are read but not checked, because which device a terminal belongs to is unreliable where device boxes are stacked.</li>
         <li><b>Positions are inferred from text.</b> Tag positions are label positions; labels sit one or two rows above their symbol, and the checks allow for that.</li>
         <li><b>Short wire numbers</b> on schematics are accepted only near the cell they name; relay terminal labels <code>T1</code>/<code>T2</code> can pass that test by coincidence (harmless, as nothing references them).</li>
@@ -943,7 +957,7 @@ tests/         271 tests on synthetic sheets + the answer key</code></pre>
 <tr class="parked"><td class="mono">DEV-002</td><td><b>Device Attribute Consistency</b> <span class="pill">parked</span><br><span class="dim">Same type, description and signal across sources. Waits for equipment list (M8).</span></td><td>&ndash;</td><td>&ndash;</td></tr>
 <tr><td class="mono">DEV-003</td><td><b>Device Terminated</b><br><span class="dim">A field device on a PLC channel whose JB&#x27;s termination drawing is supplied (the JB in its schematic channel row, or the enclosure the cable block diagram draws it in), but no terminal on it serves the device.</span></td><td>MINOR</td><td>linked model, terminations, traces</td></tr>
 <tr class="cat"><th colspan="4">Drawing Validation</th></tr>
-<tr><td class="mono">DRW-001</td><td><b>Cross-Reference Exists</b><br><span class="dim">A sheet reference such as &#x27;(SHT 35)&#x27; or &#x27;(CONT. SHT 204)&#x27; points to a sheet that is not in the package.</span></td><td>MINOR</td><td>claims</td></tr>
+<tr><td class="mono">DRW-001</td><td><b>Cross-Reference Exists</b><br><span class="dim">Sheet references such as &#x27;(SHT 35)&#x27; or &#x27;(CONT. SHT 204)&#x27; that point to sheets not in the package: one finding per referenced drawing, listing its missing sheets and where they are referenced. Sheets in the package whose text cannot be read (NO_SHX_TEXT) are not missing.</span></td><td>MINOR</td><td>claims</td></tr>
 <tr><td class="mono">DRW-002</td><td><b>Revision / Status Consistency</b><br><span class="dim">Sheets of one drawing number at the same revision show different drawing statuses.</span></td><td>MINOR</td><td>claims</td></tr>
 <tr><td class="mono">DRW-003</td><td><b>Title Block Complete</b><br><span class="dim">Drawing number, sheet, revision, title or status could not be found in the title block.</span></td><td>MAJOR</td><td>claims</td></tr>
 <tr><td class="mono">DRW-004</td><td><b>Folder / Type Match</b><br><span class="dim">The title block describes a different drawing type from the input folder it was found in.</span></td><td>MAJOR</td><td>claims</td></tr>
