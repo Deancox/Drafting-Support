@@ -198,6 +198,12 @@ def test_ak_021_s_tn23t4_copied_onto_cow_catcher_contact_2(result):
     assert "LTL/S5/CH01" in fs[0].message and "S-TN24D2" in fs[0].recommendation
 
 
+def test_ak_022_sheet_051_legend_lists_ltl_sh8(result):
+    """C-35, confirmed real (2026-10-22): the legend says =K07.11+LTL-SH8; the rows use SH-LCS8."""
+    fs = [f for f in findings(result, "PATH-004", "401103 sh 051") if "LTL-SH8" in f.message]
+    assert len(fs) == 1 and fs[0].severity.value == "MAJOR" and "SH-LCS8" in fs[0].recommendation
+
+
 def test_ak_n06_s_tn25h4_routes_via_sh_jb9(result):
     """C-23 (S-TN25H4), confirmed correct: S-TN25H4 -> SH-JB9 -> LTL-PLC on CBD 016."""
     assert not findings(result, "PATH-001", "S-TN25H4")

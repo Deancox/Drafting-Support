@@ -296,6 +296,7 @@ Every run writes three files to the output folder (default `reports/<Area>/`):
 | AK-019 | 2026-10-22 (C-24) | `S-TN44F4`, `S-TN44H4`: schematic 044 via LTL-JB3; CBD 016 via SH-JB11 / SH-JB9 (with AK-017, sheet 044 shows LTL-JB3 where the CBD does not) | 401103 sh 044, 401310 sh 016 | PATH-002 |
 | AK-020 | 2026-10-22 (C-26) | `S-TN37D4`, `S-TN37F4`: schematic 037 via LTL-JB13; CBD 016 on SH-JB3 | 401103 sh 037, 401310 sh 016 | PATH-002 |
 | AK-021 | 2026-10-22 (C-27) | `S-TN23T4` (south rail, LTL/S4/CH06–07, sheet 023) is copied onto LTL/S5/CH01 "cow catcher contact 2" on sheet 024 (G3); it should be `S-TN24D2`, like contact 1 on CH00 | 401103 sh 024 | COMP-004 (MAJOR), suggesting S-TN24D2 |
+| AK-022 | 2026-10-22 (C-35) | Sheet 051's LEGEND lists `=K07.11+LTL-SH8`; the channel rows (and everything else) use `SH-LCS8` | 401103 sh 051 | PATH-004 (MAJOR), suggesting `=K07.11+SH-LCS8` |
 | AK-007 | 2026-10-21 (C-07) | Mixed statuses within one revision: 401103 sh 035 CONCEPTUAL, sh 056 PRELIMINARY (rest of rev 0 FOR CONSTRUCTION); 401310 sh 015 AS BUILT (014/016 PRELIMINARY) | Title blocks | DRW-002 |
 
 **Must NOT be reported. These are provisional: assumed by me, not yet confirmed by the checker.**
@@ -362,7 +363,7 @@ Also seen but not reported: sheet 026 has the address `04` drawn twice on top of
 
 | # | Rule | Issue |
 |---|---|---|
-| C-35 | PATH-004 (MAJOR) | Sheet 051's legend lists `=K07.11+LTL-SH8`; the channel rows use `SH-LCS8` |
+| C-35 *(confirmed 2026-10-22: now AK-022)* | PATH-004 (MAJOR) | Sheet 051's legend lists `=K07.11+LTL-SH8`; the channel rows use `SH-LCS8` |
 | C-36 | PATH-004 | Empty LEGEND on sheets 021 (rows use LTL-LCS1) and 045 (LTL-JB1, LTL-JB2) |
 | C-37 | PATH-004 | Sheet 022's legend lists LTL-LCS1/2/4/5/6 but not LTL-JB1, LTL-JB2, which its channel rows use |
 
