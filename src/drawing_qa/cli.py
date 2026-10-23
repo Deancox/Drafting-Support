@@ -14,6 +14,8 @@ from drawing_qa.model.enums import DocType, IssueCode
 from drawing_qa.pipeline import run_pipeline
 from drawing_qa.report.writer import write_outputs
 from drawing_qa.review import carry_forward
+from drawing_qa.survey import render as render_survey
+from drawing_qa.survey import survey
 
 DEFAULT_CONFIG = Path("config/project.toml")
 _INPUT_TYPES = (DocType.PLC, DocType.CBD, DocType.TERM, DocType.EQUIP)
@@ -59,6 +61,10 @@ def _build_parser() -> argparse.ArgumentParser:
              "learned from the readable sheets",
     )
     run.add_argument("-v", "--verbose", action="store_true")
+    sv = sub.add_parser("survey", help="Count which PDFs can be read from their SHX text and which need decoding (--ocr); checks nothing")
+    sv.add_argument("--input", required=True, type=Path, help="Folder to survey: every PDF under it, any layout")
+    sv.add_argument("--config", type=Path, help=f"Project config TOML (default: {DEFAULT_CONFIG} if present)")
+    sv.add_argument("-v", "--verbose", action="store_true")
     return p
 
 
@@ -75,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     settings = Settings.load(config_path)
+    if args.command == "survey":
+        print(render_survey(survey(args.input, settings), args.input))
+        return 0
     try:
         excluded, included = _doc_types(args.exclude), _doc_types(args.include)
     except argparse.ArgumentTypeError as exc:

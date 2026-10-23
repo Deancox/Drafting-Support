@@ -46,7 +46,13 @@ Sheets plotted without SHX text notes (`PDFSHX = 0`, reported as `NO_SHX_TEXT`) 
 ```bash
 .venv/Scripts/python -m drawing_qa run --input input/Main --ocr
 ```
-It learns each letter's strokes from the package's readable sheets and decodes the unreadable ones by exact match (no OCR program or service is involved). Only words whose every letter matched are used, nothing is reported as missing from a decoded sheet, and findings resting on decoded text are marked "(decoded from line work)". A package with no readable sheets to learn from stays unread. `report.md` lists what was decoded under "Sheets decoded from line work".
+To see how many sheets a set has of each kind before running anything (quick: nothing is checked):
+```bash
+.venv/Scripts/python -m drawing_qa survey --input input/Main
+```
+It counts the sheets that are SHX readable, that need decoding (`--ocr`), that are scans and that are blank, by folder, and lists the files to re-plot or decode with the AutoCAD version that plotted them.
+
+`--ocr` learns each letter's strokes from the package's readable sheets and decodes the unreadable ones by exact match (no OCR program or service is involved). Only words whose every letter matched are used, nothing is reported as missing from a decoded sheet, and findings resting on decoded text are marked "(decoded from line work)". A package with no readable sheets to learn from stays unread. `report.md` lists what was decoded under "Sheets decoded from line work".
 The outputs are written to `reports/Main/` (change this with `--output`):
 - `review.json`: files, sheets, every extracted claim with its position, and parse issues
 - `findings.json`: QA findings, each with rule, severity, evidence (sheet + grid) and recommendation

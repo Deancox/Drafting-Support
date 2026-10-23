@@ -843,6 +843,7 @@ python -m venv .venv
           <tr><td class="mono">--config FILE</td><td>Project config; default <code>config/project.toml</code> (with <code>rules.toml</code> and <code>waivers.toml</code> beside it)</td></tr>
           <tr><td class="mono">--exclude TYPE</td><td>Leave a type out: <code>plc</code>, <code>cbd</code>, <code>term</code>, <code>equip</code>, or a folder name. Repeat or comma-separate</td></tr>
           <tr><td class="mono">--include TYPE</td><td>Put back a type the config leaves out</td></tr>
+          <tr><td class="mono">survey --input FOLDER</td><td>Separate command, checks nothing: counts every PDF page under the folder as SHX readable, needing decoding (<code>--ocr</code>), scanned or blank, by folder, and lists the files to re-plot or decode</td></tr>
           <tr><td class="mono">--ocr</td><td>Read <code>NO_SHX_TEXT</code> sheets by decoding their letter strokes, learned from the package's readable sheets (<code>[ocr]</code> in the config)</td></tr>
           <tr><td class="mono">-v</td><td>Detailed logging</td></tr>
         </tbody>

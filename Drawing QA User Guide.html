@@ -244,7 +244,7 @@ html { scroll-behavior: smooth; }
       <p>Controls drawings use SHX fonts, which AutoCAD plots as lines. The text is only readable if AutoCAD also stores it as hidden notes in the PDF. That depends on one setting:</p>
       <pre><code>PDFSHX = 1      (type PDFSHX at the AutoCAD command line before plotting or publishing)</code></pre>
       <p>To check a PDF, open its <b>Comments</b> list in Acrobat or another viewer: it should hold many entries titled <i>AutoCAD SHX Text</i>. A sheet without them is reported as <code>NO_SHX_TEXT</code> and nothing on it is checked. On the 401002 package, 76 of 149 sheets plotted from AutoCAD 2026 had none.</p>
-      <p>If a re-plot is not possible, run with <code>--ocr</code>. The tool then learns each letter's strokes from the readable sheets of the same package and decodes the unreadable ones by exact match. Only words whose every letter matched are used; nothing is reported as missing from a decoded sheet; findings that rest on decoded text say <i>(decoded from line work)</i>, so check the drawing before acting on them. It needs readable sheets in the same fonts and sizes to learn from; text it has not seen (often much of the title block) stays unread.</p>
+      <p>To see how many sheets of a set were plotted without them before a run, use <code>python -m drawing_qa survey --input FOLDER</code>: it lists each folder's SHX-readable, to-decode, scanned and blank sheets in a few seconds, and names the files and the AutoCAD version that plotted them. If a re-plot is not possible, run with <code>--ocr</code>. The tool then learns each letter's strokes from the readable sheets of the same package and decodes the unreadable ones by exact match. Only words whose every letter matched are used; nothing is reported as missing from a decoded sheet; findings that rest on decoded text say <i>(decoded from line work)</i>, so check the drawing before acting on them. It needs readable sheets in the same fonts and sizes to learn from; text it has not seen (often much of the title block) stays unread.</p>
       <h3>Name the files</h3>
       <p>Name each sheet <code>&lt;drawing&gt;-&lt;sheet&gt;.pdf</code> (<code>401103-036.pdf</code>). The title block is the source of truth, but the file name is the fallback when a title block cannot be read, and DRW-008 flags files whose name and title block disagree. Multi-page PDFs are read too; one page is one sheet.</p>
       <h3>Leave out what does not belong</h3>
@@ -435,6 +435,7 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
           <p><code>--exclude term</code> leave a type out (<code>plc, cbd, term, equip</code>)</p>
           <p><code>--include term</code> put back a type the config leaves out</p>
           <p><code>--ocr</code> decode sheets plotted without SHX text</p>
+          <p><code>python -m drawing_qa survey --input FOLDER</code> count readable / to-decode sheets, checks nothing</p>
           <p><code>--config FILE</code> another project config</p>
           <p><code>python -m pytest</code> run the tests</p>
         </div>
