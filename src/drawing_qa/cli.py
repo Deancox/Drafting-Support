@@ -53,6 +53,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--include", action="append", metavar="TYPE",
         help="Put back an input type that [ingest] unchecked_types in the config leaves out",
     )
+    run.add_argument(
+        "--ocr", action="store_true",
+        help="Read sheets plotted without SHX text (NO_SHX_TEXT) by decoding their letter strokes, "
+             "learned from the readable sheets",
+    )
     run.add_argument("-v", "--verbose", action="store_true")
     return p
 
@@ -81,6 +86,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     unchecked = [t for t in settings.ingest.unchecked_types if t not in included]
     settings.ingest.unchecked_types = unchecked + [t for t in excluded if t not in unchecked]
+    settings.ocr.enabled = settings.ocr.enabled or args.ocr
     result = run_pipeline(args.input, settings)
     out_dir = args.output or Path("reports") / args.input.resolve().name
     review = carry_forward(result, out_dir, settings) if settings.review.enabled else None

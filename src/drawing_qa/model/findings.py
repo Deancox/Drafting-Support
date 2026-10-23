@@ -44,3 +44,4 @@ class Finding(BaseModel):
     status: Decision = Decision.OPEN  # the latest review decision carried forward, OPEN if none
     review: FindingReview | None = None
     first_seen: str | None = None  # date of the first run that raised this fingerprint
+    decoded: bool = False  # rests on text decoded from letter strokes (--ocr): check the drawing

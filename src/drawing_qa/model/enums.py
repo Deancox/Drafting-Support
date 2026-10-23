@@ -83,6 +83,8 @@ class IssueCode(StrEnum):
     NEEDS_OCR = "NEEDS_OCR"
     EMPTY_PAGE = "EMPTY_PAGE"
     NO_SHX_TEXT = "NO_SHX_TEXT"  # drawn sheet whose text cannot be read: re-plot with PDFSHX=1
+    SHX_NOT_DECODED = "SHX_NOT_DECODED"  # --ocr could not decode the sheet: nothing to learn from, or font not seen
+    DECODED_TITLE_MISMATCH = "DECODED_TITLE_MISMATCH"  # decoded title block disagrees with the file name
     PANEL_MAPPING = "PANEL_MAPPING"  # a rack's assumed panel (<rack>-PLC) is shown on no drawing
     FFI_MAPPING = "FFI_MAPPING"  # the FFI -> drawing mapping disagrees with the sheets, or points outside the package
     PARSER_ERROR = "PARSER_ERROR"

@@ -168,6 +168,17 @@ class Waiver(BaseModel):
     expires: date | None = None  # not applied after this date
 
 
+class OcrConfig(BaseModel):
+    """Reading sheets plotted without SHX text notes (NO_SHX_TEXT) by decoding their letter strokes,
+    learned from the package's readable sheets. Off unless `run --ocr` (or enabled = true)."""
+
+    enabled: bool = False
+    # Hold back findings whose every piece of evidence is on decoded sheets (off: raise them, marked).
+    confirm_decoded: bool = False
+    # Stop learning once this many readable sheets in a row teach nothing new.
+    patience: int = 3
+
+
 class ReviewConfig(BaseModel):
     """Recording decisions in the register (Decision / comment columns, carried forward between runs
     in qa_review.sqlite, waivers, No Longer Raised). Off: the register is for printing and marking up
@@ -193,6 +204,7 @@ class Settings(BaseModel):
     spelling: SpellingConfig = Field(default_factory=SpellingConfig)
     cbd: CbdConfig = Field(default_factory=CbdConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
+    ocr: OcrConfig = Field(default_factory=OcrConfig)
     rules: dict[str, RuleSetting] = Field(default_factory=dict)  # from rules.toml beside the project config
     waivers: list[Waiver] = Field(default_factory=list)  # from waivers.toml beside the project config
     config_hash: str = ""

@@ -40,6 +40,15 @@ class GridFrame(BaseModel):
         return [r[0] for r in self.rows]
 
 
+class DecodeInfo(BaseModel):
+    """How much of a NO_SHX_TEXT sheet was read by decoding its letter strokes (--ocr)."""
+
+    letters: int  # letters recognised
+    shapes: int  # letter-sized shapes, recognised or not
+    words_kept: int
+    words_dropped: int  # words with an unrecognised letter: never used
+
+
 class Drawing(BaseModel):
     """One sheet (PDF page) of one drawing at one revision."""
 
@@ -55,6 +64,7 @@ class Drawing(BaseModel):
     descriptor: str | None = None  # e.g. SCHEMATIC DIAGRAM, TERMINATION DIAGRAM
     ffi: str | None = None  # from the sheet's "WIRE NUMBER / FIRST FIELD IDENTIFIER" box, e.g. TN
     text_unreadable: bool = False  # drawn, but no readable text (NO_SHX_TEXT): in the package, nothing on it checked
+    decoded: DecodeInfo | None = None  # read by decoding its letter strokes (--ocr): checked, but never fully read
     title_doc_type: DocType | None = None  # document type implied by the descriptor
     title_block_method: ExtractionMethod = ExtractionMethod.FILENAME
     missing_title_fields: list[str] = Field(default_factory=list)

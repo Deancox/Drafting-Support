@@ -74,6 +74,12 @@ TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10
 # and carry them forward between runs.
 enabled = false
 
+# [ocr]
+# Read sheets plotted without SHX text (NO_SHX_TEXT) by decoding their letter strokes. `run --ocr` turns it on.
+# enabled = false
+# true: hold back findings whose every piece of evidence is on decoded sheets (false: raise them, marked).
+# confirm_decoded = false
+
 [plc.rack_panels]
 # Which panel each PLC rack sits in, when it is not "<rack>-PLC" (rack LTL -> panel LTL-PLC needs no entry).
 # A run warns ("Rack ... is assumed to be in panel ..., which no drawing shows") when an entry is needed.
