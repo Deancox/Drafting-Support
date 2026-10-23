@@ -42,3 +42,9 @@ def test_multi_part_char_gives_two_groups(tmp_path):
 def test_groups_in_drawing_order(tmp_path):
     groups = glyph_groups(_page(tmp_path, stroke_text("AB", 300, 200) + stroke_text("C", 100, 200)))
     assert [round(g.box[0]) for g in groups] == [300, 305, 100]  # drawn A, B, then C further left
+
+
+def test_unstroked_paths_are_not_letters(tmp_path):
+    """Filled shapes (a logo) and invisible text-note outlines have no stroke width; letters always do."""
+    path = build_pdf(tmp_path / "p.pdf", [[]], lines=[stroke_text("AB", 100, 200)], shx=[[((99, 193, 110, 201), "AB")]])
+    assert len(glyph_groups(pymupdf.open(path)[0])) == 2

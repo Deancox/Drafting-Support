@@ -47,7 +47,8 @@ def glyph_groups(
     page: pymupdf.Page, *, window: int = 12, max_size: float = 40.0, touch: float = 0.3, quantum: float = 0.25
 ) -> list[Glyph]:
     """Letter candidates on the page, in drawing order. Line work larger than max_size is ignored."""
-    paths = sorted(page.get_drawings(), key=lambda d: d["seqno"])
+    # Letters are stroked with a width; filled shapes (a logo) and invisible text-note outlines are not.
+    paths = sorted((d for d in page.get_drawings() if d.get("width")), key=lambda d: d["seqno"])
     rects = [pymupdf.Rect(d["rect"]) for d in paths]
     small = [r.width <= max_size and r.height <= max_size for r in rects]
     parent = list(range(len(paths)))
