@@ -21,6 +21,42 @@ class Glyph:
     box: BBox
     key: GlyphKey
     first_seq: int
+    on_line: bool = False  # touches a long stroke (a wire, a frame): a symbol or a letter overdrawn, not text
+
+
+def _segments(path: dict) -> list[tuple]:
+    """Straight pieces of a path as (x0, y0, x1, y1); curves as the box of their points."""
+    out = []
+    for item in path["items"]:
+        if item[0] == "l":
+            out.append((item[1].x, item[1].y, item[2].x, item[2].y))
+        else:
+            pts = _points({"items": [item]})
+            if pts:
+                xs, ys = [q.x for q in pts], [q.y for q in pts]
+                out += [(min(xs), min(ys), max(xs), min(ys)), (max(xs), min(ys), max(xs), max(ys)),
+                        (max(xs), max(ys), min(xs), max(ys)), (min(xs), max(ys), min(xs), min(ys))]
+    return out
+
+
+def _hits(seg: tuple, box: tuple) -> bool:
+    """Whether a straight segment passes through a box (Liang-Barsky clipping)."""
+    x0, y0, x1, y1 = seg
+    dx, dy = x1 - x0, y1 - y0
+    t0, t1 = 0.0, 1.0
+    for p, q in ((-dx, x0 - box[0]), (dx, box[2] - x0), (-dy, y0 - box[1]), (dy, box[3] - y0)):
+        if p == 0:
+            if q < 0:
+                return False
+        else:
+            t = q / p
+            if p < 0:
+                t0 = max(t0, t)
+            else:
+                t1 = min(t1, t)
+            if t0 > t1:
+                return False
+    return True
 
 
 def _points(path: dict) -> list:
@@ -71,6 +107,22 @@ def glyph_groups(
         if small[i]:
             members.setdefault(find(i), []).append(i)
 
+    cell = 20.0
+    long_segments: dict[tuple[int, int], list[tuple]] = {}
+    for i, d in enumerate(paths):
+        if small[i]:
+            continue
+        for seg in _segments(d):
+            for cx in range(int(min(seg[0], seg[2]) // cell), int(max(seg[0], seg[2]) // cell) + 1):
+                for cy in range(int(min(seg[1], seg[3]) // cell), int(max(seg[1], seg[3]) // cell) + 1):
+                    long_segments.setdefault((cx, cy), []).append(seg)
+
+    def on_line(box: pymupdf.Rect) -> bool:
+        grown = (box.x0 - touch, box.y0 - touch, box.x1 + touch, box.y1 + touch)
+        near = {seg for cx in range(int(grown[0] // cell), int(grown[2] // cell) + 1)
+                for cy in range(int(grown[1] // cell), int(grown[3] // cell) + 1) for seg in long_segments.get((cx, cy), ())}
+        return any(_hits(seg, grown) for seg in near)
+
     glyphs = []
     for idx in sorted(members.values(), key=lambda ix: paths[ix[0]]["seqno"]):
         # By coordinates: PyMuPDF's union skips the zero-area boxes of straight strokes.
@@ -78,5 +130,5 @@ def glyph_groups(
                            max(rects[i].x1 for i in idx), max(rects[i].y1 for i in idx))
         pts = sorted((round((p.x - box.x0) / quantum), round((p.y - box.y0) / quantum)) for i in idx for p in _points(paths[i]))
         key = (round(box.width / quantum), round(box.height / quantum), len(idx), tuple(pts))
-        glyphs.append(Glyph(box=(box.x0, box.y0, box.x1, box.y1), key=key, first_seq=paths[idx[0]]["seqno"]))
+        glyphs.append(Glyph(box=(box.x0, box.y0, box.x1, box.y1), key=key, first_seq=paths[idx[0]]["seqno"], on_line=on_line(box)))
     return glyphs

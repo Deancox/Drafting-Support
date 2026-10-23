@@ -10,6 +10,7 @@ from drawing_qa.model.enums import Decision, IssueCode, Severity, StageStatus
 from drawing_qa.model.findings import Finding
 from drawing_qa.model.run import RunResult
 from drawing_qa.report.summary import RunSummary
+from drawing_qa.rules.context import quiet_rules
 
 # Issues that mean part of the package was not checked; listed in full.
 _COVERAGE_ISSUES = {
@@ -379,6 +380,10 @@ def _decoded(result: RunResult, w) -> None:
         w("|---|---|---|---|")
         for d in decoded:
             w(f"| {d.label} | {d.decoded.letters} / {d.decoded.shapes} | {d.decoded.words_kept} | {d.decoded.words_dropped} |")
+        w("")
+    if quiet := quiet_rules(result.drawings):
+        w(f"A cable block diagram or termination sheet was decoded, so these rules are quiet for the whole package "
+          f"(what they report missing could be on a decoded sheet): {', '.join(quiet)}.")
         w("")
     if left:
         labels = {d.id: d.label for d in result.drawings}

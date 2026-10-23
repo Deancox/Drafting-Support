@@ -161,3 +161,27 @@ def test_real_words_win_overlaps(tmp_path, cfg):
     result = run(package(tmp_path, text=words), cfg)
     jbs = [c for c in _claims_on(result, "037") if c.subject_type is EntityType.JUNCTION_BOX and c.predicate is Predicate.OCCURS]
     assert len(jbs) == 1 and jbs[0].method is ExtractionMethod.TEXT_LAYER
+
+
+def test_a_sheet_that_fails_to_decode_does_not_stop_the_run(tmp_path, cfg, monkeypatch):
+    import drawing_qa.pipeline as pipeline
+
+    def broken(page, book, **kw):
+        raise ValueError("bad stroke data")
+
+    monkeypatch.setattr(pipeline, "decode_page", broken)
+    result = run(package(tmp_path), cfg)
+    assert any(i.code is IssueCode.PARSER_ERROR and "bad stroke data" in i.message and "037" in (i.file_path or "")
+               for i in result.issues)
+    assert _sheet(result, "037").decoded is None and _claims_on(result, "037") == []
+
+
+def test_a_readable_sheet_that_fails_to_learn_from_does_not_stop_the_run(tmp_path, cfg, monkeypatch):
+    from drawing_qa.pdf.shx.book import GlyphBook
+
+    def broken(self, page, titles):
+        raise ValueError("odd drawing")
+
+    monkeypatch.setattr(GlyphBook, "learn_page", broken)
+    result = run(package(tmp_path), cfg)
+    assert any(i.code is IssueCode.SHX_NOT_DECODED for i in result.issues)

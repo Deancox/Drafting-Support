@@ -7,6 +7,7 @@ means that character. A fingerprint seen as two different characters is never us
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
 
@@ -14,6 +15,8 @@ import pymupdf
 
 from drawing_qa.pdf.extract import decode_autocad_text
 from drawing_qa.pdf.shx.glyphs import Glyph, GlyphKey, glyph_groups
+
+log = logging.getLogger(__name__)
 
 QUANTUM = 0.25
 MAX_PARTS = 3  # a character drawn in up to three separate parts (%, ", =, :)
@@ -72,6 +75,8 @@ class GlyphBook:
         self._near_index: dict[tuple, list] = defaultdict(list)
         self._near_cache: dict = {}
         self._key_heights: dict[GlyphKey | tuple, set[float]] = defaultdict(set)  # text heights a shape was learned at
+        # Where a shape sits across its line (0 top .. 1 bottom), to one decimal: ',' and "'" are one stroke.
+        self._positions: dict[GlyphKey, set[float]] = defaultdict(set)
 
     # --- lookups --------------------------------------------------------------------------------
 
@@ -100,6 +105,13 @@ class GlyphBook:
         used: it was learned from a note whose box caught a neighbour (sheet 077: H + '-' taught as '-')."""
         return {k: next(iter(v)) for k, v in self._multi.items()
                 if len(v) == 1 and not any((ch := self.char(part[0])) and ch.isalnum() for part in k)}
+
+    def exact(self, key: GlyphKey) -> bool:
+        """The fingerprint itself was learned (not only one within a rounding step of it)."""
+        return key in self._chars
+
+    def positions(self, key: GlyphKey) -> frozenset[float]:
+        return frozenset().union(*(self._positions.get(k, ()) for k in self._matches(key)))
 
     def sizes(self, key: GlyphKey | tuple) -> frozenset[float]:
         """Text heights this shape (single or multi-part fingerprint) was learned at."""
@@ -174,10 +186,15 @@ class GlyphBook:
         if any(len(p) > 1 and max(g.box[axis[1]] for g in p) - min(g.box[axis[0]] for g in p) > height for p in spans):
             return  # parts wider than a letter: the box caught a neighbour's strokes, not a multi-part character
         h = round(height * 2) / 2
+        lo, hi = (0, 2) if vertical else (1, 3)
+        band = min(g.box[lo] for g in glyphs), max(g.box[hi] for g in glyphs)
         for ch, parts in zip(chars, spans):
             key = parts[0].key if len(parts) == 1 else combo_key(parts)
             (self._chars if len(parts) == 1 else self._multi)[key].add(ch)
             self._key_heights[key].add(h)
+            if len(parts) == 1 and band[1] > band[0]:
+                g = parts[0]
+                self._positions[key].add(round(((g.box[lo] + g.box[hi]) / 2 - band[0]) / (band[1] - band[0]), 1))
         self.heights.add(h)
         spaced = [False] * len(chars)  # spaced[i]: a space follows character i
         i = -1
@@ -198,7 +215,12 @@ def learn(pages: Iterable[pymupdf.Page], shx_titles: Sequence[str], *, patience:
     book = GlyphBook()
     quiet = 0
     for page in pages:
-        quiet = 0 if book.learn_page(page, shx_titles) else quiet + 1
+        try:
+            added = book.learn_page(page, shx_titles)
+        except Exception:  # one odd sheet must not stop the run: learn from the others
+            log.exception("Learning letter shapes failed on page %s", getattr(page, "number", "?"))
+            added = 0
+        quiet = 0 if added else quiet + 1
         if quiet >= patience:
             break
     return book

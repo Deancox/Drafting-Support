@@ -31,7 +31,7 @@ from drawing_qa.pdf.extract import PageContent, _load_segments, extract_page, op
 from drawing_qa.pdf.shx.book import learn
 from drawing_qa.pdf.shx.decode import DecodeStats, decode_page
 from drawing_qa.pdf.ocr import OcrEngine
-from drawing_qa.rules.context import RuleContext, reference_sheet_ids
+from drawing_qa.rules.context import RuleContext, quiet_rules, reference_sheet_ids
 from drawing_qa.rules.engine import RuleEngine
 from drawing_qa.traces import build_traces
 from drawing_qa.traces.coverage import compute_coverage
@@ -255,39 +255,57 @@ def _decode_unreadable(pending: list[tuple], readable: list[tuple[Path, int]], s
 
     book = learn(pages(), settings.pdf.shx_annotation_titles, patience=settings.ocr.patience)
     for found, index, drawing, content, parser in pending:
-        with open_pdf(found.path) as doc:
-            page = doc[index]
-            decoded, stats = decode_page(page, book) if book.size else ([], DecodeStats())
-            decoded = [w for w in decoded if not any(_overlaps(w.bbox, r.bbox) for r in content.words)]  # real text wins
-            if not decoded:
-                reason = ("nothing to learn from: no readable sheet in the package has SHX text notes" if not book.size
-                          else "its font or text size was not seen on the readable sheets")
-                result.issues.append(Issue(code=IssueCode.SHX_NOT_DECODED, message=f"Not decoded (--ocr): {reason}",
-                                           file_path=drawing.file_path, drawing_id=drawing.id))
-                if content.kind is not PageKind.NO_TEXT:
-                    _parse_page(parser, content, drawing, ctx, result)  # as without --ocr
-                continue
-            merged = PageContent(page_index=index, width=content.width, height=content.height, kind=PageKind.VECTOR,
-                                 words=list(content.words) + decoded, image_count=content.image_count, drawn=True,
-                                 _segment_loader=lambda page=page: _load_segments(page))
-            drawing.grid = read_grid_frame(merged, settings.grid)
-            drawing.ffi = sheet_ffi(merged) or drawing.ffi
-            drawing.decoded = DecodeInfo(letters=stats.letters, shapes=stats.shapes, words_kept=len(decoded),
-                                         words_dropped=stats.words_dropped)
-            for issue in result.issues:
-                if issue.code is IssueCode.NO_SHX_TEXT and issue.drawing_id == drawing.id:
-                    issue.message += (f"; decoded from line work (--ocr): {stats.letters}/{stats.shapes} letters, "
-                                      f"{len(decoded)} words")
-            tb = read_title_block(merged, settings.title_block)
-            said = [v for v, own in ((tb.drawing_no, drawing.drawing_no), (tb.sheet, drawing.sheet))
-                    if v and v.lstrip("0") != own.lstrip("0")]
-            if said:
-                result.issues.append(Issue(
-                    code=IssueCode.DECODED_TITLE_MISMATCH,
-                    message=(f"Decoded title block reads drawing {tb.drawing_no or '?'} sheet {tb.sheet or '?'}; "
-                             f"the sheet keeps {drawing.label} from its file name"),
-                    file_path=drawing.file_path, drawing_id=drawing.id))
-            _parse_page(parser, merged, drawing, ctx, result)
+        try:
+            _decode_one(found, index, drawing, content, parser, book, settings, ctx, result)
+        except Exception as exc:  # one bad sheet must not stop the run: handle it as without --ocr
+            log.exception("Decoding failed on %s", drawing.id)
+            drawing.decoded = None
+            result.issues.append(Issue(code=IssueCode.PARSER_ERROR, message=f"Decoding (--ocr) failed: {type(exc).__name__}: {exc}",
+                                       file_path=drawing.file_path, drawing_id=drawing.id))
+            if content.kind is not PageKind.NO_TEXT:
+                _parse_page(parser, content, drawing, ctx, result)
+    decoded = sum(1 for _, _, d, _, _ in pending if d.decoded is not None)
+    note = f"{decoded} of {len(pending)} unreadable sheet(s) decoded from their line work (--ocr)"
+    if quiet := quiet_rules(result.drawings):
+        note += f"; quiet for the whole package (a decoded CBD / termination sheet): {', '.join(quiet)}"
+    result.stages.append(StageResult(name="decode", status=StageStatus.DONE, note=note))
+
+
+def _decode_one(found, index: int, drawing: Drawing, content: PageContent, parser, book, settings: Settings,
+                ctx: ParseContext, result: RunResult) -> None:
+    with open_pdf(found.path) as doc:
+        page = doc[index]
+        decoded, stats = decode_page(page, book) if book.size else ([], DecodeStats())
+        decoded = [w for w in decoded if not any(_overlaps(w.bbox, r.bbox) for r in content.words)]  # real text wins
+        if not decoded:
+            reason = ("nothing to learn from: no readable sheet in the package has SHX text notes" if not book.size
+                      else "its font or text size was not seen on the readable sheets")
+            result.issues.append(Issue(code=IssueCode.SHX_NOT_DECODED, message=f"Not decoded (--ocr): {reason}",
+                                       file_path=drawing.file_path, drawing_id=drawing.id))
+            if content.kind is not PageKind.NO_TEXT:
+                _parse_page(parser, content, drawing, ctx, result)  # as without --ocr
+            return
+        merged = PageContent(page_index=index, width=content.width, height=content.height, kind=PageKind.VECTOR,
+                             words=list(content.words) + decoded, image_count=content.image_count, drawn=True,
+                             _segment_loader=lambda page=page: _load_segments(page))
+        drawing.grid = read_grid_frame(merged, settings.grid)
+        drawing.ffi = sheet_ffi(merged) or drawing.ffi
+        drawing.decoded = DecodeInfo(letters=stats.letters, shapes=stats.shapes, words_kept=len(decoded),
+                                     words_dropped=stats.words_dropped)
+        for issue in result.issues:
+            if issue.code is IssueCode.NO_SHX_TEXT and issue.drawing_id == drawing.id:
+                issue.message += (f"; decoded from line work (--ocr): {stats.letters}/{stats.shapes} letters, "
+                                  f"{len(decoded)} words")
+        tb = read_title_block(merged, settings.title_block)
+        said = [v for v, own in ((tb.drawing_no, drawing.drawing_no), (tb.sheet, drawing.sheet))
+                if v and v.lstrip("0") != own.lstrip("0")]
+        if said:
+            result.issues.append(Issue(
+                code=IssueCode.DECODED_TITLE_MISMATCH,
+                message=(f"Decoded title block reads drawing {tb.drawing_no or '?'} sheet {tb.sheet or '?'}; "
+                         f"the sheet keeps {drawing.label} from its file name"),
+                file_path=drawing.file_path, drawing_id=drawing.id))
+        _parse_page(parser, merged, drawing, ctx, result)
 
 
 def _unreadable_text(content, drawing: Drawing) -> str:

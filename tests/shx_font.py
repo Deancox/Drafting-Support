@@ -22,6 +22,10 @@ def _glyph(ch: str, x: float, baseline: float, h: float, w: float = 0.5) -> list
     top = baseline - h
     if ch == "=":
         return [(x, baseline - 0.6 * h, x + w * h, baseline - 0.6 * h), (x, baseline - 0.3 * h, x + w * h, baseline - 0.3 * h)]
+    if ch == "'":  # same stroke as ',' but at the top of the text
+        return [(x, top, x, top + 0.3 * h)]
+    if ch == ",":
+        return [(x, baseline - 0.15 * h, x, baseline + 0.15 * h)]
     if ch == ":":
         return [(x, baseline - 0.6 * h, x, baseline - 0.5 * h), (x, baseline - 0.2 * h, x, baseline - 0.1 * h)]
     lines = [(x, top, x, baseline)]

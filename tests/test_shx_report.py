@@ -57,3 +57,20 @@ def test_cli_says_how_many_were_decoded(tmp_path, cfg, capsys, monkeypatch):
     monkeypatch.setattr(cli.Settings, "load", classmethod(lambda c, path=None: cfg))
     assert cli.main(["run", "--input", str(tmp_path / "pkg"), "--output", str(tmp_path / "out"), "--ocr"]) == 0
     assert "Decoded 1 of 1 unreadable sheet(s) from their line work" in capsys.readouterr().out
+
+
+def test_report_names_rules_quiet_for_the_package(tmp_path, cfg):
+    """A decoded termination or CBD sheet silences some rules for the whole package; silence must not read as clean."""
+    from drawing_qa.model.enums import DocType
+
+    result = run(package(tmp_path), cfg)
+    d = next(d for d in result.drawings if d.sheet == "037")
+    result.drawings.append(d.model_copy(update={"id": "TERM/x.pdf#p1", "doc_type": DocType.TERM, "sheet": "203"}))
+    section = render_report(result, summarise(result)).split("## Sheets decoded from line work")[1]
+    assert "DEV-003" in section and "WIRE-004" in section and "PATH-001" not in section
+
+
+def test_decode_stage_is_recorded(tmp_path, cfg):
+    result = run(package(tmp_path), cfg)
+    [stage] = [s for s in result.stages if s.name == "decode"]
+    assert "1 of 1" in stage.note

@@ -12,6 +12,18 @@ from drawing_qa.model.enums import DocType, EntityType, ExtractionMethod, Predic
 from drawing_qa.model.source import Drawing
 from drawing_qa.rules.base import Requirement
 
+# Rules that say nothing for the whole package once a sheet of this type is decoded (--ocr): a route or a
+# terminal 'not shown' could sit on any sheet of the type. Reported, so their silence is not read as clean.
+QUIET_WHEN_DECODED: dict[DocType, tuple[str, ...]] = {
+    DocType.CBD: ("PATH-001", "COMP-005"),
+    DocType.TERM: ("DEV-003", "WIRE-004", "TERM-003 (sheet references)"),
+}
+
+
+def quiet_rules(drawings) -> list[str]:
+    types = {d.doc_type for d in drawings if d.decoded is not None}
+    return [r for t, rules in QUIET_WHEN_DECODED.items() if t in types for r in rules]
+
 
 def reference_sheet_ids(drawings: list[Drawing], settings: Settings) -> set[str]:
     """Legend, symbol, title and index sheets (their example tags are not real content), and sheets of

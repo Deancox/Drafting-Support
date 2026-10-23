@@ -103,3 +103,68 @@ def test_letter_never_swallowed_into_a_multi_part_character(tmp_path):
     book = learned(tmp_path, plain + [((100, 289, 140, 301), "(AB-C")], lines)
     words, _ = decode_page(unreadable(tmp_path, stroke_text("AD-C", 300, 500, h=5.0)), book)
     assert texts(words) == ["AD-C"]
+
+
+# --- final review: misreads that must never become words ------------------------------------------
+
+
+def _rotate_cw(lines, x, baseline):
+    """Text turned to read top to bottom (270 degrees)."""
+    return [(x - (y0 - baseline), baseline + (x0 - x), x - (y1 - baseline), baseline + (x1 - x), w) for x0, y0, x1, y1, w in lines]
+
+
+def _bar(x, y, h=6.0):
+    """A hyphen drawn as one bar, as the client's font draws it, and so each half of an '='."""
+    return [(x, y, x + 0.5 * h, y, WIDTH)]
+
+
+def test_unlearned_two_part_character_drops_its_word(tmp_path):
+    """401104-148 held out: '=K07.11' came out '-K07.11', the '=' read as two hyphens."""
+    lines = _bar(100, 196.4) + stroke_text("K", 104.8, 200)  # '-K': the hyphen is one bar
+    book = learned(tmp_path, [((100, 194, 110, 200), "-K")], lines)
+    equals = _bar(300, 498.6) + _bar(300, 496.4)  # two bars 2.2 pt apart, lower first, as on 401104-148
+    words, _ = decode_page(unreadable(tmp_path, equals + stroke_text("K", 304.8, 500)), book)
+    assert texts(words) == []
+
+
+def test_comma_is_not_an_apostrophe(tmp_path):
+    """',' and "'" are one stroke; only its height in the text tells them apart (P.O. Box 57, read 57')."""
+    book = learned(tmp_path, [note("A'B", 100, 200)])
+    assert texts(decode_page(unreadable(tmp_path, stroke_text("A'B", 300, 500)), book)[0]) == ["A'B"]
+    assert texts(decode_page(unreadable(tmp_path, stroke_text("A,B", 300, 500), name="c.pdf"), book)[0]) == []
+
+
+def test_letter_merged_with_line_work_drops_both_sides(tmp_path):
+    book = learned(tmp_path, [note("S-TL60J4", 100, 200)])
+    text = stroke_text("S-TL60J4", 300, 500)
+    arc = [(315.0, 488, 315.0, 503, WIDTH)]  # a 15 pt arc drawn right after the L, through it
+    after_l = sum(len(stroke_text(c, 0, 0)) for c in "S-TL")
+    words, _ = decode_page(unreadable(tmp_path, text[:after_l] + arc + text[after_l:]), book)
+    assert texts(words) == []
+
+
+def test_text_running_top_to_bottom_is_dropped(tmp_path):
+    """Text turned 270 degrees, with its letters learned at that angle, came out one letter per word."""
+    h = 6.0
+    turned = _rotate_cw(stroke_text("S-TL60J4", 100, 200), 100, 200)
+    book = learned(tmp_path, [((100, 200, 100 + h, 200 + 8 * ADVANCE * h), "S-TL60J4")], turned)
+    words, _ = decode_page(unreadable(tmp_path, _rotate_cw(stroke_text("S-TL60J4", 400, 600), 400, 600)), book)
+    assert texts(words) in ([], ["S-TL60J4"])  # dropped, or read whole: never single letters
+
+
+def test_shape_touching_a_wire_is_not_a_letter(tmp_path):
+    """Terminal circles touching wires were read as 'O'."""
+    book = learned(tmp_path, [note("AB", 100, 200)])
+    wire = [(280, 497, 300, 497, WIDTH)]  # a 20 pt wire ending on the A's stem
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("AB", 300, 500) + wire), book)
+    assert texts(words) == []
+
+
+def test_word_matched_only_within_a_rounding_step_is_dropped(tmp_path):
+    """Near matching (one 0.25 pt step) can take an upper-case letter at one size for its lower case at
+    another (C/c, W/w on Main). A word must have at least one letter matched exactly."""
+    from tests.test_shx_book import _custom
+
+    book = learned(tmp_path, [((100, 100, 104, 106), "Q")], _custom(100, 100, 1.1249))
+    words, _ = decode_page(unreadable(tmp_path, _custom(300, 300, 1.1251)), book)
+    assert texts(words) == []
