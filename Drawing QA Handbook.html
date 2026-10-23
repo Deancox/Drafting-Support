@@ -843,6 +843,7 @@ python -m venv .venv
           <tr><td class="mono">--config FILE</td><td>Project config; default <code>config/project.toml</code> (with <code>rules.toml</code> and <code>waivers.toml</code> beside it)</td></tr>
           <tr><td class="mono">--exclude TYPE</td><td>Leave a type out: <code>plc</code>, <code>cbd</code>, <code>term</code>, <code>equip</code>, or a folder name. Repeat or comma-separate</td></tr>
           <tr><td class="mono">--include TYPE</td><td>Put back a type the config leaves out</td></tr>
+          <tr><td class="mono">--ocr</td><td>Read <code>NO_SHX_TEXT</code> sheets by decoding their letter strokes, learned from the package's readable sheets (<code>[ocr]</code> in the config)</td></tr>
           <tr><td class="mono">-v</td><td>Detailed logging</td></tr>
         </tbody>
       </table></div>
@@ -913,8 +914,8 @@ tests/         271 tests on synthetic sheets + the answer key</code></pre>
         <li><b>Built for this client's drafting standard.</b> CBD cables are 0.96 pt runs and enclosures are 0.24 pt dash-dot outlines; another drafting house's weights are set in <code>[cbd]</code> in the config. Template readers recognise this package's layouts; a new layout gets identifiers only and a <code>NO_TEMPLATE</code> issue.</li>
         <li><b>Termination drawings.</b> The readers are built against the sample package's current, old-standard termination sheets and must be re-checked when the new-standard sheets arrive. Their candidates (C-29 to C-34) are on hold until then. Wire numbers at the field device's own terminals are read but not checked, because which device a terminal belongs to is unreliable where device boxes are stacked.</li>
         <li><b>Positions are inferred from text.</b> Tag positions are label positions; labels sit one or two rows above their symbol, and the checks allow for that.</li>
-        <li><b>Short wire numbers</b> on schematics are accepted only near the cell they name; relay terminal labels <code>T1</code>/<code>T2</code> can pass that test by coincidence (harmless, as nothing references them).</li>
-        <li><b>Scanned sheets</b> are flagged, not read. <b>Sheets plotted without SHX notes</b> (<code>PDFSHX</code> = 0) are flagged <code>NO_SHX_TEXT</code> and must be re-plotted.</li>
+        <li><b>Short wire numbers</b> on schematics are accepted only near the cell they name, or along a straight run from it; boxed terminal markings such as <code>A1</code>/<code>T1</code> on a relay are not read as wires. WIRE-005 reports a wire label drawn away from the cell it encodes.</li>
+        <li><b>Scanned sheets</b> are flagged, not read. <b>Sheets plotted without SHX notes</b> (<code>PDFSHX</code> = 0) are flagged <code>NO_SHX_TEXT</code> and should be re-plotted. With <code>--ocr</code> they are decoded from their letter strokes instead: letters are fingerprinted (each path's points relative to the letter, to 0.25 pt), learned from the SHX notes on the readable sheets, and matched exactly. A word with any unmatched letter is dropped, absence rules (TAG-003, WIRE-002, COMP-001, DRW-003, TAG-007, PLC-006, COMP-002, TERM-001/003/004; PATH-001, COMP-005, DEV-003 and WIRE-004 when a CBD or termination sheet is decoded) stay quiet about decoded sheets, a decoded sheet keeps its file-name identity, and its findings are marked. <code>[ocr] confirm_decoded = true</code> holds back findings that rest only on decoded sheets.</li>
         <li><b>Parked work</b>, kept in the plan but not being built: M6 OCR and AI assist (PLC-002 description matching), M7 Word report and revision-to-revision comparison, M8 the electrical equipment list (DEV-001, DEV-002 and a full equipment list output).</li>
       </ul>
 

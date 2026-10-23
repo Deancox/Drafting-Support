@@ -98,6 +98,10 @@ def main(argv: list[str] | None = None) -> int:
     if unreadable:
         print(f"  WARNING: {len(unreadable)} sheet(s) have no readable text (plotted without SHX text notes): "
               "re-plot them from AutoCAD with PDFSHX = 1. They are listed under Parse issues in report.md")
+        if settings.ocr.enabled:
+            decoded = sum(1 for d in result.drawings if d.decoded is not None)
+            print(f"  Decoded {decoded} of {len(unreadable)} unreadable sheet(s) from their line work (--ocr); "
+                  "see 'Sheets decoded from line work' in report.md")
     for issue in (i for i in result.issues if i.code in (IssueCode.FFI_MAPPING, IssueCode.PANEL_MAPPING)):
         print(f"  WARNING: {issue.message}")
     if result.ffi_map:

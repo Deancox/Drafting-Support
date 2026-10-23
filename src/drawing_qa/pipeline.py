@@ -274,6 +274,10 @@ def _decode_unreadable(pending: list[tuple], readable: list[tuple[Path, int]], s
             drawing.ffi = sheet_ffi(merged) or drawing.ffi
             drawing.decoded = DecodeInfo(letters=stats.letters, shapes=stats.shapes, words_kept=len(decoded),
                                          words_dropped=stats.words_dropped)
+            for issue in result.issues:
+                if issue.code is IssueCode.NO_SHX_TEXT and issue.drawing_id == drawing.id:
+                    issue.message += (f"; decoded from line work (--ocr): {stats.letters}/{stats.shapes} letters, "
+                                      f"{len(decoded)} words")
             tb = read_title_block(merged, settings.title_block)
             said = [v for v, own in ((tb.drawing_no, drawing.drawing_no), (tb.sheet, drawing.sheet))
                     if v and v.lstrip("0") != own.lstrip("0")]

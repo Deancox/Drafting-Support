@@ -31,6 +31,14 @@ def _kinds(d: dict[str, int]) -> str:
     return ", ".join(f"{k.lower()} {v}" for k, v in d.items()) or "—"
 
 
+DECODED_MARK = "(decoded from line work)"
+
+
+def _msg(f: Finding) -> str:
+    """The finding's message, marked when it rests on text decoded from letter strokes (--ocr)."""
+    return f"{f.message} {DECODED_MARK}" if f.decoded else f.message
+
+
 def _sheet(f: Finding, labels: dict[str, str]) -> str:
     src = next((e.source for e in f.evidence if e.source), None)
     return labels.get(src.drawing_id, "?") if src else f.subject_key
@@ -272,12 +280,12 @@ def render_report(result: RunResult, summary: RunSummary) -> str:
                 w("| ID | Severity | Finding | Recommendation | Decision |")
                 w("|---|---|---|---|---|")
                 for f in fs:
-                    w(f"| {f.id} | {f.severity.value.title()} | {_struck(f, f.message)} | {f.recommendation or ''} | {_decision(f)} |")
+                    w(f"| {f.id} | {f.severity.value.title()} | {_struck(f, _msg(f))} | {f.recommendation or ''} | {_decision(f)} |")
             else:
                 w("| ID | Severity | Finding | Recommendation |")
                 w("|---|---|---|---|")
                 for f in fs:
-                    w(f"| {f.id} | {f.severity.value.title()} | {f.message} | {f.recommendation or ''} |")
+                    w(f"| {f.id} | {f.severity.value.title()} | {_msg(f)} | {f.recommendation or ''} |")
         else:
             # Many similar findings (typically placeholders): group by text and sheet.
             groups: dict[str, Counter[str]] = defaultdict(Counter)
@@ -349,7 +357,36 @@ def render_report(result: RunResult, summary: RunSummary) -> str:
             if len(coverage) > 50:
                 w(f"- … {len(coverage) - 50} more in review.json")
     w("")
+    _decoded(result, w)
     return "\n".join(out)
+
+
+def _decoded(result: RunResult, w) -> None:
+    """Sheets read with --ocr by decoding their letter strokes, and those that could not be."""
+    decoded = [d for d in result.drawings if d.decoded is not None]
+    left = [i for i in result.issues if i.code is IssueCode.SHX_NOT_DECODED]
+    if not decoded and not left:
+        return
+    w("## Sheets decoded from line work")
+    w("")
+    w("Plotted without SHX text notes, these sheets were read with `--ocr` by matching each letter's strokes against "
+      "letters learned from the readable sheets. Only words whose every letter matched exactly are used; nothing is "
+      f"reported as missing from them, and findings resting on them are marked {DECODED_MARK}. Re-plotting with "
+      "PDFSHX = 1 is still the better fix.")
+    w("")
+    if decoded:
+        w("| Sheet | Letters recognised / letter shapes | Words used | Words dropped |")
+        w("|---|---|---|---|")
+        for d in decoded:
+            w(f"| {d.label} | {d.decoded.letters} / {d.decoded.shapes} | {d.decoded.words_kept} | {d.decoded.words_dropped} |")
+        w("")
+    if left:
+        labels = {d.id: d.label for d in result.drawings}
+        w("Not decoded:")
+        w("")
+        for i in left:
+            w(f"- {labels.get(i.drawing_id or '', i.file_path)}: {i.message}")
+        w("")
 
 
 def write_report(result: RunResult, summary: RunSummary, out_dir: Path) -> Path:

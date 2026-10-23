@@ -244,6 +244,7 @@ html { scroll-behavior: smooth; }
       <p>Controls drawings use SHX fonts, which AutoCAD plots as lines. The text is only readable if AutoCAD also stores it as hidden notes in the PDF. That depends on one setting:</p>
       <pre><code>PDFSHX = 1      (type PDFSHX at the AutoCAD command line before plotting or publishing)</code></pre>
       <p>To check a PDF, open its <b>Comments</b> list in Acrobat or another viewer: it should hold many entries titled <i>AutoCAD SHX Text</i>. A sheet without them is reported as <code>NO_SHX_TEXT</code> and nothing on it is checked. On the 401002 package, 76 of 149 sheets plotted from AutoCAD 2026 had none.</p>
+      <p>If a re-plot is not possible, run with <code>--ocr</code>. The tool then learns each letter's strokes from the readable sheets of the same package and decodes the unreadable ones by exact match. Only words whose every letter matched are used; nothing is reported as missing from a decoded sheet; findings that rest on decoded text say <i>(decoded from line work)</i>, so check the drawing before acting on them. It needs readable sheets in the same fonts and sizes to learn from; text it has not seen (often much of the title block) stays unread.</p>
       <h3>Name the files</h3>
       <p>Name each sheet <code>&lt;drawing&gt;-&lt;sheet&gt;.pdf</code> (<code>401103-036.pdf</code>). The title block is the source of truth, but the file name is the fallback when a title block cannot be read, and DRW-008 flags files whose name and title block disagree. Multi-page PDFs are read too; one page is one sheet.</p>
       <h3>Leave out what does not belong</h3>
@@ -309,7 +310,8 @@ html { scroll-behavior: smooth; }
         <thead><tr><th>Line</th><th>What it tells you</th><th>Act when</th></tr></thead>
         <tbody>
           <tr><td class="mono">issue(s)</td><td>Problems reading the package (not drawing errors)</td><td>Above zero: read <i>Parse issues</i> in <code>report.md</code></td></tr>
-          <tr><td class="mono">WARNING: … no readable text</td><td>Sheets plotted without SHX notes</td><td>Always: re-plot those sheets with PDFSHX = 1</td></tr>
+          <tr><td class="mono">WARNING: … no readable text</td><td>Sheets plotted without SHX notes</td><td>Always: re-plot those sheets with PDFSHX = 1 (or run with <code>--ocr</code>)</td></tr>
+          <tr><td class="mono">Decoded N of M …</td><td>With <code>--ocr</code>: unreadable sheets read from their letter strokes</td><td>Read <i>Sheets decoded from line work</i> in <code>report.md</code></td></tr>
           <tr><td class="mono">WARNING: … config maps / Rack …</td><td>A project fact the config has wrong</td><td>Always: add the line it names</td></tr>
           <tr><td class="mono">FFIs:</td><td>Which drawing each FFI's tags were checked against</td><td>A package FFI shows <code>EXTERNAL</code> or a drawing you did not supply</td></tr>
           <tr><td class="mono">reviewed / left out</td><td>What was checked</td><td>It is not what you intended</td></tr>
@@ -412,7 +414,7 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
       <div class="table-wrap"><table>
         <thead><tr><th>You see</th><th>Likely cause</th><th>Do this</th></tr></thead>
         <tbody>
-          <tr><td>"title block missing", empty sheets, <code>NO_SHX_TEXT</code></td><td>Plotted with PDFSHX = 0</td><td>Re-plot with PDFSHX = 1</td></tr>
+          <tr><td>"title block missing", empty sheets, <code>NO_SHX_TEXT</code></td><td>Plotted with PDFSHX = 0</td><td>Re-plot with PDFSHX = 1, or run with <code>--ocr</code></td></tr>
           <tr><td>Few TAG / WIRE findings on a package you expected many on; DRW-009 "not checked"</td><td>The package's FFI is marked EXTERNAL or mapped to a drawing you did not supply</td><td>Check the <code>FFIs:</code> line; fix <code>[identifiers.ffi_drawings]</code></td></tr>
           <tr><td>Traces end at a panel no drawing shows</td><td>Rack panel default guessed wrong</td><td>Add the <code>[plc.rack_panels]</code> line the warning names</td></tr>
           <tr><td>No cable routes, PATH-001 on everything</td><td>CBD line weights differ from the client standard</td><td>Adjust <code>[cbd]</code></td></tr>
@@ -432,6 +434,7 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
           <p><code>--output FOLDER</code> where the register lives</p>
           <p><code>--exclude term</code> leave a type out (<code>plc, cbd, term, equip</code>)</p>
           <p><code>--include term</code> put back a type the config leaves out</p>
+          <p><code>--ocr</code> decode sheets plotted without SHX text</p>
           <p><code>--config FILE</code> another project config</p>
           <p><code>python -m pytest</code> run the tests</p>
         </div>

@@ -41,6 +41,12 @@ All four inputs are reviewed by default. To leave one out (for example terminati
 .venv/Scripts/python -m drawing_qa run --input input/Main --exclude term
 ```
 `--exclude` takes `plc`, `cbd`, `term` or `equip` (or a folder name), repeated or comma-separated. A left-out type is still listed, but nothing is checked against it.
+
+Sheets plotted without SHX text notes (`PDFSHX = 0`, reported as `NO_SHX_TEXT`) have nothing to read. Re-plotting them with `PDFSHX = 1` is the fix; when that is not possible, add `--ocr`:
+```bash
+.venv/Scripts/python -m drawing_qa run --input input/Main --ocr
+```
+It learns each letter's strokes from the package's readable sheets and decodes the unreadable ones by exact match (no OCR program or service is involved). Only words whose every letter matched are used, nothing is reported as missing from a decoded sheet, and findings resting on decoded text are marked "(decoded from line work)". A package with no readable sheets to learn from stays unread. `report.md` lists what was decoded under "Sheets decoded from line work".
 The outputs are written to `reports/Main/` (change this with `--output`):
 - `review.json`: files, sheets, every extracted claim with its position, and parse issues
 - `findings.json`: QA findings, each with rule, severity, evidence (sheet + grid) and recommendation

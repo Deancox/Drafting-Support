@@ -150,7 +150,8 @@ def _findings_sheet(wb: Workbook, result: RunResult, idx: _Index, review: bool) 
                         per_doc[doc].append(text)
 
         values = [
-            f.id, f.severity.value, f.rule_id, f.category.replace(" Validation", ""), tag, channel, f.message,
+            f.id, f.severity.value, f.rule_id, f.category.replace(" Validation", ""), tag, channel,
+            f"{f.message} (decoded from line work)" if f.decoded else f.message,
             *("\n".join(per_doc[d]) or "-" for d in _DOCS),
             f.recommendation or "",
         ]
