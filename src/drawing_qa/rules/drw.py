@@ -112,7 +112,7 @@ class TitleBlockComplete(Rule):
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
         for d in ctx.active_drawings:  # sheets with no readable text are excluded: NO_SHX_TEXT reports them
-            if not d.missing_title_fields:
+            if not d.missing_title_fields or d.id in ctx.decoded_ids:  # decoded: identity is from the file name
                 continue
             yield make(
                 subject_type="DRAWING",

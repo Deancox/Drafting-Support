@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from drawing_qa.model.claims import Claim
-from drawing_qa.model.enums import Predicate, Severity
+from drawing_qa.model.enums import DocType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -177,7 +177,11 @@ class ModuleTypeMatch(Rule):
                         discriminator="layout",
                         recommendation="Make the rack layout and the slot sheet agree",
                     )
+        listed = {(c.subject_key, int(c.value["sheet"])) for c in ctx.claims_of(Predicate.SLOT_SHEET)}
+        decoded_plc = {d.sheet_number for d in ctx.drawings if d.id in ctx.decoded_ids and d.doc_type is DocType.PLC}
         for key, lcs in sorted(layout.items()):
+            if any(k == key and n in decoded_plc for k, n in listed):
+                continue  # its slot sheet was decoded (--ocr): the slot header may not have decoded
             if key not in modules(ctx, "slot_sheet") and ctx.sheet_numbers:
                 yield make(
                     subject_type="PLC_MODULE",

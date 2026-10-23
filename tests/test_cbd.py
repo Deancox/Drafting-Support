@@ -89,3 +89,15 @@ def test_path_001_device_on_cbd_without_route(tmp_path, cfg):
     s_items, frame = slot_sheet(rows=[channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB2", ["BRAKE"])])
     add_sheet(tmp_path, "PLC", "036", s_items, **frame)
     assert [f.subject_key for f in by_rule(run_pipeline(tmp_path, cfg), "PATH-001")] == ["S-TN36D4"]
+
+
+def test_path_001_quiet_when_a_cbd_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    items = [((60, 140, 110, 150), "S-TN36D4"), ((620, 105, 700, 115), "=K07.11+LTL-PLC")]
+    cbd_sheet(tmp_path, items, box(600, 100, 720, 600))
+    s_items, frame = slot_sheet(rows=[channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB2", ["BRAKE"])])
+    add_sheet(tmp_path, "PLC", "036", s_items, **frame)
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "PATH-001")
+    assert not rule_ids(recheck(result, cfg, lambda d: d.doc_type.value == "CBD"), "PATH-001")

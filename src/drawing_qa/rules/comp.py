@@ -11,7 +11,7 @@ from collections.abc import Iterable
 
 from drawing_qa.common.tags import near_tags
 from drawing_qa.model.engineering import HopStatus, SignalTrace, TraceStatus
-from drawing_qa.model.enums import Severity
+from drawing_qa.model.enums import DocType, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -71,6 +71,8 @@ class IncompleteTrace(Rule):
             if t.status is not TraceStatus.PARTIAL or not t.gaps:
                 continue
             claim = _claim(ctx, t)
+            if claim and claim.source.drawing_id in ctx.decoded_ids:
+                continue  # decoded from its strokes (--ocr): a gap may be a word that did not decode
             where = make.where(claim.source) if claim else t.channel
             heading = without_prefix(t.description, ctx.model.description_prefix)[:70]
             if "DEVICE" in t.gaps:
@@ -127,6 +129,8 @@ class OrphanDevice(Rule):
         for t in _orphans(ctx):
             if not t.device or not _on_home_sheet(ctx, t.device):
                 continue
+            if any(c.source.drawing_id in ctx.decoded_ids for c in _occurrences(ctx, t.device)):
+                continue  # on a decoded sheet (--ocr): its channel row may not have decoded
             yield make(
                 subject_type="DEVICE",
                 subject_key=t.device,
@@ -152,6 +156,8 @@ class NotOnCableBlockDiagram(Rule):
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        if DocType.CBD in ctx.decoded_types:
+            return  # a decoded CBD (--ocr): the device's tag may not have decoded
         orphan_tags = [o.device for o in _orphans(ctx) if o.device]
         internal = {p.upper() for p in ctx.settings.identifiers.panel_device_prefixes}
         seen: set[str] = set()

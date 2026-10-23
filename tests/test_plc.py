@@ -290,3 +290,16 @@ def test_wire_002_wire_missing_from_home_sheet(tmp_path, cfg):
     findings = by_rule(run_pipeline(tmp_path, cfg), "WIRE-002")
     assert [f.subject_key for f in findings] == ["TN36E6"]
     assert "TN36D6" in findings[0].message
+
+
+def test_plc_006_no_slot_sheet_quiet_when_listed_sheet_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    items, frame = rack_layout({13: ("1734-IB8 INPUT MODULE", ["036"]), 14: ("1734-IB8 INPUT MODULE", ["037"])})
+    add_sheet(tmp_path, "PLC", "013", items, **frame)
+    s_items, s_frame = slot_sheet()
+    add_sheet(tmp_path, "PLC", "036", s_items, **s_frame)
+    add_sheet(tmp_path, "PLC", "037")  # slot 14's sheet, its slot not read
+    result = run_pipeline(tmp_path, cfg)
+    assert [f for f in by_rule(result, "PLC-006") if f.subject_key == "LTL/S14"]
+    assert not [f for f in rule_ids(recheck(result, cfg, lambda d: d.sheet == "037"), "PLC-006") if f.subject_key == "LTL/S14"]

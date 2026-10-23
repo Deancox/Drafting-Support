@@ -136,3 +136,25 @@ def test_superseded_designation_links_to_replacement(tmp_path, cfg):
     assert node.written_as == ["LTL-AUT1"]
     assert "LOCATION:LTL-AUT1" not in result.model.nodes
     assert by_rule(result, "DRW-006")  # still reported
+
+
+def test_comp_002_quiet_when_home_sheet_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    items, frame = slot_sheet(rows=[channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB2", ["BRAKE"])])
+    items.append((cell_rect("W8"), "S-TN36W8"))
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    add_sheet(tmp_path, "CBD", "014", [(cell_rect("H3"), "S-TN36W8"), (cell_rect("C3"), "S-TN36D4")], drawing_no="401310")
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "COMP-002")
+    assert not rule_ids(recheck(result, cfg, lambda d: d.sheet == "036"), "COMP-002")
+
+
+def test_comp_005_quiet_when_a_cbd_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    rows = [channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB2", ["BRAKE"])]
+    _package(tmp_path, rows, [(cell_rect("C5"), "LTL-JB2")])
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "COMP-005")
+    assert not rule_ids(recheck(result, cfg, lambda d: d.doc_type.value == "CBD"), "COMP-005")

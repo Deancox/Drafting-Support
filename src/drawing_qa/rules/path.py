@@ -6,7 +6,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from drawing_qa.model.engineering import TraceStatus
-from drawing_qa.model.enums import Severity
+from drawing_qa.model.enums import DocType, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -36,6 +36,8 @@ class RouteExists(Rule):
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        if DocType.CBD in ctx.decoded_types:
+            return  # a decoded CBD (--ocr): a cable or its number may not have decoded
         seen = set()
         for t in _field_traces(ctx):
             if not t.on_cbd or t.cbd_route or t.device in seen:

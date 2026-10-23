@@ -50,6 +50,11 @@ class RuleEngine:
             record.findings = len(produced)
             findings.extend(produced)
 
+        for f in findings:
+            f.decoded = any(e.source is not None and e.source.drawing_id in ctx.decoded_ids for e in f.evidence)
+        if ctx.settings.ocr.confirm_decoded:  # hold back findings resting only on decoded text
+            findings = [f for f in findings if not f.decoded or any(
+                e.source is not None and e.source.drawing_id not in ctx.decoded_ids for e in f.evidence)]
         _number_repeats(findings)
         findings.sort(key=lambda f: (_SEVERITY_ORDER[f.severity], f.rule_id, f.subject_key, f.fingerprint))
         for n, f in enumerate(findings, start=1):

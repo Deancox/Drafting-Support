@@ -62,8 +62,20 @@ class RuleContext:
 
     @cached_property
     def active_drawings(self) -> list[Drawing]:
-        """Drawings that were read (identical duplicate copies and sheets with no readable text excluded)."""
-        return [d for d in self.drawings if d.duplicate_of is None and not d.text_unreadable]
+        """Drawings that were read (identical duplicate copies and sheets with no readable text excluded;
+        sheets decoded from their letter strokes with --ocr included)."""
+        return [d for d in self.drawings if d.duplicate_of is None and (not d.text_unreadable or d.decoded is not None)]
+
+    @cached_property
+    def decoded_ids(self) -> frozenset[str]:
+        """Sheets read by decoding their letter strokes (--ocr). Checked, but never fully read: a word that
+        could not be decoded looks like a missing one, so nothing is reported as absent from them."""
+        return frozenset(d.id for d in self.drawings if d.decoded is not None)
+
+    @cached_property
+    def decoded_types(self) -> frozenset:
+        """Document types with a decoded sheet: a route or terminal 'not shown' on them may not have decoded."""
+        return frozenset(d.doc_type for d in self.drawings if d.decoded is not None)
 
     @cached_property
     def unreadable_sheets(self) -> set[tuple[str, int]]:

@@ -7,7 +7,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from drawing_qa.model.claims import Claim
-from drawing_qa.model.enums import EntityType, Predicate, Severity
+from drawing_qa.model.enums import DocType, EntityType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.common import col_offset, row_offset
@@ -127,6 +127,8 @@ class WireHomeSheet(Rule):
             home_ids = {d.id for d in homes}
             if any(c.source.drawing_id in home_ids for c in claims):
                 continue
+            if home_ids & ctx.decoded_ids:
+                continue  # home sheet decoded from its strokes (--ocr): the wire may be a word that did not decode
             near = _near_wires(wire, claims[0], wires, home_ids)
             refs = sorted({ctx.sheet_of(c).label for c in claims})
             yield make(
@@ -209,6 +211,8 @@ class WireContinuity(Rule):
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
         from drawing_qa.rules.term import is_placeholder_wire
 
+        if DocType.TERM in ctx.decoded_types:
+            return  # a decoded termination sheet (--ocr): its wire numbers may not have decoded
         # Schematic channel row vs JB terminals.
         seen = set()
         for t in ctx.traces:

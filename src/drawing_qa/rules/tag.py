@@ -101,6 +101,8 @@ class SheetValidation(Rule):
             home_ids = {d.id for d in homes}
             if any(c.source.drawing_id in home_ids for c in claims):
                 continue
+            if home_ids & ctx.decoded_ids:
+                continue  # home sheet decoded from its strokes (--ocr): the tag may be a word that did not decode
             near = _near_matches(tag, claims[0], all_devices, home_ids)
             refs = sorted({make.where(c.source).split(" grid")[0] for c in claims})
             home_label = homes[0].label
@@ -246,6 +248,8 @@ class AuxiliaryContactPointer(Rule):
             coil, aux, sheet, grid = p.value["coil"], p.value["aux_tag"], p.value["target_sheet"], p.value["target_grid"]
             pointer = f"{sheet}/{grid}"
             if coil is None:
+                if p.source.drawing_id in ctx.decoded_ids:
+                    continue  # decoded sheet: the coil tag above may not have decoded
                 yield make(
                     subject_type="DEVICE",
                     subject_key=pointer,
@@ -275,6 +279,8 @@ class AuxiliaryContactPointer(Rule):
             elif on_target:
                 message = f"{coil} contact table at {where} points to {pointer}, but {coil} is labelled at {make.where(on_target[0].source)}"
                 recommendation, severity, evidence_b = "Correct the pointer or move the contact", Severity.MINOR, on_target
+            elif target_ids & ctx.decoded_ids:
+                continue  # decoded target sheet: the contact's label may not have decoded
             else:
                 message = f"{coil} contact table at {where} points to {pointer}, but {coil} is not on {targets[0].label}"
                 recommendation = f"Draw the auxiliary contact {coil} at {targets[0].label} grid {grid}, or correct the pointer"

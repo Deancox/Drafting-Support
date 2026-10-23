@@ -303,3 +303,13 @@ def test_drw_010_spelling(tmp_path, cfg):
     add_sheet(tmp_path, "CBD", "015", words, drawing_no="401310")
     findings = by_rule(run_pipeline(tmp_path, cfg), "DRW-010")
     assert [(f.subject_key, f.recommendation) for f in findings] == [("STOBE", "Check the spelling; did you mean STROBE?")]
+
+
+def test_tag_007_quiet_when_target_sheet_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    _coil_sheet(tmp_path, ["43/D4"])
+    add_sheet(tmp_path, "PLC", "043")
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "TAG-007")
+    assert not rule_ids(recheck(result, cfg, lambda d: d.sheet == "043"), "TAG-007")

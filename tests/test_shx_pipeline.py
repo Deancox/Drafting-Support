@@ -50,23 +50,24 @@ def unreadable_sheet(root, kind, sheet, items, *, title_sheet=None, text=(), sca
     build_pdf(root / FOLDER[kind] / f"{DRAWING}-{sheet}.pdf", [list(text)], lines=[as_strokes(everything, FILL)])
 
 
-def slot_037():
+def slot_037(device="S-TN37D4", extra=()):
     rows = [
-        channel_row(113, "00", "IN-0", "S-TN37D4", "B4", "D6", "LTL-JB2", ["LONG TRAVEL BRAKE", "RELEASED SWITCH"]),
+        channel_row(113, "00", "IN-0", device, "B4", "D6", "LTL-JB2", ["LONG TRAVEL BRAKE", "RELEASED SWITCH"]),
         channel_row(182, "01", "IN-1", wire="F6", description=["SPARE"]),
+        list(extra),
     ]
     return slot_sheet(sheet="037", slot=14, rows=rows)
 
 
-def package(tmp_path, *, readable=True, **unreadable_kw):
+def package(tmp_path, *, readable=True, device="S-TN37D4", extra=(), readable_extra=(), **unreadable_kw):
     """Readable slot sheet 036 to learn from; slot sheet 037 plotted without SHX notes."""
     if readable:
         items, frame = slot_sheet()
         # Characters sheet 037 uses that 036 does not show at those sizes: a 7 like the device tags,
         # a 4 like the rack and POINTS lines.
         items = items + [((505, 400, 567, 410), "NOTE 7"), ((300, 600, 340, 614), "N 14"), ((300, 640, 340, 652), "S14")]
-        readable_sheet(tmp_path, "PLC", "036", items, **frame)
-    items, frame = slot_037()
+        readable_sheet(tmp_path, "PLC", "036", items + list(readable_extra), **frame)
+    items, frame = slot_037(device, extra)
     unreadable_sheet(tmp_path, "PLC", "037", items, **frame, **unreadable_kw)
     return tmp_path
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 
-from drawing_qa.model.enums import Severity
+from drawing_qa.model.enums import DocType, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -27,6 +27,8 @@ class DeviceTerminated(Rule):
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        if DocType.TERM in ctx.decoded_types:
+            return  # a decoded termination sheet (--ocr): the terminals may not have decoded
         internal = {p.upper() for p in ctx.settings.identifiers.panel_device_prefixes}
         seen = set()
         for t in ctx.traces:

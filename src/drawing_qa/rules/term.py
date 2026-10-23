@@ -96,6 +96,8 @@ class TerminalAllocation(Rule):
                 missing.append("device")
             if not missing:
                 continue
+            if c.source.drawing_id in ctx.decoded_ids:
+                continue  # decoded sheet (--ocr): the wire number or device may not have decoded
             what = " or ".join(missing)
             yield make(
                 subject_type="TERMINAL",
@@ -167,6 +169,8 @@ class TerminalReference(Rule):
             seen.add((c.subject_key, c.object_key, ref))
             ref_sheet = f"{int(ref):03d}"
             supplied = any(d.sheet == ref_sheet for d in ctx.active_drawings if d.doc_type is DocType.TERM)
+            if DocType.TERM in ctx.decoded_types:
+                continue  # a decoded termination sheet (--ocr): the JB's terminals may not have decoded
             if not supplied or ref_sheet in sheets_of_jb.get(c.object_key, set()):
                 continue  # a sheet not supplied is DRW-001's business
             shown = ", ".join(sorted(sheets_of_jb.get(c.object_key, set()))) or "no supplied sheet"
@@ -183,6 +187,8 @@ class TerminalReference(Rule):
             if c.method is ExtractionMethod.TEMPLATE:
                 continue
             jb = c.value.get("jb")
+            if jb in strips and any(r.source.drawing_id in ctx.decoded_ids for r in strips[jb]):
+                continue  # the strip is on a decoded sheet (--ocr): the terminal may not have decoded
             if jb in strips and c.subject_key not in {r.subject_key for r in strips[jb]}:
                 yield make(
                     subject_type="TERMINAL",
@@ -211,8 +217,8 @@ class TerminalSequence(Rule):
             if not numbers:
                 continue
             missing = sorted(set(range(1, max(numbers) + 1)) - numbers)
-            if not missing:
-                continue
+            if not missing or any(c.source.drawing_id in ctx.decoded_ids for c in cs):
+                continue  # none missing, or the strip is on a decoded sheet (--ocr): a terminal may not have decoded
             sheets = ", ".join(sorted({ctx.sheet_of(c).label for c in cs}))
             yield make(
                 subject_type="JUNCTION_BOX",

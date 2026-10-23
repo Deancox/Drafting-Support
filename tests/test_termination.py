@@ -214,3 +214,47 @@ def test_slot_sheet_wire_on_another_module_is_plc_001(tmp_path, cfg):
     slot_term_sheet(tmp_path, slot=12, rows=[("1", "TN36D6"), ("2", "TN15D5")])
     findings = by_rule(run_pipeline(tmp_path, cfg), "PLC-001")
     assert len(findings) == 1 and "the schematics have it on LTL/S13" in findings[0].message
+
+
+def _term_decoded(d):
+    return d.doc_type.value == "TERM"
+
+
+def test_dev_003_and_wire_004_quiet_when_termination_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    schematic(tmp_path, device="S-TN36D5")
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13)
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "DEV-003")
+    assert not rule_ids(recheck(result, cfg, _term_decoded), "DEV-003")
+
+    other = tmp_path / "wire"
+    schematic(other, wire="D5")
+    jb_sheet(other, blocks=BRAKE, destinations=TO_SLOT_13)
+    result = run_pipeline(other, cfg)
+    assert rule_ids(result.findings, "WIRE-004")
+    assert not rule_ids(recheck(result, cfg, _term_decoded), "WIRE-004")
+
+
+def test_term_001_and_004_quiet_when_termination_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    extra = [((280, 58, 288, 67), "9"), ((293, 58, 313, 67), "TN36W6")]
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13, extra=extra)
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "TERM-001") and rule_ids(result.findings, "TERM-004")
+    again = recheck(result, cfg, _term_decoded)
+    assert not rule_ids(again, "TERM-001") and not rule_ids(again, "TERM-004")
+
+
+def test_term_003_quiet_when_termination_is_decoded(tmp_path, cfg):
+    from tests.test_shx_rules import recheck, rule_ids
+
+    schematic(tmp_path)
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13)
+    slot_term_sheet(tmp_path, slot=13, rows=[("1", "TN36D6"), ("2", "TN15D5")], ref="0205")
+    jb_sheet(tmp_path, "205", jb="=K07.11+LTL-JB2", blocks=[("S-TN37D4", [("1", "TN15D5"), ("2", "TN37D6")])], spec=None)
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "TERM-003")
+    assert not rule_ids(recheck(result, cfg, _term_decoded), "TERM-003")
