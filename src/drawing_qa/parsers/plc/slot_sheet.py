@@ -26,7 +26,8 @@ from drawing_qa.model.source import BBox, Drawing
 from drawing_qa.parsers.base import DrawingParser, ParseContext, ParseResult, TemplateReader
 from drawing_qa.pdf.extract import PageContent, TextLine
 
-_POINTS = re.compile(r"POINTS\s*:?\s*(?P<text>\S+)", re.I)
+_POINTS = re.compile(r"POINTS\s*:?\s*(?P<text>[^\s:]\S*)", re.I)
+_POINTS_LABEL = re.compile(r"^POINTS\s*:?$", re.I)
 _POINTS_PARTS = re.compile(
     r"^(?P<rack>[A-Z0-9]+)\.S(?P<slot>\d+)\.?(?P<type>DI|DO|AI|AO)\.(?P<first>\d{2})\.{1,2}(?P<last>\d{2})$"
 )
@@ -141,6 +142,8 @@ class SlotSheetReader(TemplateReader):
         for ln in page.lines:
             if (m := _POINTS.search(ln.text)) and points is None:
                 points, points_line = m["text"].upper(), ln
+            elif _POINTS_LABEL.match(ln.text.strip()) and points is None and (value := self._beside(page, ln)):
+                points, points_line = value.text.strip().upper(), ln  # label and value as two texts (decoded sheets)
             if (m := _RACK.search(ln.text)) and rack is None:
                 rack, rack_line = m, ln
             if (m := _TYPE.search(ln.text)) and part is None:
@@ -183,6 +186,14 @@ class SlotSheetReader(TemplateReader):
         )
         return module, claim
 
+    @staticmethod
+    def _beside(page: PageContent, label: TextLine) -> TextLine | None:
+        """The text just right of a label, on its line."""
+        height = label.bbox[3] - label.bbox[1]
+        right = [ln for ln in page.lines if ln is not label and abs(_cy(ln.bbox) - _cy(label.bbox)) < height / 2
+                 and 0 <= ln.bbox[0] - label.bbox[2] < 4 * height]
+        return min(right, key=lambda ln: ln.bbox[0], default=None)
+
     # --- channel rows -------------------------------------------------------------
 
     @staticmethod
@@ -205,7 +216,9 @@ class SlotSheetReader(TemplateReader):
     def _bands(ys: list[float]) -> list[tuple[float, float]]:
         gap = median([b - a for a, b in zip(ys, ys[1:])]) if len(ys) > 1 else 70.0
         bounds = [ys[0] - gap / 2] + [(a + b) / 2 for a, b in zip(ys, ys[1:])] + [ys[-1] + gap / 2]
-        return list(zip(bounds, bounds[1:]))
+        # A row reaches at most 0.6 of a row spacing from its address, so where an address is missing
+        # (not drawn, or not decoded) that row's items go to no channel rather than to a neighbour.
+        return [(max(lo, y - 0.6 * gap), min(hi, y + 0.6 * gap)) for y, lo, hi in zip(ys, bounds, bounds[1:])]
 
     @staticmethod
     def _row_centre(drawing: Drawing, row: str, default: float) -> float:

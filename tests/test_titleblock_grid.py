@@ -86,3 +86,15 @@ def test_claims_carry_grid_cells(tmp_path, make_pdf, settings):
     doc.close()
     claim = next(c for c in result.claims if c.subject_key == "S-TN35T4")
     assert claim.source.grid_cell == "D5"
+
+
+def test_grid_fills_a_missing_label(tmp_path, make_pdf):
+    """A row letter that could not be read (decoded sheet 069 lost its S) must not shift its cells to a neighbour."""
+    items = [it for it in sheet_frame() if it[1] not in ("S", "4")]
+    doc, page = _page(tmp_path, make_pdf, items)
+    grid = read_grid_frame(page, GridConfig())
+    doc.close()
+    assert grid.row_labels == list("ABCDEFGHJKLMNPQRSTUVWXYZ")
+    assert [c[0] for c in grid.cols] == [str(i) for i in range(10)]
+    x0, y0, x1, y1 = cell_rect("S4")
+    assert grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2 + 3) == "S4"

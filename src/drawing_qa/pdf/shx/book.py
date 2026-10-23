@@ -19,6 +19,17 @@ QUANTUM = 0.25
 MAX_PARTS = 3  # a character drawn in up to three separate parts (%, ", =, :)
 
 
+def _within_a_step(a: GlyphKey, b: GlyphKey) -> bool:
+    if abs(a[0] - b[0]) > 1 or abs(a[1] - b[1]) > 1:
+        return False
+    pa, pb = a[3], b[3]
+    for order in (None, lambda p: (p[1], p[0])):
+        xs, ys = (sorted(pa, key=order), sorted(pb, key=order)) if order else (pa, pb)
+        if all(abs(x[0] - y[0]) <= 1 and abs(x[1] - y[1]) <= 1 for x, y in zip(xs, ys)):
+            return True
+    return False
+
+
 def combo_key(parts: Sequence[Glyph]) -> tuple:
     """Fingerprint of a character drawn in several separate parts: each part and its offset from the first."""
     x0, y0 = parts[0].box[0], parts[0].box[1]
@@ -57,21 +68,44 @@ class GlyphBook:
         self._letter_gaps: dict[float, list[float]] = defaultdict(list)
         self._space_gaps: dict[float, list[float]] = defaultdict(list)
         self.heights: set[float] = set()
+        self._near_index_for: dict = {}
+        self._near_index: dict[tuple, list] = defaultdict(list)
+        self._near_cache: dict = {}
         self._key_heights: dict[GlyphKey | tuple, set[float]] = defaultdict(set)  # text heights a shape was learned at
 
     # --- lookups --------------------------------------------------------------------------------
 
     def char(self, key: GlyphKey) -> str | None:
-        seen = self._chars.get(key)
-        return next(iter(seen)) if seen and len(seen) == 1 else None
+        chars = set().union(*(self._chars[k] for k in self._matches(key)))
+        return next(iter(chars)) if len(chars) == 1 else None
+
+    def _matches(self, key: GlyphKey) -> list:
+        """The learned fingerprints this one is: itself, or else those within one rounding step (0.25 pt) on
+        every point. A point near a rounding boundary falls either side depending on where the letter is."""
+        if key in self._chars:
+            return [key]
+        if len(self._near_index_for) != len(self._chars):
+            self._near_index_for = dict.fromkeys(self._chars)
+            self._near_index = defaultdict(list)
+            for k in self._chars:
+                self._near_index[(k[2], len(k[3]))].append(k)
+            self._near_cache = {}
+        if key not in self._near_cache:
+            self._near_cache[key] = [k for k in self._near_index.get((key[2], len(key[3])), []) if _within_a_step(k, key)]
+        return self._near_cache[key]
 
     @property
     def multi(self) -> dict[tuple, str]:
-        return {k: next(iter(v)) for k, v in self._multi.items() if len(v) == 1}
+        """Characters drawn in parts. A combination with a part that is itself a letter or digit is never
+        used: it was learned from a note whose box caught a neighbour (sheet 077: H + '-' taught as '-')."""
+        return {k: next(iter(v)) for k, v in self._multi.items()
+                if len(v) == 1 and not any((ch := self.char(part[0])) and ch.isalnum() for part in k)}
 
     def sizes(self, key: GlyphKey | tuple) -> frozenset[float]:
         """Text heights this shape (single or multi-part fingerprint) was learned at."""
-        return frozenset(self._key_heights.get(key, ()))
+        if key in self._key_heights:
+            return frozenset(self._key_heights[key])
+        return frozenset().union(*(self._key_heights.get(k, ()) for k in self._matches(key))) if len(key) == 4 else frozenset()
 
     @property
     def size(self) -> int:

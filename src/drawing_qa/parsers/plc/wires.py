@@ -70,7 +70,7 @@ def _boxed(bbox, segments) -> bool:
                 pos, a, b = s.y0, min(s.x0, s.x1), max(s.x0, s.x1)
             else:
                 continue
-            if -1 <= (pos - at) * outward <= 3 and a <= lo + 1 and b >= hi - 1:
+            if -1 <= (pos - at) * outward <= 4.5 and a <= lo + 1 and b >= hi - 1:
                 return True
         return False
 

@@ -107,3 +107,26 @@ def test_plain_notes_are_learned_before_ambiguous_ones(tmp_path):
     book = book_from(tmp_path, [note("(A=B)", 100, 300), note("A B ( )", 100, 200)])
     assert list(book.multi.values()) == ["="]
 
+
+
+def _custom(x, y, tick):
+    """A made-up letter: stem plus one tick `tick` pt below the top."""
+    return [(x, y, x, y + 6, 0.5), (x, y + tick, x + 3, y + tick, 0.5)]
+
+
+def test_rounding_jitter_still_matches(tmp_path):
+    """A point within a hair of a 0.25 pt rounding boundary falls either side depending on where the letter is
+    (401104-060: the R of TERMINAL matched, the R of /ADDRESS did not)."""
+    page = readable(tmp_path, [((100, 100, 104, 106), "Q")], _custom(100, 100, 1.1249))
+    book = GlyphBook()
+    book.learn_page(page, TITLES)
+    [g] = glyph_groups(pymupdf.open(build_pdf(tmp_path / "u.pdf", [[]], lines=[_custom(300, 300, 1.1251)]))[0])
+    assert book.char(g.key) == "Q"
+
+
+def test_a_different_shape_never_matches(tmp_path):
+    page = readable(tmp_path, [((100, 100, 104, 106), "Q")], _custom(100, 100, 1.0))
+    book = GlyphBook()
+    book.learn_page(page, TITLES)
+    [g] = glyph_groups(pymupdf.open(build_pdf(tmp_path / "u.pdf", [[]], lines=[_custom(300, 300, 1.5)]))[0])
+    assert book.char(g.key) is None

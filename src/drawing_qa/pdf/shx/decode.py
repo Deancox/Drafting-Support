@@ -31,6 +31,7 @@ class _Letter:
     char: str | None  # None: letter-sized but not recognised
     box: BBox
     sizes: frozenset[float] = frozenset()  # text heights the shape was learned at
+    clash: bool = False  # follows a letter of another text size with no space: the word is not one text
 
 
 def _union(a: BBox, b: BBox) -> BBox:
@@ -63,13 +64,14 @@ def _letters(page: pymupdf.Page, book: GlyphBook) -> list[_Letter | None]:
     return out
 
 
+def _same_size(a: frozenset[float], b: frozenset[float]) -> bool:
+    """Text heights are rounded from a note's tallest letter, so one font differs by up to 0.5."""
+    return not a or not b or any(abs(x - y) <= 0.5 for x in a for y in b)
+
+
 def _follows(line: list[_Letter], vertical: bool | None, letter: _Letter, book: GlyphBook) -> tuple[bool, bool, bool]:
-    """(letter continues the line, the line is vertical, a space comes before it). AutoCAD gives a
-    text one height, so a letter learned only at other heights than the line's starts a new line."""
+    """(letter continues the line, the line is vertical, a space comes before it)."""
     nxt = letter.box
-    line_sizes = frozenset().union(*(g.sizes for g in line))
-    if letter.sizes and line_sizes and not letter.sizes & line_sizes:
-        return False, bool(vertical), False
     prev = line[-1].box
     for vert in ([vertical] if vertical is not None else [False, True]):
         height = max((b.box[2] - b.box[0]) if vert else (b.box[3] - b.box[1]) for b in line)
@@ -123,6 +125,14 @@ def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_00
             line, spaces, vertical = ([letter], [False], None) if letter else ([], [], None)
             continue
         joins, vert, spaced = _follows(line, vertical, letter, book)
+        if joins and not _same_size(letter.sizes, line[-1].sizes):
+            # AutoCAD gives a text one height. After a space, a letter of another size starts another text;
+            # run together with no space, they are two texts touching, and splitting them could make
+            # fragments look like identifiers (K-TL20F6 -> 20F6), so the word is dropped.
+            if spaced:
+                joins = False
+            else:
+                letter.clash = True
         if joins:
             line.append(letter)
             spaces.append(spaced)
@@ -142,7 +152,7 @@ def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_00
                 groups.append([])
             groups[-1].append(letter)
         for group in groups:
-            if any(g.char is None for g in group):
+            if any(g.char is None or g.clash for g in group):
                 stats.words_dropped += 1
                 continue
             box = group[0].box

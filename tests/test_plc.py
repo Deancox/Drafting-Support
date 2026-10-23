@@ -303,3 +303,54 @@ def test_plc_006_no_slot_sheet_quiet_when_listed_sheet_is_decoded(tmp_path, cfg)
     result = run_pipeline(tmp_path, cfg)
     assert [f for f in by_rule(result, "PLC-006") if f.subject_key == "LTL/S14"]
     assert not [f for f in rule_ids(recheck(result, cfg, lambda d: d.sheet == "037"), "PLC-006") if f.subject_key == "LTL/S14"]
+
+
+def test_boxed_terminal_marking_with_a_tight_text_box(tmp_path, cfg):
+    """Decoded text has a tight box (its strokes), so a relay's terminal frame sits further out (401104-020: 3.8 pt)."""
+    x0, y0, x1, y1 = cell_rect("H1", 12)
+    d = 4.5  # 3.5 pt outside the text box the test PDF reports
+    box = [(x0 - d, y0 - d, x1 + d, y0 - d), (x0 - d, y1 + d, x1 + d, y1 + d), (x0 - d, y0 - d, x0 - d, y1 + d), (x1 + d, y0 - d, x1 + d, y1 + d)]
+    add_sheet(tmp_path, "PLC", "037", LEGEND + [((x0, y0, x1, y1), "T1")], lines=box)
+    assert not [c for c in run_pipeline(tmp_path, cfg).claims if c.subject_type.value == "WIRE"]
+
+
+def test_points_value_beside_its_label(tmp_path, cfg):
+    """Decoded sheets (401104-060) give 'POINTS:' and its value as two texts on one line."""
+    items, frame = slot_sheet()
+    items = [it for it in items if not it[1].startswith("POINTS")]
+    items += [((881, 644, 925, 656), "POINTS:"), ((935, 644, 1010, 656), "LTL.S13.DI.00..07")]
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    result = run_pipeline(tmp_path, cfg)
+    [module] = claims(result, Predicate.INSTALLED_IN)
+    assert module.value["points"] == "LTL.S13.DI.00..07" and module.value["points_valid"] is True
+    assert by_rule(result, "PLC-008") == []
+
+
+def test_row_with_no_address_lends_its_device_to_no_channel(tmp_path, cfg):
+    """A channel number that did not decode (or was not drawn) must not hand its row's device to a neighbour."""
+    rows = [
+        channel_row(113, "00", "IN-0", "S-TN36D4", "B4", description=["A"]),
+        channel_row(182, "01", "IN-1", "S-TN36F4", "E4", description=["B"]),
+        [(cell_rect("G4"), "S-TN36H4")],  # row 02 at y 251: its device, but no address
+        channel_row(320, "03", "IN-3", "S-TN36L4", "K4", description=["D"]),
+        channel_row(389, "04", "IN-4", "S-TN36N4", "M4", description=["E"]),
+    ]
+    items, frame = slot_sheet(rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    ch = {c.subject_key: c.value["devices"] for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
+    assert ch["LTL/S13/CH01"] == ["S-TN36F4"] and ch["LTL/S13/CH03"] == ["S-TN36L4"]
+
+
+def test_missing_row_device_close_to_the_next_address(tmp_path, cfg):
+    """401104-069: CH12's number did not decode, and its device S-TL69P4 sits 0.65 of a row above CH13's number."""
+    rows = [
+        channel_row(113, "00", "IN-0", "S-TN36D4", "B4", description=["A"]),
+        channel_row(182, "01", "IN-1", "S-TN36F4", "E4", description=["B"]),
+        [(cell_rect("G4"), "S-TN36J4")],  # row 02's device: encodes row J, 45 pt above CH03's number
+        channel_row(320, "03", "IN-3", "S-TN36L4", "K4", description=["D"]),
+        channel_row(389, "04", "IN-4", "S-TN36N4", "M4", description=["E"]),
+    ]
+    items, frame = slot_sheet(rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    ch = {c.subject_key: c.value["devices"] for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
+    assert ch["LTL/S13/CH03"] == ["S-TN36L4"]

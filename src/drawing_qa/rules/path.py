@@ -213,6 +213,8 @@ class RouteLegendMatch(Rule):
             if c.object_type in (EntityType.JUNCTION_BOX, EntityType.LOCATION) and c.object_key:
                 rows[c.source.drawing_id].add(c.object_key)
         for drawing_id, entries in sorted(legends.items(), key=lambda kv: ctx.drawing[kv[0]].label):
+            if drawing_id in ctx.decoded_ids:
+                continue  # decoded sheet (--ocr): its legend or channel rows may not have fully decoded
             label = ctx.drawing[drawing_id].label
             listed = {c.subject_key for c in entries if c.subject_type is not EntityType.DRAWING}
             missing = sorted(rows.get(drawing_id, set()) - listed)

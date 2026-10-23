@@ -21,6 +21,7 @@ from drawing_qa.pdf.extract import PageContent
 _ROW = re.compile(r"^[A-Z]$")
 _COL = re.compile(r"^\d{1,2}$")
 _ALIGN = 6.0  # points; labels on one edge share x (rows) or y (columns) within this
+_ROW_ORDER = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 
 def read_grid_frame(page: PageContent, config: GridConfig) -> GridFrame | None:
@@ -39,8 +40,8 @@ def read_grid_frame(page: PageContent, config: GridConfig) -> GridFrame | None:
         elif _COL.match(text) and y1 <= top:
             cols[round(cy / _ALIGN)].append((cx, text))
 
-    best_rows = _best_line(rows, key=lambda label: label)
-    best_cols = _best_line(cols, key=int)
+    best_rows = _fill_gaps(_best_line(rows, key=lambda label: label), list(_ROW_ORDER))
+    best_cols = _fill_gaps(_best_line(cols, key=int), [str(i) for i in range(100)])
     if len(best_rows) < config.min_labels or len(best_cols) < config.min_labels:
         return None
     return GridFrame(rows=[(lbl, pos) for pos, lbl in best_rows], cols=[(lbl, pos) for pos, lbl in best_cols])
@@ -55,6 +56,22 @@ def _best_line(groups: dict[int, list[tuple[float, str]]], key) -> list[tuple[fl
         if len(run) > len(best):
             best = run
     return best
+
+
+def _fill_gaps(run: list[tuple[float, str]], order: list[str]) -> list[tuple[float, str]]:
+    """Put back labels missing between two read ones (unreadable, or not decoded) when the gap between
+    them is the usual spacing times the number missing, so their cells do not go to a neighbour."""
+    if len(run) < 3 or any(label not in order for _, label in run):
+        return run
+    steps = sorted((b[0] - a[0]) / (order.index(b[1]) - order.index(a[1])) for a, b in zip(run, run[1:]))
+    spacing = steps[len(steps) // 2]
+    out = [run[0]]
+    for (pa, la), (pb, lb) in zip(run, run[1:]):
+        n = order.index(lb) - order.index(la)
+        if n > 1 and abs((pb - pa) / n - spacing) <= 0.15 * spacing:
+            out += [(pa + (pb - pa) * k / n, order[order.index(la) + k]) for k in range(1, n)]
+        out.append((pb, lb))
+    return out
 
 
 def _increasing(items: list[tuple[float, str]], key) -> list[tuple[float, str]]:

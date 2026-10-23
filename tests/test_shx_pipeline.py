@@ -33,7 +33,10 @@ def _items(kind, sheet, items, frame, title_sheet=None):
     items = [(_LEGEND.get(text, rect), text) for rect, text in items]
     frame = dict(frame)
     frame.setdefault("descriptor", DESCRIPTOR[kind])
-    return sheet_frame(DRAWING, title_sheet or sheet, **frame) + list(items)
+    # The title block's sheet number sits a little apart from its "Sheet N°" label, as on the client's sheets.
+    title = [((r[0] + 8, r[1], r[2] + 8, r[3]), t) if r == (1038, 779, 1074, 799) else (r, t)
+             for r, t in sheet_frame(DRAWING, title_sheet or sheet, **frame)]
+    return title + list(items)
 
 
 def readable_sheet(root, kind, sheet, items, **frame):
@@ -123,7 +126,7 @@ def test_grid_and_ffi_from_decoded_text(tmp_path, cfg):
 
 
 def test_unseen_font_leaves_sheet_unread(tmp_path, cfg):
-    result = run(package(tmp_path, scale=1.5), cfg)
+    result = run(package(tmp_path, scale=2.6), cfg)  # far from every size on the readable sheet
     assert _claims_on(result, "037") == []
     assert any(i.code is IssueCode.SHX_NOT_DECODED and "not seen" in i.message for i in result.issues)
     d = _sheet(result, "037")

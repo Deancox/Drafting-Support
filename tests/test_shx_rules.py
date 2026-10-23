@@ -70,3 +70,16 @@ def recheck(result, cfg, decoded):
 
 def rule_ids(findings, rule_id):
     return [f for f in findings if f.rule_id == rule_id]
+
+
+def test_path_004_quiet_on_a_decoded_legend_sheet(tmp_path, cfg):
+    """On real decoded sheets 041/044 the legend decoded but the channel rows did not."""
+    from drawing_qa.pipeline import run_pipeline
+    from tests.test_plc import slot_sheet
+
+    items, frame = slot_sheet()  # channel 00 routes through LTL-JB2
+    items += [((881, 300, 930, 312), "LEGEND"), ((881, 316, 1000, 328), "=K07.11+LTL-JB9")]
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "PATH-004")
+    assert not rule_ids(recheck(result, cfg, lambda d: d.sheet == "036"), "PATH-004")
