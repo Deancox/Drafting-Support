@@ -48,3 +48,11 @@ def test_unstroked_paths_are_not_letters(tmp_path):
     """Filled shapes (a logo) and invisible text-note outlines have no stroke width; letters always do."""
     path = build_pdf(tmp_path / "p.pdf", [[]], lines=[stroke_text("AB", 100, 200)], shx=[[((99, 193, 110, 201), "AB")]])
     assert len(glyph_groups(pymupdf.open(path)[0])) == 2
+
+
+def test_box_covers_every_stroke(tmp_path):
+    """Straight strokes have zero-area boxes, which PyMuPDF's rectangle union skips."""
+    [g] = glyph_groups(_page(tmp_path, stroke_text("A", 100, 200)))
+    assert tuple(round(v, 1) for v in g.box) == (100, 194, 103, 200)
+    [v] = glyph_groups(_page(tmp_path, stroke_text("A", 100, 200, vertical=True)))
+    assert tuple(round(c, 1) for c in v.box) == (94, 197, 100, 200)

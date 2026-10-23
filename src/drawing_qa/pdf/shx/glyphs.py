@@ -73,9 +73,9 @@ def glyph_groups(
 
     glyphs = []
     for idx in sorted(members.values(), key=lambda ix: paths[ix[0]]["seqno"]):
-        box = pymupdf.Rect(rects[idx[0]])
-        for i in idx[1:]:
-            box |= rects[i]
+        # By coordinates: PyMuPDF's union skips the zero-area boxes of straight strokes.
+        box = pymupdf.Rect(min(rects[i].x0 for i in idx), min(rects[i].y0 for i in idx),
+                           max(rects[i].x1 for i in idx), max(rects[i].y1 for i in idx))
         pts = sorted((round((p.x - box.x0) / quantum), round((p.y - box.y0) / quantum)) for i in idx for p in _points(paths[i]))
         key = (round(box.width / quantum), round(box.height / quantum), len(idx), tuple(pts))
         glyphs.append(Glyph(box=(box.x0, box.y0, box.x1, box.y1), key=key, first_seq=paths[idx[0]]["seqno"]))

@@ -34,9 +34,9 @@ def text_height(glyphs: Sequence[Glyph]) -> tuple[float, bool]:
     return max((g.box[2] - g.box[0]) if vertical else (g.box[3] - g.box[1]) for g in glyphs), vertical
 
 
-def _alignments(chars: str, n_groups: int) -> list[list[int]]:
+def _alignments(chars: str, n_groups: int, limit: int = 32) -> list[list[int]]:
     """Ways to give each character 1 to MAX_PARTS consecutive groups (more than one only for
-    punctuation), as lists of group counts. Stops counting at two."""
+    punctuation), as lists of group counts. At most `limit` are kept per step."""
     ways: dict[tuple[int, int], list[list[int]]] = {(0, 0): [[]]}
     for i, ch in enumerate(chars):
         sizes = range(1, MAX_PARTS + 1) if not ch.isalnum() else (1,)
@@ -45,7 +45,7 @@ def _alignments(chars: str, n_groups: int) -> list[list[int]]:
                 for k in sizes:
                     if j + k <= n_groups:
                         bucket = ways.setdefault((i + 1, j + k), [])
-                        if len(bucket) < 2:
+                        if len(bucket) < limit:
                             bucket.append(prev + [k])
     return ways.get((len(chars), n_groups), [])
 
@@ -104,19 +104,36 @@ class GlyphBook:
     def _learn_note(self, text: str, glyphs: list[Glyph]) -> None:
         chars = text.replace(" ", "")
         options = _alignments(chars, len(glyphs))
-        if len(options) != 1:
-            return  # no alignment, or more than one: the note does not say which strokes are which
+        if not options:
+            return
+        if len(options) > 1:
+            # Several characters could be the one drawn in parts: take the alignment whose single
+            # letters agree most with letters already learned, if it is the clear winner.
+            def agree(counts: list[int]) -> int:
+                pos, n = 0, 0
+                for ch, k in zip(chars, counts):
+                    n += k == 1 and self.char(glyphs[pos].key) == ch
+                    pos += k
+                return n
+
+            scored = sorted(((agree(o), o) for o in options), key=lambda t: -t[0])
+            if scored[0][0] == 0 or scored[0][0] == scored[1][0]:
+                return  # the note does not say which strokes are which
+            options = [scored[0][1]]
+        height, vertical = text_height(glyphs)
         spans: list[list[Glyph]] = []
         pos = 0
-        for ch, k in zip(chars, options[0]):
-            parts = glyphs[pos:pos + k]
+        for k in options[0]:
+            spans.append(glyphs[pos:pos + k])
             pos += k
-            spans.append(parts)
-            if k == 1:
+        axis = (1, 3) if vertical else (0, 2)
+        if any(len(p) > 1 and max(g.box[axis[1]] for g in p) - min(g.box[axis[0]] for g in p) > height for p in spans):
+            return  # parts wider than a letter: the box caught a neighbour's strokes, not a multi-part character
+        for ch, parts in zip(chars, spans):
+            if len(parts) == 1:
                 self._chars[parts[0].key].add(ch)
             else:
                 self._multi[combo_key(parts)].add(ch)
-        height, vertical = text_height(glyphs)
         h = round(height * 2) / 2
         self.heights.add(h)
         spaced = [False] * len(chars)  # spaced[i]: a space follows character i

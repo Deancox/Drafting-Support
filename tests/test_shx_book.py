@@ -7,13 +7,14 @@ import pymupdf
 from drawing_qa.pdf.shx.book import GlyphBook, learn
 from drawing_qa.pdf.shx.glyphs import glyph_groups
 from tests.conftest import build_pdf
-from tests.shx_font import ADVANCE, stroke_text
+from tests.shx_font import ADVANCE, SPACE, stroke_text
 
 TITLES = ("AutoCAD SHX Text",)
 
 
 def note(text: str, x: float, baseline: float, h: float = 6.0):
-    return ((x, baseline - h, x + len(text) * ADVANCE * h, baseline), text)
+    width = sum(SPACE if ch == " " else ADVANCE for ch in text) * h
+    return ((x, baseline - h, x + width, baseline), text)
 
 
 def readable(tmp_path, items, lines=None, name="r.pdf"):
@@ -79,3 +80,23 @@ def test_learning_stops_when_nothing_new(tmp_path):
     book = learn(feed(), TITLES, patience=3)
     assert book.size > 0
     assert len(read) <= 4
+
+
+def test_wide_combination_is_not_learned(tmp_path):
+    """A note box catching a neighbour's letter must not teach '-' + that letter as one wide '-'
+    (on real sheets this decoded S-TL60J4 as S-60J4)."""
+    item = ((100, 194, 120, 200), "-AB")  # the box covers four letters' strokes
+    lines = stroke_text("-X", 100, 200) + stroke_text("AB", 100 + 2 * ADVANCE * 6, 200)
+    book = book_from(tmp_path, [item], lines)
+    assert book.multi == {}
+
+
+def test_known_letters_settle_an_ambiguous_note(tmp_path):
+    """'(A=B)' could have '(', '=' or ')' as the two-part character; letters already learned say it is '='."""
+    book = book_from(tmp_path, [note("A B ( )", 100, 200), note("(A=B)", 100, 300)])
+    assert list(book.multi.values()) == ["="]
+
+
+def test_unsettled_ambiguity_is_skipped(tmp_path):
+    book = book_from(tmp_path, [note("(A=B)", 100, 300)])  # nothing known yet: no way to tell
+    assert book.multi == {}

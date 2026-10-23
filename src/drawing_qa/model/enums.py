@@ -21,6 +21,7 @@ class PageKind(StrEnum):
 class ExtractionMethod(StrEnum):
     TEXT_LAYER = "TEXT_LAYER"
     SHX_ANNOTATION = "SHX_ANNOTATION"
+    SHX_STROKES = "SHX_STROKES"  # decoded from the letter strokes of a sheet plotted without SHX notes
     TEMPLATE = "TEMPLATE"
     VECTOR = "VECTOR"
     OCR = "OCR"
