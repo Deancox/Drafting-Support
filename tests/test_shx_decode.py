@@ -65,3 +65,12 @@ def test_stats_count_letters_and_words(tmp_path):
     book = learned(tmp_path, [note("-TL60F4 OK", 100, 200)])
     _, stats = decode_page(unreadable(tmp_path, stroke_text("S-TL60F4 OK", 300, 500)), book)
     assert (stats.letters, stats.shapes, stats.words_kept, stats.words_dropped) == (9, 10, 1, 1)
+
+
+def test_text_of_another_size_starts_a_new_line(tmp_path):
+    """Two texts side by side ('Sheet N°' and the sheet number) stay apart when their sizes differ."""
+    book = learned(tmp_path, [note("AB", 100, 200), note("CD", 100, 300, h=9.0)])
+    lines = stroke_text("AB", 300, 500) + stroke_text("CD", 300 + 2 * ADVANCE * 6, 500, h=9.0)
+    words, _ = decode_page(unreadable(tmp_path, lines), book)
+    assert texts(words) == ["AB", "CD"]
+    assert words[0].block != words[1].block

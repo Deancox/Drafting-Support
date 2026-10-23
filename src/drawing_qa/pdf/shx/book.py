@@ -57,6 +57,7 @@ class GlyphBook:
         self._letter_gaps: dict[float, list[float]] = defaultdict(list)
         self._space_gaps: dict[float, list[float]] = defaultdict(list)
         self.heights: set[float] = set()
+        self._key_heights: dict[GlyphKey | tuple, set[float]] = defaultdict(set)  # text heights a shape was learned at
 
     # --- lookups --------------------------------------------------------------------------------
 
@@ -67,6 +68,10 @@ class GlyphBook:
     @property
     def multi(self) -> dict[tuple, str]:
         return {k: next(iter(v)) for k, v in self._multi.items() if len(v) == 1}
+
+    def sizes(self, key: GlyphKey | tuple) -> frozenset[float]:
+        """Text heights this shape (single or multi-part fingerprint) was learned at."""
+        return frozenset(self._key_heights.get(key, ()))
 
     @property
     def size(self) -> int:
@@ -93,12 +98,17 @@ class GlyphBook:
             return 0
         groups = glyph_groups(page, quantum=QUANTUM)
         before = len(self._chars) + len(self._multi)
+        found = []
         for annot in notes:
             text = decode_autocad_text(annot.info.get("content") or "").strip()
             r = annot.rect
             inside = [g for g in groups if r.x0 - 1 <= g.box[0] and g.box[2] <= r.x1 + 1 and r.y0 - 1 <= g.box[1] and g.box[3] <= r.y1 + 1]
             if text and inside:
-                self._learn_note(text, inside)
+                found.append((text, inside))
+        # Plain notes (one letter per character) first: what they teach settles the ambiguous ones.
+        found.sort(key=lambda t: len(t[1]) != len(t[0].replace(" ", "")))
+        for text, inside in found:
+            self._learn_note(text, inside)
         return len(self._chars) + len(self._multi) - before
 
     def _learn_note(self, text: str, glyphs: list[Glyph]) -> None:
@@ -129,12 +139,11 @@ class GlyphBook:
         axis = (1, 3) if vertical else (0, 2)
         if any(len(p) > 1 and max(g.box[axis[1]] for g in p) - min(g.box[axis[0]] for g in p) > height for p in spans):
             return  # parts wider than a letter: the box caught a neighbour's strokes, not a multi-part character
-        for ch, parts in zip(chars, spans):
-            if len(parts) == 1:
-                self._chars[parts[0].key].add(ch)
-            else:
-                self._multi[combo_key(parts)].add(ch)
         h = round(height * 2) / 2
+        for ch, parts in zip(chars, spans):
+            key = parts[0].key if len(parts) == 1 else combo_key(parts)
+            (self._chars if len(parts) == 1 else self._multi)[key].add(ch)
+            self._key_heights[key].add(h)
         self.heights.add(h)
         spaced = [False] * len(chars)  # spaced[i]: a space follows character i
         i = -1

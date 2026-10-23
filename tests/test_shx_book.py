@@ -100,3 +100,10 @@ def test_known_letters_settle_an_ambiguous_note(tmp_path):
 def test_unsettled_ambiguity_is_skipped(tmp_path):
     book = book_from(tmp_path, [note("(A=B)", 100, 300)])  # nothing known yet: no way to tell
     assert book.multi == {}
+
+
+def test_plain_notes_are_learned_before_ambiguous_ones(tmp_path):
+    """'(A=B)' comes first on the page, but the plain note after it settles which character is in parts."""
+    book = book_from(tmp_path, [note("(A=B)", 100, 300), note("A B ( )", 100, 200)])
+    assert list(book.multi.values()) == ["="]
+

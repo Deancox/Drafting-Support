@@ -20,12 +20,16 @@ from drawing_qa.graph import build_graph
 from drawing_qa.linker import link
 from drawing_qa.model.enums import DocType, ExtractionMethod, IssueCode, PageKind, StageStatus
 from drawing_qa.model.run import RunInfo, RunResult, StageResult
-from drawing_qa.model.source import Drawing, Issue
+from drawing_qa.model.source import DecodeInfo, Drawing, Issue
 from drawing_qa.parsers.base import ParseContext
 from drawing_qa.parsers.plc.wires import sheet_ffi
 from drawing_qa.parsers.registry import build_parsers
 from drawing_qa.parsers.titleblock import drawing_for_page
-from drawing_qa.pdf.extract import extract_page, open_pdf
+from drawing_qa.common.grid import read_grid_frame
+from drawing_qa.common.titleblock import read_title_block
+from drawing_qa.pdf.extract import PageContent, _load_segments, extract_page, open_pdf
+from drawing_qa.pdf.shx.book import learn
+from drawing_qa.pdf.shx.decode import DecodeStats, decode_page
 from drawing_qa.pdf.ocr import OcrEngine
 from drawing_qa.rules.context import RuleContext, reference_sheet_ids
 from drawing_qa.rules.engine import RuleEngine
@@ -130,6 +134,10 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
     min_words = settings.pdf.min_words_for_vector
     # (drawing no, sheet) -> first drawing seen with that identity, to catch copies of one sheet.
     seen_sheets: dict[tuple[str, str], Drawing] = {}
+    # --ocr: NO_SHX_TEXT pages to decode after every sheet is read, and pages with SHX notes to learn from.
+    decode = settings.ocr.enabled
+    pending: list[tuple] = []
+    readable: list[tuple[Path, int]] = []
 
     for found in files:
         record = found.record
@@ -158,8 +166,13 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
                                 drawing_id=drawing.id,
                             )
                         )
+                        if decode:
+                            pending.append((found, page.number, drawing, content, parser))
+                            continue
                         if content.kind is PageKind.NO_TEXT:
                             continue
+                    elif decode and content.shx_word_count:
+                        readable.append((found.path, page.number))
                     if drawing.grid is None and content.kind is PageKind.VECTOR and not unreadable:
                         result.issues.append(
                             Issue(
@@ -186,23 +199,15 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
                             Issue(code=IssueCode.EMPTY_PAGE, message="Page has no text or images", file_path=record.path, drawing_id=drawing.id)
                         )
                         continue
-                    if parser is None:
-                        continue
-                    try:
-                        parsed = parser.parse(content, drawing, ctx)
-                    except Exception as exc:  # one bad sheet must not stop the run
-                        log.exception("Parser failed on %s", drawing.id)
-                        result.issues.append(
-                            Issue(code=IssueCode.PARSER_ERROR, message=f"{type(exc).__name__}: {exc}", file_path=record.path, drawing_id=drawing.id)
-                        )
-                        continue
-                    result.claims.extend(parsed.claims)
-                    result.issues.extend(parsed.issues)
+                    _parse_page(parser, content, drawing, ctx, result)
         except Exception as exc:
             record.readable = False
             result.issues.append(
                 Issue(code=IssueCode.UNREADABLE_FILE, message=f"{type(exc).__name__}: {exc}", file_path=record.path)
             )
+
+    if pending:
+        _decode_unreadable(pending, readable, settings, ctx, result)
 
     notes = "; ".join(
         f"{p.doc_type.value}: identifiers, placeholders"
@@ -214,6 +219,71 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
     if equip:
         notes += f"; EQUIP: {equip} equipment list file(s) listed, not read yet (reader waits for the list format)"
     result.stages.append(StageResult(name="parse", status=StageStatus.DONE, note=notes))
+
+
+def _parse_page(parser, content: PageContent, drawing: Drawing, ctx: ParseContext, result: RunResult) -> None:
+    if parser is None:
+        return
+    try:
+        parsed = parser.parse(content, drawing, ctx)
+    except Exception as exc:  # one bad sheet must not stop the run
+        log.exception("Parser failed on %s", drawing.id)
+        result.issues.append(
+            Issue(code=IssueCode.PARSER_ERROR, message=f"{type(exc).__name__}: {exc}", file_path=drawing.file_path, drawing_id=drawing.id)
+        )
+        return
+    result.claims.extend(parsed.claims)
+    result.issues.extend(parsed.issues)
+
+
+def _overlaps(a, b) -> bool:
+    return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+
+def _decode_unreadable(pending: list[tuple], readable: list[tuple[Path, int]], settings: Settings, ctx: ParseContext,
+                       result: RunResult) -> None:
+    """--ocr: decode NO_SHX_TEXT pages from their letter strokes, learned from the readable pages.
+
+    A decoded page keeps its file-name identity; its grid and FFI come from the decoded text. It stays
+    text_unreadable (never fully read). Where nothing decodes, the page is handled as without --ocr.
+    """
+
+    def pages():
+        for path, index in readable:
+            with open_pdf(path) as doc:
+                yield doc[index]
+
+    book = learn(pages(), settings.pdf.shx_annotation_titles, patience=settings.ocr.patience)
+    for found, index, drawing, content, parser in pending:
+        with open_pdf(found.path) as doc:
+            page = doc[index]
+            decoded, stats = decode_page(page, book) if book.size else ([], DecodeStats())
+            decoded = [w for w in decoded if not any(_overlaps(w.bbox, r.bbox) for r in content.words)]  # real text wins
+            if not decoded:
+                reason = ("nothing to learn from: no readable sheet in the package has SHX text notes" if not book.size
+                          else "its font or text size was not seen on the readable sheets")
+                result.issues.append(Issue(code=IssueCode.SHX_NOT_DECODED, message=f"Not decoded (--ocr): {reason}",
+                                           file_path=drawing.file_path, drawing_id=drawing.id))
+                if content.kind is not PageKind.NO_TEXT:
+                    _parse_page(parser, content, drawing, ctx, result)  # as without --ocr
+                continue
+            merged = PageContent(page_index=index, width=content.width, height=content.height, kind=PageKind.VECTOR,
+                                 words=list(content.words) + decoded, image_count=content.image_count, drawn=True,
+                                 _segment_loader=lambda page=page: _load_segments(page))
+            drawing.grid = read_grid_frame(merged, settings.grid)
+            drawing.ffi = sheet_ffi(merged) or drawing.ffi
+            drawing.decoded = DecodeInfo(letters=stats.letters, shapes=stats.shapes, words_kept=len(decoded),
+                                         words_dropped=stats.words_dropped)
+            tb = read_title_block(merged, settings.title_block)
+            said = [v for v, own in ((tb.drawing_no, drawing.drawing_no), (tb.sheet, drawing.sheet))
+                    if v and v.lstrip("0") != own.lstrip("0")]
+            if said:
+                result.issues.append(Issue(
+                    code=IssueCode.DECODED_TITLE_MISMATCH,
+                    message=(f"Decoded title block reads drawing {tb.drawing_no or '?'} sheet {tb.sheet or '?'}; "
+                             f"the sheet keeps {drawing.label} from its file name"),
+                    file_path=drawing.file_path, drawing_id=drawing.id))
+            _parse_page(parser, merged, drawing, ctx, result)
 
 
 def _unreadable_text(content, drawing: Drawing) -> str:

@@ -30,6 +30,7 @@ class DecodeStats:
 class _Letter:
     char: str | None  # None: letter-sized but not recognised
     box: BBox
+    sizes: frozenset[float] = frozenset()  # text heights the shape was learned at
 
 
 def _union(a: BBox, b: BBox) -> BBox:
@@ -50,20 +51,25 @@ def _letters(page: pymupdf.Page, book: GlyphBook) -> list[_Letter | None]:
                 box = parts[0].box
                 for p in parts[1:]:
                     box = _union(box, p.box)
-                out.append(_Letter(ch, box))
+                out.append(_Letter(ch, box, book.sizes(combo_key(parts))))
                 i += k
                 break
         else:
             g = groups[i]
             ch = book.char(g.key)
             w, h = g.box[2] - g.box[0], g.box[3] - g.box[1]
-            out.append(_Letter(ch, g.box) if ch or max(w, h) <= largest else None)
+            out.append(_Letter(ch, g.box, book.sizes(g.key) if ch else frozenset()) if ch or max(w, h) <= largest else None)
             i += 1
     return out
 
 
-def _follows(line: list[_Letter], vertical: bool | None, nxt: BBox, book: GlyphBook) -> tuple[bool, bool, bool]:
-    """(nxt continues the line, the line is vertical, a space comes before nxt)."""
+def _follows(line: list[_Letter], vertical: bool | None, letter: _Letter, book: GlyphBook) -> tuple[bool, bool, bool]:
+    """(letter continues the line, the line is vertical, a space comes before it). AutoCAD gives a
+    text one height, so a letter learned only at other heights than the line's starts a new line."""
+    nxt = letter.box
+    line_sizes = frozenset().union(*(g.sizes for g in line))
+    if letter.sizes and line_sizes and not letter.sizes & line_sizes:
+        return False, bool(vertical), False
     prev = line[-1].box
     for vert in ([vertical] if vertical is not None else [False, True]):
         height = max((b.box[2] - b.box[0]) if vert else (b.box[3] - b.box[1]) for b in line)
@@ -116,7 +122,7 @@ def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_00
                 lines.append((line, spaces))
             line, spaces, vertical = ([letter], [False], None) if letter else ([], [], None)
             continue
-        joins, vert, spaced = _follows(line, vertical, letter.box, book)
+        joins, vert, spaced = _follows(line, vertical, letter, book)
         if joins:
             line.append(letter)
             spaces.append(spaced)
