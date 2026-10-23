@@ -8,7 +8,7 @@ Automated QA of controls drawing packages: PLC drawings, cable block diagrams an
 | [DATA_MODEL.md](DATA_MODEL.md) | Entities, claims, engineering graph |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Stack, parsing, rule engine, milestones |
 
-**Status:** milestones M0, M1, M2 (termination parser), M3a (PLC parser), M3b (linker, graph, signal traces), M4 (CBD routing) and M5 (QA register, review carry-forward, coverage, waivers).
+**Status:** milestones M0, M1, M2 (termination parser), M3a (PLC parser), M3b (linker, graph, signal traces), M4 (CBD routing) and M5 (QA register, review carry-forward, coverage, waivers). The register is printed and marked up by hand by default; recording decisions in it is switched on with `[review] enabled = true`.
 - Every sheet's title block and grid frame are read; identifiers, placeholders and words (for spelling) are extracted with their grid cells.
 - Schematic sheets are read as a PLC system: rack layout, modules, channels (device, JB, wire, description per channel), abbreviated wire numbers.
 - Cable block diagrams are read from the drawn lines: enclosures (JB / LCS / panel), the devices in them, and every cable between them with its spec and number.

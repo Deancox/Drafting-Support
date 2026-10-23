@@ -181,7 +181,7 @@ html { scroll-behavior: smooth; }
         <li><a href="#traces"><span>09</span>Signal traces</a></li>
         <li><a href="#rules"><span>10</span>The rule engine</a></li>
         <li><a href="#findings"><span>11</span>Findings</a></li>
-        <li><a href="#review"><span>12</span>Review and carry-forward</a></li>
+        <li><a href="#review"><span>12</span>Review (optional)</a></li>
         <li><a href="#outputs"><span>13</span>Outputs</a></li>
         <li><a href="#running"><span>14</span>Running it</a></li>
         <li><a href="#accuracy"><span>15</span>Accuracy</a></li>
@@ -278,7 +278,7 @@ html { scroll-behavior: smooth; }
             <text x="548" y="304" font-size="11" class="red">read at the next run</text>
           </svg>
         </div>
-        <figcaption><b>Seven stages, one direction, one loop.</b> Each stage hands its product to the next. The only loop is the red one: decisions the checker types into the register are read back at the start of the next run's review stage.</figcaption>
+        <figcaption><b>Seven stages, one direction, one loop.</b> Each stage hands its product to the next. The only loop is the red one, and only when review is switched on: decisions the checker types into the register are read back at the start of the next run's review stage. By default the register is printed and marked up by hand, and there is no loop.</figcaption>
       </figure>
       <div class="table-wrap"><table>
         <thead><tr><th>Stage</th><th>Code</th><th>What it produces</th></tr></thead>
@@ -288,7 +288,7 @@ html { scroll-behavior: smooth; }
           <tr><td>3 Link</td><td class="mono">linker/, graph/</td><td>One engineering model: a node per device, wire, JB, panel, module, channel and terminal, with typed edges between them.</td></tr>
           <tr><td>4 Trace</td><td class="mono">traces/</td><td>A signal trace per PLC channel, from the field device to the channel, plus orphan traces and coverage figures.</td></tr>
           <tr><td>5 Rules</td><td class="mono">rules/</td><td>Findings, plus an audit of every rule: ran, skipped (and why) or failed.</td></tr>
-          <tr><td>6 Review</td><td class="mono">review/</td><td>The checker's decision put on every finding; what is new; what is no longer raised.</td></tr>
+          <tr><td>6 Review</td><td class="mono">review/</td><td>Only with <code>[review] enabled = true</code> (off by default): the checker's decision put on every finding; what is new; what is no longer raised.</td></tr>
           <tr><td>7 Outputs</td><td class="mono">report/</td><td>The register, the readable report and two JSON files.</td></tr>
         </tbody>
       </table></div>
@@ -746,8 +746,11 @@ fingerprint  983b06b120a4      status  OPEN until reviewed (confirmed as AK-016)
       </figure>
 
       <!-- 12 -->
-      <h2 id="review"><span class="no">12</span>Review and carry-forward</h2>
-      <p>The checker records decisions in <code>QA_Register.xlsx</code>, in the four yellow columns: <b>Decision</b>, <b>Checker comment</b>, <b>Reviewed by</b>, <b>Date</b>. Everything else in the register is rewritten every run.</p>
+      <h2 id="review"><span class="no">12</span>Review and carry-forward (optional)</h2>
+      <div class="note">
+        <p><b>Off by default.</b> The register is normally printed and marked up by hand, so it carries no decision columns, and the review stage, the decision database, waivers and the No Longer Raised tab are all skipped. Set <code>enabled = true</code> under <code>[review]</code> in <code>config/project.toml</code> to switch everything in this section on. The code is unchanged either way.</p>
+      </div>
+      <p>With review on, the checker records decisions in <code>QA_Register.xlsx</code>, in the four yellow columns: <b>Decision</b>, <b>Checker comment</b>, <b>Reviewed by</b>, <b>Date</b>. Everything else in the register is rewritten every run.</p>
       <div class="table-wrap"><table>
         <thead><tr><th>Decision</th><th>Meaning</th><th>On later runs</th></tr></thead>
         <tbody>
@@ -809,11 +812,11 @@ fingerprint  983b06b120a4      status  OPEN until reviewed (confirmed as AK-016)
       <div class="table-wrap"><table>
         <thead><tr><th>File</th><th>For</th><th>Contents</th></tr></thead>
         <tbody>
-          <tr><td class="mono">QA_Register.xlsx</td><td>The checker</td><td><b>Findings</b>: one row per occurrence with tag, PLC channel, issue, the location on each document type in full (<code>401103 sh 036 C7</code>), recommendation, the yellow decision columns, first-seen date and fingerprint. <b>Tag Index</b>: every field device and where it is drawn, with schematic JB beside CBD route (mismatches highlighted). <b>No Longer Raised</b>, <b>Summary</b> (counts by category, severity and decision, as formulas), <b>Coverage</b>, <b>Waivers</b>, and <b>Key</b> (how to use it, what each decision means, and every rule with its result this run).</td></tr>
-          <tr><td class="mono">report.md</td><td>Anyone</td><td>Run summary and review status, findings by rule, every finding with its decision (large groups such as placeholders summarised by sheet), the trace table, coverage, the PLC I/O table, the input summary and parse issues.</td></tr>
+          <tr><td class="mono">QA_Register.xlsx</td><td>The checker</td><td><b>Findings</b>: one row per occurrence with tag, PLC channel, issue, the location on each document type in full (<code>401103 sh 036 C7</code>) and recommendation. <b>Tag Index</b>: every field device and where it is drawn, with schematic JB beside CBD route (mismatches highlighted). <b>Summary</b> (counts by category and severity, as formulas), <b>Coverage</b>, and <b>Key</b> (how to read locations and severities, and every rule with its result this run). Made to be printed and marked up by hand. With review on it also has the yellow decision columns, first-seen date and fingerprint, decision counts on Summary, and the <b>No Longer Raised</b> and <b>Waivers</b> tabs.</td></tr>
+          <tr><td class="mono">report.md</td><td>Anyone</td><td>Run summary, findings by rule, every finding (with its decision when review is on; large groups such as placeholders summarised by sheet), the trace table, coverage, the PLC I/O table, the input summary and parse issues.</td></tr>
           <tr><td class="mono">findings.json</td><td>Other tools</td><td>Every finding with fingerprint, evidence, decision and first-seen date; summary counts.</td></tr>
           <tr><td class="mono">review.json</td><td>Audit, deeper review</td><td>Run metadata (ID, tool version, config hash), the input manifest with SHA-256, every sheet, every claim, the model, the traces, coverage, the rule audit and the issues.</td></tr>
-          <tr><td class="mono">qa_review.sqlite</td><td>The platform</td><td>The decision history and which fingerprints each run raised. Back this folder up: it is not in git.</td></tr>
+          <tr><td class="mono">qa_review.sqlite</td><td>The platform</td><td>Review on only: the decision history and which fingerprints each run raised. Back this folder up: it is not in git.</td></tr>
         </tbody>
       </table></div>
       <p>Each JSON file carries a <code>schema_version</code> and is built from the same validated pydantic models the platform uses internally.</p>
@@ -851,11 +854,12 @@ python -m venv .venv
           <p><code>[placeholders]</code> tokens and phrases; <code>[spelling]</code> known real words.</p>
           <p><code>[cbd]</code> the line weights that identify cables (≥ 0.9 pt) and enclosure outlines (≤ 0.3 pt) on cable block diagrams.</p>
           <p><code>[plc.rack_panels]</code> which panel a PLC rack sits in when it is not <code>&lt;rack&gt;-PLC</code> (e.g. <code>MCC1 = "MCC-PLC"</code>). A run warns when the default names a panel no drawing shows, and says which line to add. Racks a package does not have are ignored, so several packages' entries can sit together.</p>
+          <p><code>[review] enabled</code> false (default): the register is for printing and marking up by hand. true: decision columns, carry-forward, waivers and No Longer Raised (section 12).</p>
           <p><code>[plc] description_prefix</code> the project text that starts every channel description (<code>07.11 SHIPLOADER</code>). Normally left unset: it is detected from the package and ignored when channel headings are compared.</p>
         </div>
         <div class="card"><h4>rules.toml · waivers.toml</h4>
           <p><code>rules.toml</code>: per rule, <code>enabled</code> and <code>severity</code>.</p>
-          <p><code>waivers.toml</code>: <code>[[waiver]]</code> entries with id, rule, subject, reason, approved_by, expires.</p>
+          <p><code>waivers.toml</code>: <code>[[waiver]]</code> entries with id, rule, subject, reason, approved_by, expires. Applied only with review on.</p>
           <p>All three files feed the run's <b>config hash</b>, recorded in every <code>review.json</code>, so a result can always be tied to the settings that produced it.</p>
         </div>
       </div>

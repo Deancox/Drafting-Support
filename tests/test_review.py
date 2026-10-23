@@ -296,3 +296,38 @@ def test_waivers_load_from_waivers_toml(tmp_path):
     )
     s = Settings.load(tmp_path / "project.toml")
     assert [(w.id, w.rule, w.subject, w.expires) for w in s.waivers] == [("W-001", "COMP-002", "K-TN32*", date(2027, 6, 30))]
+
+
+# --- review off (the default): a register for printing and marking up by hand ----------
+
+def _cli(package, out, config_text):
+    from drawing_qa.cli import main
+
+    config = out.parent / "project.toml"
+    config.write_text(config_text, encoding="utf-8")
+    assert main(["run", "--input", str(package), "--output", str(out), "--config", str(config)]) == 0
+
+
+def test_default_register_has_no_review_columns_or_tabs(sample_package, tmp_path, capsys):
+    out = tmp_path / "out"
+    _cli(sample_package, out, '[project]\ncode = "TEST"\n')
+    wb = load_workbook(out / REGISTER_NAME)
+    assert wb.sheetnames == ["Findings", "Tag Index", "Summary", "Coverage", "Key"]
+    header = [c.value for c in wb[FINDINGS_SHEET][HEADER_ROW]]
+    assert header[-1] == "Recommendation"
+    assert COL_DECISION not in header and "Fingerprint" not in header
+    assert not wb[FINDINGS_SHEET].data_validations.dataValidation
+    assert not (out / STORE_NAME).exists()
+    report = (out / "report.md").read_text(encoding="utf-8")
+    assert "| Decision |" not in report
+    assert "review:" not in capsys.readouterr().out
+
+
+def test_review_enabled_keeps_the_decision_columns(sample_package, tmp_path, capsys):
+    out = tmp_path / "out"
+    _cli(sample_package, out, '[project]\ncode = "TEST"\n[review]\nenabled = true\n')
+    wb = load_workbook(out / REGISTER_NAME)
+    assert wb.sheetnames == ["Findings", "Tag Index", "No Longer Raised", "Summary", "Coverage", "Waivers", "Key"]
+    assert COL_DECISION in [c.value for c in wb[FINDINGS_SHEET][HEADER_ROW]]
+    assert (out / STORE_NAME).exists()
+    assert "review:" in capsys.readouterr().out

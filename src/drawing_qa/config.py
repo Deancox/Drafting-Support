@@ -168,6 +168,14 @@ class Waiver(BaseModel):
     expires: date | None = None  # not applied after this date
 
 
+class ReviewConfig(BaseModel):
+    """Recording decisions in the register (Decision / comment columns, carried forward between runs
+    in qa_review.sqlite, waivers, No Longer Raised). Off: the register is for printing and marking up
+    by hand, with no review columns. The review code is kept; set enabled = true to use it again."""
+
+    enabled: bool = False
+
+
 class ProjectInfo(BaseModel):
     code: str = ""
     name: str = ""
@@ -184,6 +192,7 @@ class Settings(BaseModel):
     plc: PlcConfig = Field(default_factory=PlcConfig)
     spelling: SpellingConfig = Field(default_factory=SpellingConfig)
     cbd: CbdConfig = Field(default_factory=CbdConfig)
+    review: ReviewConfig = Field(default_factory=ReviewConfig)
     rules: dict[str, RuleSetting] = Field(default_factory=dict)  # from rules.toml beside the project config
     waivers: list[Waiver] = Field(default_factory=list)  # from waivers.toml beside the project config
     config_hash: str = ""

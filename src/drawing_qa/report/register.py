@@ -1,11 +1,9 @@
-"""QA_Register.xlsx: the checker's findings register (IMPLEMENTATION_PLAN.md section 8, agreed 2026-10-22).
+"""QA_Register.xlsx: the findings register (IMPLEMENTATION_PLAN.md section 8).
 
-Tabs: Findings (one row per finding occurrence, with the checker's Decision / comment columns),
-Tag Index (every field device and where it is drawn on each document type), No Longer Raised,
-Summary (formulas), Key (how to use it, decisions, and every rule in the catalogue).
-
-Only the yellow checker columns are read back (review/register_reader.py); everything else is
-rewritten each run.
+Printed and marked up by hand (default): Findings (one row per finding occurrence), Tag Index (every
+field device and where it is drawn on each document type), Summary, Coverage, Key (legend and every
+rule). With [review] enabled = true it also carries the checker's Decision / comment columns (read
+back by review/register_reader.py), a No Longer Raised tab and a Waivers tab.
 """
 
 from __future__ import annotations
@@ -112,14 +110,14 @@ class _Index:
             per_doc[d.doc_type].append(text)
 
 
-def _findings_sheet(wb: Workbook, result: RunResult, idx: _Index) -> tuple[str, int]:
+def _findings_sheet(wb: Workbook, result: RunResult, idx: _Index, review: bool) -> tuple[str, int]:
     ws = wb.active
     ws.title = FINDINGS_SHEET
     _title(
         ws,
         "QA Findings Register",
-        f"Run {result.info.run_id} · {len(result.findings)} findings · "
-        "edit only the yellow columns; everything else is rewritten each run",
+        f"Run {result.info.run_id} · {len(result.findings)} findings"
+        + (" · edit only the yellow columns; everything else is rewritten each run" if review else ""),
     )
     columns = [
         ("Ref", 8, None), ("Severity", 9, None), ("Rule", 14, None), ("Category", 14, None),
@@ -127,9 +125,12 @@ def _findings_sheet(wb: Workbook, result: RunResult, idx: _Index) -> tuple[str, 
         ("PLC schematic" + _left_out(result, "PLC"), 20, "PLC"), ("Cable block diagram" + _left_out(result, "CBD"), 20, "CBD"),
         ("Termination" + _left_out(result, "TERM"), 20, "TERM"),
         ("Recommendation", 32, None),
-        (COL_DECISION, 15, "REVIEW"), (COL_COMMENT, 34, "REVIEW"), (COL_REVIEWER, 11, "REVIEW"), (COL_DATE, 11, "REVIEW"),
-        ("First seen", 10, None), (COL_FINGERPRINT, 13, None),
     ]
+    if review:
+        columns += [
+            (COL_DECISION, 15, "REVIEW"), (COL_COMMENT, 34, "REVIEW"), (COL_REVIEWER, 11, "REVIEW"), (COL_DATE, 11, "REVIEW"),
+            ("First seen", 10, None), (COL_FINGERPRINT, 13, None),
+        ]
     _header(ws, HEADER_ROW, columns)
     first = HEADER_ROW + 1
     for r, f in enumerate(result.findings, start=first):
@@ -148,14 +149,15 @@ def _findings_sheet(wb: Workbook, result: RunResult, idx: _Index) -> tuple[str, 
                     if text not in per_doc[doc]:
                         per_doc[doc].append(text)
 
-        review = f.review
         values = [
             f.id, f.severity.value, f.rule_id, f.category.replace(" Validation", ""), tag, channel, f.message,
             *("\n".join(per_doc[d]) or "-" for d in _DOCS),
             f.recommendation or "",
-            f.status.value, review.comment if review else "", review.reviewer if review else "", review.decided_on if review else "",
-            f.first_seen or "", f.fingerprint,
         ]
+        if review:
+            rv = f.review
+            values += [f.status.value, rv.comment if rv else "", rv.reviewer if rv else "", rv.decided_on if rv else "",
+                       f.first_seen or "", f.fingerprint]
         for c, v in enumerate(values, start=1):
             cell = _cell(ws, r, c, v)
             if 12 <= c <= 15:
@@ -164,22 +166,23 @@ def _findings_sheet(wb: Workbook, result: RunResult, idx: _Index) -> tuple[str, 
     ws.freeze_panes = ws.cell(row=first, column=6)
     ws.auto_filter.ref = f"A{HEADER_ROW}:{get_column_letter(len(columns))}{last}"
 
-    dv = DataValidation(type="list", formula1='"' + ",".join(d.value for d in Decision) + '"', allow_blank=True)
-    dv.errorTitle, dv.error = "Decision", "Pick a decision from the list"
-    ws.add_data_validation(dv)
-    dv.add(f"L{first}:L{last}")
     for sev, colour in _SEV_FILLS.items():
         ws.conditional_formatting.add(
             f"B{first}:B{last}",
             CellIsRule(operator="equal", formula=[f'"{sev}"'], fill=PatternFill("solid", fgColor=colour),
                        font=Font(name=_FONT, size=9, bold=True, color="FFFFFF" if sev == "CRITICAL" else "000000")),
         )
-    closed = ",".join(f'$L{first}="{d}"' for d in ("FALSE_POSITIVE", "WAIVED", "FIXED"))
-    ws.conditional_formatting.add(f"A{first}:K{last}", FormulaRule(formula=[f"OR({closed})"], font=Font(color="A6A6A6", strike=True)))
-    for decision, colour in (("CONFIRMED", "C6EFCE"), ("DEFERRED", "D9D9D9")):
-        ws.conditional_formatting.add(
-            f"L{first}:L{last}", CellIsRule(operator="equal", formula=[f'"{decision}"'], fill=PatternFill("solid", fgColor=colour))
-        )
+    if review:
+        dv = DataValidation(type="list", formula1='"' + ",".join(d.value for d in Decision) + '"', allow_blank=True)
+        dv.errorTitle, dv.error = "Decision", "Pick a decision from the list"
+        ws.add_data_validation(dv)
+        dv.add(f"L{first}:L{last}")
+        closed = ",".join(f'$L{first}="{d}"' for d in ("FALSE_POSITIVE", "WAIVED", "FIXED"))
+        ws.conditional_formatting.add(f"A{first}:K{last}", FormulaRule(formula=[f"OR({closed})"], font=Font(color="A6A6A6", strike=True)))
+        for decision, colour in (("CONFIRMED", "C6EFCE"), ("DEFERRED", "D9D9D9")):
+            ws.conditional_formatting.add(
+                f"L{first}:L{last}", CellIsRule(operator="equal", formula=[f'"{decision}"'], fill=PatternFill("solid", fgColor=colour))
+            )
     return "E", last
 
 
@@ -249,11 +252,12 @@ def _gone_sheet(wb: Workbook, result: RunResult) -> None:
     ws.freeze_panes = ws.cell(row=first, column=4)
 
 
-def _summary_sheet(wb: Workbook, result: RunResult, last: int) -> None:
+def _summary_sheet(wb: Workbook, result: RunResult, last: int, review: bool) -> None:
     ws = wb.create_sheet("Summary")
-    _title(ws, "Summary", "Counts update as decisions are entered on the Findings tab")
+    _title(ws, "Summary", "Counts update as decisions are entered on the Findings tab" if review
+           else f"Findings by category and severity · run {result.info.run_id}")
     severities = ["CRITICAL", "MAJOR", "MINOR", "INFO"]
-    decisions = [d.value for d in Decision]
+    decisions = [d.value for d in Decision] if review else []
     _header(ws, 3, [("Category", 16, None), *((s.title(), 10, None) for s in severities), ("Total", 9, None),
                     *((d.replace("_", " ").title(), 11, "REVIEW") for d in decisions)])
     cats = [Category[n].value.replace(" Validation", "") for n in _CATEGORY_ORDER]
@@ -315,9 +319,15 @@ def _waiver_sheet(wb: Workbook, result: RunResult) -> None:
         _cell(ws, 4, 1, "None. Add [[waiver]] entries to config/waivers.toml.")
 
 
-def _key_sheet(wb: Workbook, result: RunResult) -> None:
+def _key_sheet(wb: Workbook, result: RunResult, review: bool) -> None:
     ws = wb.create_sheet("Key")
     lines = [
+        ("Key", None),
+        ("Locations", "Drawing, sheet and grid cell on each document type, e.g. '401103 sh 036 C7'. '-' = not shown on that document type."),
+        ("Left out", "An input type left out of the review (python -m drawing_qa run ... --exclude term) is still read and its locations "
+                     "listed, marked '(left out)' in its column header, but nothing is checked against it."),
+        ("Severity", "MAJOR: a wiring or identity error. MINOR: incomplete or inconsistent drafting. INFO: a note, e.g. a reference to a separate package."),
+    ] if not review else [
         ("How to use", None),
         ("Edit", "Only the yellow columns on Findings (Decision, Checker comment, Reviewed by, Date). Everything else is rewritten every run."),
         ("Carry-forward", "Save this file where it is. The next run reads your decisions, keeps them in qa_review.sqlite next to it, "
@@ -387,13 +397,16 @@ def _key_sheet(wb: Workbook, result: RunResult) -> None:
 def build_register(result: RunResult) -> Workbook:
     idx = _Index(result)
     wb = Workbook()
-    tag_col, last = _findings_sheet(wb, result, idx)
+    review = result.review is not None  # decisions are recorded only when [review] enabled = true
+    tag_col, last = _findings_sheet(wb, result, idx, review)
     _tag_index_sheet(wb, result, idx, tag_col, last)
-    _gone_sheet(wb, result)
-    _summary_sheet(wb, result, last)
+    if review:
+        _gone_sheet(wb, result)
+    _summary_sheet(wb, result, last, review)
     _coverage_sheet(wb, result)
-    _waiver_sheet(wb, result)
-    _key_sheet(wb, result)
+    if review:
+        _waiver_sheet(wb, result)
+    _key_sheet(wb, result, review)
     for ws in wb.worksheets:
         ws.sheet_view.zoomScale = 90
     return wb

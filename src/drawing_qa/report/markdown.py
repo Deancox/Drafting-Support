@@ -268,10 +268,16 @@ def render_report(result: RunResult, summary: RunSummary) -> str:
         w("")
         repetitive = len({f.subject_key for f in fs}) <= len(fs) / 2  # e.g. 233 x CXXXXX
         if len(fs) <= _MAX_LISTED or not repetitive:
-            w("| ID | Severity | Finding | Recommendation | Decision |")
-            w("|---|---|---|---|---|")
-            for f in fs:
-                w(f"| {f.id} | {f.severity.value.title()} | {_struck(f, f.message)} | {f.recommendation or ''} | {_decision(f)} |")
+            if result.review is not None:
+                w("| ID | Severity | Finding | Recommendation | Decision |")
+                w("|---|---|---|---|---|")
+                for f in fs:
+                    w(f"| {f.id} | {f.severity.value.title()} | {_struck(f, f.message)} | {f.recommendation or ''} | {_decision(f)} |")
+            else:
+                w("| ID | Severity | Finding | Recommendation |")
+                w("|---|---|---|---|")
+                for f in fs:
+                    w(f"| {f.id} | {f.severity.value.title()} | {f.message} | {f.recommendation or ''} |")
         else:
             # Many similar findings (typically placeholders): group by text and sheet.
             groups: dict[str, Counter[str]] = defaultdict(Counter)

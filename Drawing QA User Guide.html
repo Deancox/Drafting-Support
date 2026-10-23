@@ -154,7 +154,7 @@ html { scroll-behavior: smooth; }
   <header class="titleblock">
     <div class="name">
       <h1>Drawing QA User Guide</h1>
-      <p>How to get the most out of the Controls Drawing QA platform on a real package: preparing the drawings, setting it up for a new project, reading a run, working through the register, and keeping findings under control across revisions. The companion Drawing QA Handbook explains how it works inside.</p>
+      <p>How to get the most out of the Controls Drawing QA platform on a real package: preparing the drawings, setting it up for a new project, reading a run, printing the register and marking it up, and keeping findings under control across revisions. The companion Drawing QA Handbook explains how it works inside.</p>
     </div>
     <div class="cells">
       <div class="cell"><span class="k">For</span><span class="v">Checkers, drafters</span></div>
@@ -176,7 +176,7 @@ html { scroll-behavior: smooth; }
         <li><a href="#run"><span>04</span>Run it</a></li>
         <li><a href="#readrun"><span>05</span>Read the run first</a></li>
         <li><a href="#triage"><span>06</span>Triage the register</a></li>
-        <li><a href="#decide"><span>07</span>Record decisions</a></li>
+        <li><a href="#decide"><span>07</span>Print and mark up</a></li>
         <li><a href="#patterns"><span>08</span>Handle patterns</a></li>
         <li><a href="#revisions"><span>09</span>Across revisions</a></li>
         <li><a href="#trust"><span>10</span>Keep it accurate</a></li>
@@ -186,7 +186,7 @@ html { scroll-behavior: smooth; }
     </nav>
 
     <main>
-      <p class="lede">The platform does the tedious cross-checking: every tag against its home sheet, every channel against the cable block diagram and the terminations, every placeholder and sheet reference. Your job is the judgement: is each finding real, and what should be done about it. This guide is about making that judgement fast and making it stick.</p>
+      <p class="lede">The platform does the tedious cross-checking: every tag against its home sheet, every channel against the cable block diagram and the terminations, every placeholder and sheet reference. Your job is the judgement: is each finding real, and what should be done about it. This guide is about making that judgement fast and keeping a clear record of it.</p>
 
       <div class="note">
         <p><b>Five habits that matter most</b></p>
@@ -194,7 +194,7 @@ html { scroll-behavior: smooth; }
         <p>2. Read the console warnings and the report's stage table before any finding.</p>
         <p>3. Give each package its own output folder and keep the same <code>--exclude</code> setting for it.</p>
         <p>4. Close the register in Excel before every run.</p>
-        <p>5. Decide every finding in the register, even the false alarms: decisions are what make the next run quick.</p>
+        <p>5. Mark up every row of the printed register, even the false alarms, with your initials: the marked-up copy is the record of the check.</p>
       </div>
 
       <!-- 01 -->
@@ -202,7 +202,7 @@ html { scroll-behavior: smooth; }
       <p>Using the platform well is a loop, not a one-off run. Each pass leaves fewer open findings, because everything you decide comes back already decided.</p>
       <figure>
         <div class="fig">
-          <svg viewBox="0 0 900 200" role="img" aria-label="The working loop: prepare the package, run, read the run summary, triage findings in the register, record decisions, the drafters fix the drawings, then run again. Decisions are carried into the next run.">
+          <svg viewBox="0 0 900 200" role="img" aria-label="The working loop: prepare the package, run, read the run summary, triage findings in the register, print the register and mark it up by hand, the drafters fix the drawings, then run again.">
             <defs>
               <marker id="u1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="head"/></marker>
               <marker id="u1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="red"/></marker>
@@ -212,8 +212,8 @@ html { scroll-behavior: smooth; }
               <rect x="150" y="50" width="110" height="56" class="box"/><text x="205" y="74" class="t-disp" font-size="15">Run</text><text x="205" y="92" font-size="10.5" class="dimfill">one command</text>
               <rect x="290" y="50" width="110" height="56" class="box-warn"/><text x="345" y="74" class="t-disp" font-size="15">Read the run</text><text x="345" y="92" font-size="10.5" class="dimfill">warnings first</text>
               <rect x="430" y="50" width="110" height="56" class="box"/><text x="485" y="74" class="t-disp" font-size="15">Triage</text><text x="485" y="92" font-size="10.5" class="dimfill">register</text>
-              <rect x="570" y="50" width="110" height="56" class="box-red"/><text x="625" y="74" class="t-disp" font-size="15">Decide</text><text x="625" y="92" font-size="10.5" class="dimfill">yellow columns</text>
-              <rect x="710" y="50" width="180" height="56" class="box"/><text x="800" y="74" class="t-disp" font-size="15">Drafters fix</text><text x="800" y="92" font-size="10.5" class="dimfill">confirmed findings</text>
+              <rect x="570" y="50" width="110" height="56" class="box-red"/><text x="625" y="74" class="t-disp" font-size="15">Mark up</text><text x="625" y="92" font-size="10.5" class="dimfill">printed register</text>
+              <rect x="710" y="50" width="180" height="56" class="box"/><text x="800" y="74" class="t-disp" font-size="15">Drafters fix</text><text x="800" y="92" font-size="10.5" class="dimfill">marked-up findings</text>
             </g>
             <g class="ln">
               <line x1="120" y1="78" x2="146" y2="78" marker-end="url(#u1)"/><line x1="260" y1="78" x2="286" y2="78" marker-end="url(#u1)"/>
@@ -221,10 +221,10 @@ html { scroll-behavior: smooth; }
               <line x1="680" y1="78" x2="706" y2="78" marker-end="url(#u1)"/>
             </g>
             <path d="M800 106 V150 H205 V110" class="ln-red" marker-end="url(#u1r)"/>
-            <text x="500" y="170" text-anchor="middle" font-size="11.5" class="red">re-run: your decisions come back, fixed items move to No Longer Raised, new problems stand out</text>
+            <text x="500" y="170" text-anchor="middle" font-size="11.5" class="red">re-run: a fresh register lists only what is still wrong; tick off the rest on the old copy</text>
           </svg>
         </div>
-        <figcaption><b>Run, decide, fix, run again.</b> A first run on a package typically raises a few hundred findings. Most of the time is spent once, on the first triage. After that each run only asks about what changed.</figcaption>
+        <figcaption><b>Run, mark up, fix, run again.</b> A first run on a package typically raises a few hundred findings. Most of the time is spent once, on the first mark-up. After that each run's register is shorter: what was fixed is no longer on it.</figcaption>
       </figure>
 
       <!-- 02 -->
@@ -290,12 +290,12 @@ html { scroll-behavior: smooth; }
           <p>All four input types are reviewed unless you leave one out with <code>--exclude plc</code>, <code>cbd</code>, <code>term</code> or <code>equip</code> (comma-separated for several).</p>
           <p>A left-out type is still listed and its locations still appear in the register, marked "(left out)", but nothing is checked against it and its hops in the traces read "not sourced", never gaps.</p>
         </div>
-        <div class="card"><h4>Keep each folder consistent</h4>
-          <p>The register and its decisions live in the output folder. Keep one output folder per package, and keep the same <code>--exclude</code> setting for it.</p>
-          <p>Switching terminations in and out between runs into one folder makes their findings jump between open and "no longer raised". Use a second output folder for a run with a different selection.</p>
+        <div class="card"><h4>One output folder per package</h4>
+          <p>Each run rewrites the register in its output folder. Keep one output folder per package and the same <code>--exclude</code> setting for it, so one run's register can be compared with the last.</p>
+          <p>Print or save a copy of the register you mark up (e.g. <code>QA_Register_RevA_marked.pdf</code>) before the next run replaces it.</p>
         </div>
       </div>
-      <p><b>Close <code>QA_Register.xlsx</code> in Excel first.</b> If it is open, the run cannot overwrite it and writes <code>QA_Register-&lt;run id&gt;.xlsx</code> beside it instead. Nothing is lost: the next run reads both and files the extra copy in <code>register_history/</code>. But it is easier to keep one file.</p>
+      <p><b>Close <code>QA_Register.xlsx</code> in Excel first.</b> If it is open, the run cannot overwrite it and writes <code>QA_Register-&lt;run id&gt;.xlsx</code> beside it instead; the next successful run files that copy in <code>register_history/</code>.</p>
 
       <!-- 05 -->
       <h2 id="readrun"><span class="no">05</span>Read the run before the findings</h2>
@@ -304,8 +304,7 @@ html { scroll-behavior: smooth; }
   WARNING: 76 sheet(s) have no readable text (plotted without SHX text notes): re-plot ...
   WARNING: Rack MCC1 is assumed to be in panel MCC1-PLC, which no drawing shows ...
   FFIs: TH -&gt; 401002 (sheets, overrides the config); TN -&gt; 401103 (config); TV -&gt; EXTERNAL (config)
-  reviewed: PLC, CBD, TERM; left out: EQUIP
-  review: 12 decision(s) read from the QA register, 4 new finding(s), 2 no longer raised</code></pre>
+  reviewed: PLC, CBD, TERM; left out: EQUIP</code></pre>
       <div class="table-wrap"><table>
         <thead><tr><th>Line</th><th>What it tells you</th><th>Act when</th></tr></thead>
         <tbody>
@@ -314,7 +313,6 @@ html { scroll-behavior: smooth; }
           <tr><td class="mono">WARNING: … config maps / Rack …</td><td>A project fact the config has wrong</td><td>Always: add the line it names</td></tr>
           <tr><td class="mono">FFIs:</td><td>Which drawing each FFI's tags were checked against</td><td>A package FFI shows <code>EXTERNAL</code> or a drawing you did not supply</td></tr>
           <tr><td class="mono">reviewed / left out</td><td>What was checked</td><td>It is not what you intended</td></tr>
-          <tr><td class="mono">review:</td><td>Decisions read, new findings, no longer raised</td><td>"0 decisions" when you expected some: wrong output folder, or the register was not saved</td></tr>
         </tbody>
       </table></div>
       <p>Then open <code>report.md</code> and look at two tables near the end:</p>
@@ -325,17 +323,17 @@ html { scroll-behavior: smooth; }
 
       <!-- 06 -->
       <h2 id="triage"><span class="no">06</span>Triage the register</h2>
-      <p><code>QA_Register.xlsx</code> is where the work happens. Use its tabs in this order:</p>
+      <p><code>QA_Register.xlsx</code> is where the work happens: on screen to plan, on paper to mark up. Use its tabs in this order:</p>
       <ol class="steps">
-        <li><span><b>Summary</b>: counts by category and severity. Decide where to start: MAJOR findings in the PATH, PLC, TAG and COMP categories are usually the real wiring problems; placeholders are usually one decision for many rows.</span></li>
+        <li><span><b>Summary</b>: counts by category and severity. Decide where to start: MAJOR findings in the PATH, PLC, TAG and COMP categories are usually the real wiring problems; placeholders are usually one cause for many rows.</span></li>
         <li><span><b>Coverage</b>: traced share per area, panel, slot and JB, with anything under 80% shaded. A slot at 0% next to slots at 100% points at one sheet with a systematic problem.</span></li>
-        <li><span><b>Findings</b>: filter on <i>Rule</i> or <i>Severity</i> and work one rule at a time. The same rule tends to fail the same way, so you decide faster. Each row gives the location on every drawing type (<code>401103 sh 036 C7</code>, <code>401310 sh 015 C0</code>) so you can open the sheets side by side.</span></li>
+        <li><span><b>Findings</b>: filter on <i>Rule</i> or <i>Severity</i> and work one rule at a time. The same rule tends to fail the same way, so you get through it faster. Each row gives the location on every drawing type (<code>401103 sh 036 C7</code>, <code>401310 sh 015 C0</code>) so you can open the sheets side by side.</span></li>
         <li><span><b>Tag Index</b>: one row per field device, with the schematic JB beside the CBD route (mismatches shaded red) and where it is drawn on each drawing type. Best for a device-by-device walk through one area.</span></li>
       </ol>
       <div class="two">
         <div class="card"><h4>Read a finding fully</h4>
           <p>The <b>message</b> says what disagrees, the <b>locations</b> say where, and the <b>recommendation</b> says the likely fix: often the exact tag to use ("did you mean H-TN51W7?").</p>
-          <p>TAG-003, TAG-005 and COMP-001 often describe one mistake from different sides: a copied tag shows as a duplicate, a gap and a missing home. Decide them together.</p>
+          <p>TAG-003, TAG-005 and COMP-001 often describe one mistake from different sides: a copied tag shows as a duplicate, a gap and a missing home. Mark them up together.</p>
         </div>
         <div class="card"><h4>Severity is a starting point</h4>
           <p>MAJOR: a wiring or identity error that would mislead someone on site. MINOR: incomplete or inconsistent drafting. INFO: a note, such as references to a separate package.</p>
@@ -344,32 +342,32 @@ html { scroll-behavior: smooth; }
       </div>
 
       <!-- 07 -->
-      <h2 id="decide"><span class="no">07</span>Record decisions</h2>
-      <p>Fill the four yellow columns: <b>Decision</b>, <b>Checker comment</b>, <b>Reviewed by</b>, <b>Date</b>. Save, close, and re-run. Everything else in the register is rewritten every run, so anything typed outside the yellow columns is lost.</p>
+      <h2 id="decide"><span class="no">07</span>Print and mark up</h2>
+      <p>The register has no columns to fill in: it is meant to be printed and marked up by hand. Print the <b>Findings</b> tab (and <b>Tag Index</b> if you walk the package device by device), take it to the drawings, and mark every row.</p>
       <div class="table-wrap"><table>
-        <thead><tr><th>Decision</th><th>Use it when</th><th>Next run</th></tr></thead>
+        <thead><tr><th>Mark</th><th>Use it when</th><th>Then</th></tr></thead>
         <tbody>
-          <tr><td><span class="pill ok">CONFIRMED</span></td><td>It is a real problem and should be fixed</td><td>Stays on the register until the drawing changes</td></tr>
-          <tr><td><span class="pill">FALSE_POSITIVE</span></td><td>The drawing is right; the platform misread or the rule does not apply here</td><td>Greyed out with your comment, until the evidence changes</td></tr>
-          <tr><td><span class="pill">FIXED</span></td><td>The drafters have corrected it (usually set on the No Longer Raised tab)</td><td>Drops off once no longer raised</td></tr>
-          <tr><td><span class="pill">WAIVED</span></td><td>It is a known, accepted exception for this item</td><td>Greyed out</td></tr>
-          <tr><td><span class="pill warn">DEFERRED</span></td><td>You need information you do not have yet (e.g. the new termination drawings)</td><td>Shown, marked grey</td></tr>
-          <tr><td><span class="pill">OPEN</span> or blank</td><td>Not decided; also how you reopen a decision</td><td>Shown normally</td></tr>
+          <tr><td><span class="pill ok">Real</span></td><td>It is a real problem and should be fixed</td><td>Mark up the drawing too, for the drafters</td></tr>
+          <tr><td><span class="pill">Not a problem</span></td><td>The drawing is right; the platform misread or the rule does not apply here</td><td>Write why, in a few words</td></tr>
+          <tr><td><span class="pill warn">Later</span></td><td>You need information you do not have yet (e.g. the new termination drawings)</td><td>Check it on the next run</td></tr>
         </tbody>
       </table></div>
       <ul>
-        <li><b>Always write a comment</b> for FALSE_POSITIVE and WAIVED. It is shown on every later run and is the audit trail for why a finding was set aside.</li>
-        <li>Typing is forgiving: <code>false positive</code>, <code>False_Positive</code> and <code>FALSE POSITIVE</code> are all read. An unrecognised word is reported and your previous decision stands.</li>
-        <li>Decisions follow the <b>fingerprint</b> (last column), not the row. Sort and filter freely; hide columns if you like, but do not rename the yellow column headers.</li>
-        <li>Decisions are also stored in <code>qa_review.sqlite</code> beside the register, so deleting the register loses nothing. <b>Back up the whole output folder</b>: it is the record of your review.</li>
-        <li>A finding comes back undecided if its evidence changes (the tag is renamed, the text moves to another grid cell). That is deliberate: a changed drawing deserves a fresh look.</li>
+        <li><b>Initial and date each page.</b> The marked-up copy is the record of the check; scan or file it with the drawing revision it applies to.</li>
+        <li><b>Always say why</b> for "not a problem". If the same false alarm comes up on run after run, pass it on (section 10): the platform should be fixed, not the reader.</li>
+        <li>The <b>Ref</b> column (F-0001 …) numbers rows within one run only. Between runs, match a finding by its rule, tag and location, not its Ref.</li>
+        <li>The register is rewritten every run, so anything typed into it is lost. Mark up the paper copy, not the file.</li>
       </ul>
+      <div class="note">
+        <p><b>Recording decisions in the file instead</b></p>
+        <p>The platform can also keep decisions itself: set <code>enabled = true</code> under <code>[review]</code> in <code>config/project.toml</code>. The register then gets yellow <b>Decision</b>, <b>Checker comment</b>, <b>Reviewed by</b> and <b>Date</b> columns, a <b>No Longer Raised</b> tab and a <b>Waivers</b> tab; decisions are kept in <code>qa_review.sqlite</code> and carried onto the same findings on later runs. It is off by default because the register is marked up on paper.</p>
+      </div>
 
       <!-- 08 -->
       <h2 id="patterns"><span class="no">08</span>Handle patterns, not just rows</h2>
-      <p>When many findings have one cause, decide the cause once.</p>
-      <h3>Waivers: one rule, many rows</h3>
-      <p>A known exception that applies to a group (interfaces to another area, a supplier's device range) belongs in <code>config/waivers.toml</code>. Every matching finding is marked WAIVED with the reason, and any decision you type yourself still takes precedence.</p>
+      <p>When many findings have one cause, deal with the cause once.</p>
+      <h3>Waivers: one rule, many rows (review on only)</h3>
+      <p>Waivers apply only with <code>[review] enabled = true</code>; with review off, mark the group once on the printed copy instead. A known exception that applies to a group (interfaces to another area, a supplier's device range) belongs in <code>config/waivers.toml</code>. Every matching finding is marked WAIVED with the reason, and any decision typed into the register still takes precedence.</p>
       <pre><code>[[waiver]]
 id = "W-001"
 rule = "COMP-002"          # rule ID; * and ? allowed (COMP-*)
@@ -381,7 +379,7 @@ expires = 2027-06-30       # optional: listed but not applied after this date</c
       <h3>Renames</h3>
       <p>When a designation has been renamed (AUT renamed to PLC), add <code>"OLD" = "NEW"</code> under <code>[identifiers.superseded]</code> once it is confirmed. Every use of the old name is then reported with the new one as the fix, and traces join up through the rename.</p>
       <h3>Rules that do not fit a project</h3>
-      <p>In <code>config/rules.toml</code> you can change a rule's severity or turn it off. Prefer a waiver or decisions over turning a rule off: a disabled rule also stops catching the cases that are real.</p>
+      <p>In <code>config/rules.toml</code> you can change a rule's severity or turn it off. Prefer marking findings up (or a waiver) over turning a rule off: a disabled rule also stops catching the cases that are real.</p>
       <pre><code>[rules."PLACEHOLDER-004"]
 severity = "MAJOR"      # report HOLD as MAJOR everywhere
 
@@ -392,16 +390,16 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
       <h2 id="revisions"><span class="no">09</span>Across revisions</h2>
       <p>When the drafters issue corrected drawings:</p>
       <ol class="steps">
-        <li><span>Replace the PDFs in the package's input folder (or put the new revision in its own folder and run it into the <b>same output folder</b> to carry decisions over).</span></li>
+        <li><span>Replace the PDFs in the package's input folder (or put the new revision in its own folder and run it into the <b>same output folder</b>).</span></li>
         <li><span>Run with the <b>same <code>--exclude</code> setting</b> as before.</span></li>
-        <li><span>Open <b>No Longer Raised</b>. Each row is a finding the drawings no longer trigger. Check the fix on the sheet and set <b>FIXED</b>. Rows you had decided stay there until you do, so nothing is closed by accident.</span></li>
-        <li><span>Filter <b>Findings</b> on <i>First seen</i> = today's date for what the revision introduced.</span></li>
+        <li><span>Print the new register and lay it beside the last marked-up copy. A row marked <b>Real</b> that is not on the new register has been fixed: check the fix on the sheet and tick it off.</span></li>
+        <li><span>Rows on the new register that were not on the old one are what the revision introduced. Rows you marked "not a problem" come back each run; mark them the same way.</span></li>
       </ol>
-      <p>The console's <code>review:</code> line summarises it: decisions read, new findings, no longer raised.</p>
+      <p>With <code>[review] enabled = true</code> the platform does this comparison itself: decisions carry over, fixed findings move to the No Longer Raised tab, and <i>First seen</i> shows when each finding first appeared.</p>
 
       <!-- 10 -->
       <h2 id="trust"><span class="no">10</span>Keep it accurate</h2>
-      <p>The platform is only as good as its checks, and your decisions are how it gets better.</p>
+      <p>The platform is only as good as its checks, and your mark-ups are how it gets better.</p>
       <ul>
         <li><b>A false positive that keeps recurring is a platform issue, not a drawing issue.</b> Note the rule and an example (fingerprint, sheet, grid) and pass it on. Confirmed false alarms become <b>AK-N</b> entries in the answer key: tests that make sure they are never reported again.</li>
         <li><b>Real problems you confirm</b> on the sample package become <b>AK</b> entries: tests that make sure the platform keeps catching them after every change.</li>
@@ -420,9 +418,9 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
           <tr><td>No cable routes, PATH-001 on everything</td><td>CBD line weights differ from the client standard</td><td>Adjust <code>[cbd]</code></td></tr>
           <tr><td>Many <code>NO_TEMPLATE</code> issues</td><td>A layout the readers do not recognise (another drafting standard)</td><td>Only generic checks run on those sheets; the readers need extending</td></tr>
           <tr><td><code>QA_Register-&lt;run id&gt;.xlsx</code> appeared</td><td>The register was open in Excel</td><td>Close Excel; the next run tidies up</td></tr>
-          <tr><td>Everything is "new" and undecided</td><td>A different output folder (often a renamed input folder)</td><td>Run into the folder that holds your register, with <code>--output</code></td></tr>
-          <tr><td>A decision did not stick</td><td>Typed outside the yellow columns, register not saved, or the evidence changed</td><td>Re-enter it in the yellow columns; check <i>Parse issues</i> for <code>REGISTER_ROW_SKIPPED</code></td></tr>
-          <tr><td>Termination findings jump in and out</td><td><code>--exclude term</code> used on some runs and not others</td><td>Keep one setting per output folder</td></tr>
+          <tr><td>The register replaced the one you were marking up</td><td>Each run rewrites <code>QA_Register.xlsx</code></td><td>Print or save a copy before re-running; use <code>--output</code> for a separate folder</td></tr>
+          <tr><td>No Decision columns or No Longer Raised tab</td><td>Review is off (the default)</td><td>Set <code>[review] enabled = true</code> if you want decisions recorded in the file</td></tr>
+          <tr><td>Termination findings appear and disappear between runs</td><td><code>--exclude term</code> used on some runs and not others</td><td>Keep one setting per output folder</td></tr>
         </tbody>
       </table></div>
 
@@ -438,12 +436,12 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
           <p><code>python -m pytest</code> run the tests</p>
         </div>
         <div class="card"><h4>Files</h4>
-          <p><code>reports/&lt;pkg&gt;/QA_Register.xlsx</code> triage and decisions</p>
+          <p><code>reports/&lt;pkg&gt;/QA_Register.xlsx</code> the register to print and mark up</p>
           <p><code>reports/&lt;pkg&gt;/report.md</code> run summary, stages, parse issues</p>
-          <p><code>reports/&lt;pkg&gt;/qa_review.sqlite</code> decision history (back up)</p>
+          <p><code>reports/&lt;pkg&gt;/qa_review.sqlite</code> decision history (review on only)</p>
           <p><code>config/project.toml</code> project facts</p>
           <p><code>config/rules.toml</code> rule severity, on / off</p>
-          <p><code>config/waivers.toml</code> accepted exceptions</p>
+          <p><code>config/waivers.toml</code> accepted exceptions (review on only)</p>
         </div>
       </div>
       <p class="small dim">For how each step works inside (claims, the model, traces, fingerprints and every rule), see the Drawing QA Handbook.</p>

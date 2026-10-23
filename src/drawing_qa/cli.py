@@ -83,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     settings.ingest.unchecked_types = unchecked + [t for t in excluded if t not in unchecked]
     result = run_pipeline(args.input, settings)
     out_dir = args.output or Path("reports") / args.input.resolve().name
-    review = carry_forward(result, out_dir, settings)
+    review = carry_forward(result, out_dir, settings) if settings.review.enabled else None
     paths = write_outputs(result, out_dir)
 
     print(f"Run {result.info.run_id}: {len(result.files)} file(s), {len(result.drawings)} sheet(s), "
@@ -99,8 +99,9 @@ def main(argv: list[str] | None = None) -> int:
     reviewed = [t.value for t in _INPUT_TYPES if t not in settings.ingest.unchecked_types]
     left_out = [t.value for t in settings.ingest.unchecked_types]
     print(f"  reviewed: {', '.join(reviewed) or 'nothing'}" + (f"; left out: {', '.join(left_out)}" if left_out else ""))
-    print(f"  review: {review.decisions_recorded} decision(s) read from the QA register, "
-          f"{review.new_findings} new finding(s), {len(review.no_longer_raised)} no longer raised")
+    if review is not None:
+        print(f"  review: {review.decisions_recorded} decision(s) read from the QA register, "
+              f"{review.new_findings} new finding(s), {len(review.no_longer_raised)} no longer raised")
     for path in paths:
         print(f"  wrote {path}")
     return 0
