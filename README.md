@@ -13,7 +13,7 @@ Automated QA of controls drawing packages: PLC drawings, cable block diagrams an
 - Schematic sheets are read as a PLC system: rack layout, modules, channels (device, JB, wire, description per channel), abbreviated wire numbers.
 - Cable block diagrams are read from the drawn lines: enclosures (JB / LCS / panel), the devices in them, and every cable between them with its spec and number.
 - Everything is linked into one engineering graph; a **signal trace** is built for every PLC channel, with the device's **cable route** on the CBD (device → JB / LCS → panel) compared against the schematic.
-- 34 rules run (TAG, WIRE, PLC, PATH, COMP, PLACEHOLDER, DRW). Per-rule settings are in `config/rules.toml`.
+- 50 rules run (TAG, WIRE, PLC, PATH, COMP, PLACEHOLDER, DRW). Per-rule settings are in `config/rules.toml`.
 
 Termination drawings are read as JB terminal strips (terminal, wire, device, destination panel and slot, multicore) and PLC slot terminal strips, and cross-checked against the schematics and CBDs.
 

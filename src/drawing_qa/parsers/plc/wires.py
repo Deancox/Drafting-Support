@@ -50,6 +50,33 @@ def _near(encoded: str, cell: str) -> bool:
     return (-1 <= dr <= 2 and abs(dc) <= 1) or dc == 0 or dr == 0
 
 
+def _beside_cell(encoded: str, cell: str) -> bool:
+    dr = _ROWS.index(encoded[0]) - _ROWS.index(cell[0])
+    return -1 <= dr <= 2 and abs(int(encoded[1:]) - int(cell[1:])) <= 1
+
+
+def _boxed(bbox, segments) -> bool:
+    """Text framed on all four sides, like the A1 / T1 terminal markings on a relay symbol
+    (401103-018): a terminal name, not a wire number. A wire label touches at most its wire."""
+    x0, y0, x1, y1 = bbox
+
+    def side(at: float, lo: float, hi: float, vertical: bool, outward: int) -> bool:
+        for s in segments:
+            if s.width == 0:
+                continue  # SHX letter strokes and invisible text outlines, not line work
+            if vertical and s.vertical:
+                pos, a, b = s.x0, min(s.y0, s.y1), max(s.y0, s.y1)
+            elif not vertical and s.horizontal:
+                pos, a, b = s.y0, min(s.x0, s.x1), max(s.x0, s.x1)
+            else:
+                continue
+            if -1 <= (pos - at) * outward <= 3 and a <= lo + 1 and b >= hi - 1:
+                return True
+        return False
+
+    return side(x0, y0, y1, True, -1) and side(x1, y0, y1, True, 1) and side(y0, x0, x1, False, -1) and side(y1, x0, x1, False, 1)
+
+
 def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser: DrawingParser) -> list[Claim]:
     ffi = sheet_ffi(page)
     if ffi is None or drawing.grid is None or drawing.sheet_number is None:
@@ -66,6 +93,8 @@ def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser:
         if m := _SAME_SHEET.match(text):
             cell = drawing.grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2)
             if not _near(m["grid"], cell):
+                continue
+            if not _beside_cell(m["grid"], cell) and _boxed(line.bbox, page.segments):
                 continue
             sheet, grid = this_sheet, m["grid"]
         elif m := _OTHER_SHEET.match(text):

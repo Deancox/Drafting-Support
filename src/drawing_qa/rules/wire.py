@@ -139,6 +139,42 @@ class WireHomeSheet(Rule):
             )
 
 
+@rule
+class WireGrid(Rule):
+    meta = RuleMeta(
+        rule_id="WIRE-005",
+        title="Wire Grid",
+        category=Category.WIRE,
+        default_severity=Severity.MINOR,
+        description=(
+            "On its home sheet, a wire number is not drawn near the grid cell it encodes. A wire is numbered where it "
+            "starts and labelled there, so 'C2' drawn at C6 is numbered from the wrong end (401104-176). A wire carried "
+            "to another sheet ('16D2') is checked at its origin. Same tolerance as TAG-004."
+        ),
+        requires=frozenset({Requirement.CLAIMS, Requirement.GRID}),
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        from drawing_qa.rules.tag import GridValidation
+
+        close = GridValidation()._close
+        for wire, claims in sorted(wire_claims(ctx).items()):
+            grid = claims[0].value["grid"]
+            homes = {d.id for d in home_sheets(ctx, claims[0].value["ffi"], int(claims[0].value["sheet"]))}
+            on_home = [c for c in claims if c.source.drawing_id in homes and c.source.grid_cell]
+            if not on_home or any(close(grid, c.source.grid_cell) for c in on_home):
+                continue
+            c = on_home[0]
+            label = c.value.get("abbreviated") or wire
+            yield make(
+                subject_type="WIRE",
+                subject_key=wire,
+                message=f"Wire {wire} ('{label}') encodes grid {grid} but is drawn at {make.where(c.source)}",
+                evidence=on_home,
+                recommendation=f"Number the wire for where it starts ({c.source.grid_cell}?) or check its label",
+            )
+
+
 def _near_wires(wire: str, claim: Claim, wires: dict[str, list[Claim]], home_ids: set[str]) -> list[str]:
     v = claim.value
     found = []

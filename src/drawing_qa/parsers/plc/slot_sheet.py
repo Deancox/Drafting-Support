@@ -77,6 +77,7 @@ class SlotSheetReader(TemplateReader):
         anchors = [a for i, a in enumerate(anchors) if not any(
             b.text.strip() == a.text.strip() and abs(b.bbox[1] - a.bbox[1]) < 3 and abs(b.bbox[0] - a.bbox[0]) < 3 for b in anchors[:i]
         )]
+        anchors = self._address_column(anchors)
         if not anchors:
             return result
         bands = self._bands([_cy(a.bbox) for a in anchors])
@@ -183,6 +184,22 @@ class SlotSheetReader(TemplateReader):
         return module, claim
 
     # --- channel rows -------------------------------------------------------------
+
+    @staticmethod
+    def _address_column(anchors: list[TextLine]) -> list[TextLine]:
+        """The addresses, without the terminal numbers some sheets write in their own column under
+        the same header (sheet 176: terminals 10..12 beside channels 00..03; sheet 147: terminals
+        27..35 beside channels 24..31). The address column is the one drawn in the larger text."""
+        columns: list[list[TextLine]] = []
+        for a in sorted(anchors, key=lambda ln: _cx(ln.bbox)):
+            if columns and _cx(a.bbox) - _cx(columns[-1][-1].bbox) <= 12:
+                columns[-1].append(a)
+            else:
+                columns.append([a])
+        if len(columns) < 2:
+            return anchors
+        best = max(columns, key=lambda col: (median(a.bbox[3] - a.bbox[1] for a in col), len(col)))
+        return sorted(best, key=lambda ln: _cy(ln.bbox))
 
     @staticmethod
     def _bands(ys: list[float]) -> list[tuple[float, float]]:

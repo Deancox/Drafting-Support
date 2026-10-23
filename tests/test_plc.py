@@ -132,6 +132,66 @@ def test_safety_test_output_rows_are_not_channels(tmp_path, cfg):
     assert "TN36E6" not in ch["LTL/S13/CH00"]["wires"]  # the T0 row keeps its own wire
 
 
+def test_two_digit_terminal_numbers_are_not_channels(tmp_path, cfg):
+    """Like the RTD sheets (401104-176): terminals 1..12 are numbered in their own column under
+    "TERMINAL / CHANNEL", beside the channel numbers, so 10, 11, 12 look like addresses."""
+    rows = [
+        channel_row(113, "00", "1", wire="D6"),
+        channel_row(182, "01", "3", wire="F6"),
+        channel_row(251, "02", "10", wire="H6"),
+        channel_row(320, "03", "12", wire="K6"),
+        [((779, 280, 800, 294), "11")],
+    ]
+    items, frame = slot_sheet(part="1756-IR8I", points="POINTS: LTL.S13.RI.00..03", rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    ch = {c.subject_key: c.value for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
+    assert set(ch) == {"LTL/S13/CH00", "LTL/S13/CH01", "LTL/S13/CH02", "LTL/S13/CH03"}
+
+
+def test_terminal_column_as_long_as_the_address_column(tmp_path, cfg):
+    """Like 401104-147: channels 24..31 beside terminals 27..34, neither with a leading zero."""
+    rows = [channel_row(113 + 69 * i, f"{24 + i}", f"{27 + i}", wire=f"{'DFHKMPSU'[i]}6") for i in range(8)]
+    items, frame = slot_sheet(part="1756-OB32", points="POINTS: LTL.S13.DO.24..31", rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    ch = {c.subject_key for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
+    assert ch == {f"LTL/S13/CH{n}" for n in range(24, 32)}
+
+
+@pytest.mark.parametrize(("label", "cell", "expected"), [
+    ("C6", "C6", 0),  # drawn where it starts
+    ("D6", "C6", 0),  # label above its wire
+    ("D6", "D7", 0),  # on the column boundary
+    ("C2", "C6", 1),  # like 401104-176: numbered from the device end, drawn at the PLC terminal
+    ("K6", "C6", 1),
+])
+def test_wire_005_number_matches_where_it_is_drawn(tmp_path, cfg, label, cell, expected):
+    add_sheet(tmp_path, "PLC", "036", LEGEND + [(cell_rect(cell, 18), label)])
+    findings = by_rule(run_pipeline(tmp_path, cfg), "WIRE-005")
+    assert len(findings) == expected
+    if expected:
+        assert f"TN36{label}" in findings[0].message and cell in findings[0].message
+
+
+def test_boxed_terminal_marking_is_not_a_wire(tmp_path, cfg):
+    """Like the relay terminals A1 / T1 on 401103-018: boxed, in the wire's column but rows away."""
+    x0, y0, x1, y1 = cell_rect("H1", 12)
+    d = 2.5  # the test PDF's text box is 1 pt larger than asked
+    box = [(x0 - d, y0 - d, x1 + d, y0 - d), (x0 - d, y1 + d, x1 + d, y1 + d), (x0 - d, y0 - d, x0 - d, y1 + d), (x1 + d, y0 - d, x1 + d, y1 + d)]
+    add_sheet(tmp_path, "PLC", "036", LEGEND + [((x0, y0, x1, y1), "T1")], lines=box[:3])
+    add_sheet(tmp_path, "PLC", "037", LEGEND + [((x0, y0, x1, y1), "T1")], lines=box)
+    wires = {c.subject_key for c in run_pipeline(tmp_path, cfg).claims if c.subject_type.value == "WIRE"}
+    assert wires == {"TN36T1"}  # open on one side: still read (and reported by WIRE-005)
+
+
+def test_wire_005_checks_a_transferred_wire_at_its_origin(tmp_path, cfg):
+    """'16D2' on another sheet is checked where it starts: on sheet 016, at D2."""
+    add_sheet(tmp_path, "PLC", "036", LEGEND + [(cell_rect("B3", 24), "16D2")])
+    add_sheet(tmp_path, "PLC", "016", LEGEND + [(cell_rect("D6", 18), "D2")])
+    findings = by_rule(run_pipeline(tmp_path, cfg), "WIRE-005")
+    assert [f.subject_key for f in findings] == ["TN16D2"]
+    assert "sh 016" in findings[0].message
+
+
 def test_rack_layout(tmp_path, cfg):
     items, frame = rack_layout({1: ("1734-IB8S SAFETY INPUT MODULE", ["020"]), 13: ("1734-IB8 INPUT MODULE", ["036"])})
     add_sheet(tmp_path, "PLC", "013", items, **frame)

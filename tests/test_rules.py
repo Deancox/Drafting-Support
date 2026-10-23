@@ -13,10 +13,10 @@ FOLDER = {"PLC": "PLC", "CBD": "CableBlocks", "TERM": "Terminations"}
 DESCRIPTOR = {"PLC": "SCHEMATIC DIAGRAM", "CBD": "CABLING BLOCK DIAGRAM", "TERM": "TERMINATION DIAGRAM"}
 
 
-def add_sheet(root, kind, sheet, items=(), *, drawing_no="401103", file_name=None, **frame):
+def add_sheet(root, kind, sheet, items=(), *, drawing_no="401103", file_name=None, lines=(), **frame):
     frame.setdefault("descriptor", DESCRIPTOR[kind])
     name = file_name or f"{drawing_no}-{sheet}.pdf"
-    build_pdf(root / FOLDER[kind] / name, [[]], shx=[sheet_frame(drawing_no, sheet, **frame) + list(items)])
+    build_pdf(root / FOLDER[kind] / name, [[]], lines=[list(lines)], shx=[sheet_frame(drawing_no, sheet, **frame) + list(items)])
 
 
 @pytest.fixture
