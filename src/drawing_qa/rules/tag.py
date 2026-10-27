@@ -201,6 +201,8 @@ class DuplicateDeviceTag(Rule):
             homes = {d.id for d in home_sheets(ctx, v["ffi"], int(v["sheet"]))}
             if not homes or not any(c.source.drawing_id in homes for c in claims):
                 continue  # not on its home sheet: TAG-003
+            if homes & ctx.decoded_ids:
+                continue  # home sheet decoded (--ocr): a relay's contact table there may not have decoded
             copies = [
                 c
                 for c in claims

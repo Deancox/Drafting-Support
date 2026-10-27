@@ -313,3 +313,17 @@ def test_tag_007_quiet_when_target_sheet_is_decoded(tmp_path, cfg):
     result = run_pipeline(tmp_path, cfg)
     assert rule_ids(result.findings, "TAG-007")
     assert not rule_ids(recheck(result, cfg, lambda d: d.sheet == "043"), "TAG-007")
+
+
+def test_tag_005_quiet_when_the_home_sheet_is_decoded(tmp_path, cfg):
+    """401104-020 decoded: its relay contact table (63/G4 ...) did not decode, so a relay whose contact on
+    063 happens to sit near its own grid looked copied (K-TL20F3, K-TL21F3)."""
+    from tests.test_shx_rules import recheck, rule_ids
+
+    add_sheet(tmp_path, "PLC", "027", [(cell_rect("B2"), "S-TN27D2")])
+    add_sheet(tmp_path, "PLC", "028", [(cell_rect("B2"), "S-TN27D2"), (cell_rect("P7"), "S-TN27D2")])
+    result = run_pipeline(tmp_path, cfg)
+    assert rule_ids(result.findings, "TAG-005")
+    assert not rule_ids(recheck(result, cfg, lambda d: d.sheet == "027"), "TAG-005")
+    fresh = run_pipeline(tmp_path, cfg)
+    assert rule_ids(recheck(fresh, cfg, lambda d: d.sheet == "028"), "TAG-005")  # a copy on a decoded sheet: still found
