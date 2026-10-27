@@ -84,6 +84,35 @@ def merge_runs(segments: list[Segment], max_gap: float) -> list[Run]:
     return runs
 
 
+def split_at_corners(runs: list[Run], segments: list[Segment], tol: float = 1.0) -> list[Run]:
+    """Undo joins across a gap where perpendicular lines end at both edges of the gap: that is the bottom
+    corner of one box and the top corner of the next, stacked a few points apart, not a dash-dot gap
+    (nothing ends at a dash-dot gap). Each such run is cut there."""
+    buckets: dict[tuple[bool, int, int], list[tuple[float, float]]] = defaultdict(list)
+    for s in segments:
+        if s.horizontal or s.vertical:
+            for x, y in ((s.x0, s.y0), (s.x1, s.y1)):
+                buckets[(s.horizontal, round(x), round(y))].append((x, y))
+
+    def cornered(run: Run, at: float) -> bool:
+        x, y = (at, run.pos) if run.horizontal else (run.pos, at)
+        return any(abs(px - x) <= tol and abs(py - y) <= tol
+                   for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                   for px, py in buckets.get((not run.horizontal, round(x) + dx, round(y) + dy), ()))
+
+    out: list[Run] = []
+    for run in runs:
+        spans = sorted(run.spans)
+        piece = [spans[0]]
+        for a, b in zip(spans, spans[1:]):
+            if b[0] - a[1] > 0.5 and cornered(run, a[1]) and cornered(run, b[0]):
+                out.append(Run(run.horizontal, run.pos, piece[0][0], max(e for _, e in piece), len(piece), piece))
+                piece = []
+            piece.append(b)
+        out.append(Run(run.horizontal, run.pos, piece[0][0], max(e for _, e in piece), len(piece), piece))
+    return out
+
+
 @dataclass
 class Box:
     bbox: BBox
@@ -116,12 +145,21 @@ def find_boxes(runs: list[Run], corner_tol: float = 6.0, min_size: float = 25.0)
         return i
 
     ends = [r.ends for r in runs]
+    # Each end meets the nearest perpendicular end within corner_tol: with boxes stacked a few points
+    # apart, a side's end is near the corners of both boxes, and only the nearer one is its own.
     for i in range(len(runs)):
-        for j in range(i + 1, len(runs)):
-            if runs[i].horizontal == runs[j].horizontal:
-                continue
-            if any(abs(a[0] - b[0]) <= corner_tol and abs(a[1] - b[1]) <= corner_tol for a in ends[i] for b in ends[j]):
-                parent[find(i)] = find(j)
+        for a in ends[i]:
+            best, best_d = None, None
+            for j in range(len(runs)):
+                if runs[i].horizontal == runs[j].horizontal:
+                    continue
+                for b in ends[j]:
+                    if abs(a[0] - b[0]) <= corner_tol and abs(a[1] - b[1]) <= corner_tol:
+                        d = abs(a[0] - b[0]) + abs(a[1] - b[1])
+                        if best_d is None or d < best_d:
+                            best, best_d = j, d
+            if best is not None:
+                parent[find(i)] = find(best)
     groups: dict[int, list[Run]] = defaultdict(list)
     for i, r in enumerate(runs):
         groups[find(i)].append(r)

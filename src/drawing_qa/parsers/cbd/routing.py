@@ -18,7 +18,7 @@ from drawing_qa.model.claims import Claim
 from drawing_qa.model.enums import EntityType, ExtractionMethod, Predicate
 from drawing_qa.model.source import BBox, Drawing
 from drawing_qa.parsers.base import DrawingParser, ParseContext, ParseResult, TemplateReader
-from drawing_qa.parsers.cbd.geometry import Box, Cable, find_boxes, find_cables, merge_runs, split_at_boxes
+from drawing_qa.parsers.cbd.geometry import Box, Cable, find_boxes, find_cables, merge_runs, split_at_boxes, split_at_corners
 from drawing_qa.pdf.extract import PageContent
 
 _SPEC = re.compile(r"\b\d+\s*(C|PR|TPR)\b|MM|PVC|FIBRE|SCR", re.I)
@@ -65,7 +65,10 @@ class CableRoutingReader(TemplateReader):
         ]
         thin = merge_runs([s for s in segs if s.width <= THIN_MAX], max_gap=6.0)
         thick = merge_runs([s for s in segs if s.width >= THICK_MIN], max_gap=w.cable_label_gap)
-        boxes = find_boxes([r for r in thin if r.length >= 15])
+        # Outlines without the joins between boxes stacked a few points apart (401310-020): joining across
+        # them made one tall box out of a named box and the device boxes below it.
+        outlines = split_at_corners(thin, [s for s in segs if s.width <= THIN_MAX])
+        boxes = find_boxes([r for r in outlines if r.length >= 15])
         boxes = self._split_stacked(boxes, thin, prior, drawing)
         # Some enclosures are solid rectangles (LTL-JB3 and SH-JB3 on 401310-016). Solid boxes are also
         # device symbols, so only those with a designation at the top count as enclosures.
@@ -76,6 +79,12 @@ class CableRoutingReader(TemplateReader):
             c for c in prior
             if c.source.drawing_id == drawing.id and c.predicate is Predicate.OCCURS and c.subject_type in _ENCLOSURE_KINDS
         ]
+        # Short named boxes (=K07.11+SH-DB5 on 401310-020 is 17 pt tall) are below find_boxes' minimum size,
+        # which keeps device symbol squares out; without them their designation goes to the box below.
+        for box in find_boxes([r for r in outlines if r.length >= 10], min_size=12.0):
+            if any(box.contains(*_centre(c.source.bbox)) for c in designations):
+                if not any(abs(b.bbox[0] - box.bbox[0]) < 3 and abs(b.bbox[1] - box.bbox[1]) < 3 for b in boxes):
+                    boxes.append(box)
         for box in find_boxes([r for r in solid if r.length >= 15], corner_tol=3.0):
             x0, y0, x1, y1 = box.bbox
             if any(box.contains(*_centre(c.source.bbox)) and _centre(c.source.bbox)[1] < y0 + 20 for c in designations):

@@ -101,3 +101,32 @@ def test_path_001_quiet_when_a_cbd_is_decoded(tmp_path, cfg):
     result = run_pipeline(tmp_path, cfg)
     assert rule_ids(result.findings, "PATH-001")
     assert not rule_ids(recheck(result, cfg, lambda d: d.doc_type.value == "CBD"), "PATH-001")
+
+
+def test_stacked_separate_boxes_are_not_one_enclosure(tmp_path, cfg):
+    """401310-020: a named box (SH-DB5) above a column of device symbol squares on the same right edge,
+    3.5 pt apart, each tag to the left of its square. Bridging the gaps made one tall 'SH-DB5' around every
+    device below it, so S-TL40H4's cable to BH-JB1 was never used."""
+    items = [
+        ((60, 46, 120, 56), "=K07.11+LTL-JB9"),
+        ((60, 70, 95, 80), "S-TN36D4"),
+        ((60, 108, 95, 118), "S-TN36F4"),
+        ((330, 105, 410, 115), "=K07.11+LTL-JB1"),
+    ]
+    lines = box(57, 44, 127, 61) + box(99, 64.5, 127, 99.2) + box(99, 102.7, 127, 137.4) + box(300, 100, 420, 300)
+    lines += [(127, 125, 300, 125, THICK)]  # S-TN36F4's box -> LTL-JB1
+    cbd_sheet(tmp_path, items, lines)
+    result = run_pipeline(tmp_path, cfg)
+    members = {(c.subject_key, c.object_key) for c in result.claims if c.predicate is Predicate.IN_ENCLOSURE}
+    assert not {m for m in members if m[1] == "LTL-JB9"}
+    assert ("S-TN36F4", "LTL-JB1") in {(a, b) for a, b, _, _ in routes(result)}
+
+
+def test_enclosure_with_an_inner_divider_stays_one(tmp_path, cfg):
+    """A JB's own divider is one line across unbroken sides: the device below it is still in the JB."""
+    items = [((60, 46, 120, 56), "=K07.11+LTL-JB9"), ((60, 108, 110, 118), "S-TN36F4")]
+    lines = box(57, 44, 127, 140) + [(57, 90, 127, 90, THIN)]
+    cbd_sheet(tmp_path, items, lines)
+    members = {(c.subject_key, c.object_key) for c in run_pipeline(tmp_path, cfg).claims if c.predicate is Predicate.IN_ENCLOSURE}
+    assert ("S-TN36F4", "LTL-JB9") in members
+
