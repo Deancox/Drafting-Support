@@ -45,6 +45,9 @@ grid = "[A-Z]\\d"
 # Known values. Empty list = accept any value that matches the pattern.
 prefixes = []
 ffis = []
+# Areas are also learned from the drawings: any area written in a location designation
+# ("=K07.11+BC-LCS13" -> BC) is known for the run, and the parse stage lists them. Only areas that
+# never appear with a "+" designation need listing here.
 areas = ["LTL", "RCL", "SPL", "EER1", "SH", "ES"]
 # Panel suffixes after "<AREA>-" (to confirm).
 panel_types = ["PLC"]
@@ -68,6 +71,8 @@ TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10
 [identifiers.superseded]
 "LTL-AUT1" = "LTL-PLC"   # AUT renamed to PLC (confirmed by checker 2026-10-21)
 
+
+
 [review]
 # false: the QA register is for printing and marking up by hand (no Decision / comment columns,
 # no decision carry-forward, waivers or No Longer Raised tab). true: record decisions in the register
@@ -86,6 +91,9 @@ enabled = false
 # Racks a package does not have are ignored, so entries for several packages can sit here together.
 MCC1 = "MCC-PLC"   # 401002 package: racks MCC1 and MCC2 are in the MCC PLC panel
 MCC2 = "MCC-PLC"
+
+SH1 = "SH-PLC"
+SH2 = "SH-PLC"
 
 [cbd]
 # Line weights (pt) on cable block diagrams. Cables and enclosure outlines are found by their

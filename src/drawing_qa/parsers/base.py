@@ -35,9 +35,9 @@ class ParseResult:
 class ParseContext:
     """Shared services and claim construction for one run."""
 
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, settings: Settings, learned_areas=()) -> None:
         self.settings = settings
-        self.grammar = IdentifierGrammar(settings.identifiers)
+        self.grammar = IdentifierGrammar(settings.identifiers, learned_areas)
         self.placeholders = PlaceholderDetector(settings.placeholders)
         self._counters: dict[str, int] = {}
 

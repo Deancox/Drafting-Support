@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from drawing_qa.model.engineering import HopStatus, TraceStatus
+from drawing_qa.model.enums import Predicate
 from drawing_qa.pipeline import run_pipeline
 from tests.conftest import cell_rect
 from tests.test_plc import channel_row, slot_sheet
@@ -158,3 +159,24 @@ def test_comp_005_quiet_when_a_cbd_is_decoded(tmp_path, cfg):
     result = run_pipeline(tmp_path, cfg)
     assert rule_ids(result.findings, "COMP-005")
     assert not rule_ids(recheck(result, cfg, lambda d: d.doc_type.value == "CBD"), "COMP-005")
+
+
+def test_areas_learned_from_the_packages_designations(tmp_path, cfg):
+    """BC is not in the config, but a CBD designates =K07.11+BC-LCS13, so the schematic's bare BC-LCS13 in a
+    channel row is a location too (401310-022 / 401104 channel rows)."""
+    rows = [channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "BC-LCS13", ["BRAKE"])]
+    items, frame = slot_sheet(rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    add_sheet(tmp_path, "CBD", "014", [(cell_rect("C3"), "=K07.11+BC-LCS13")], drawing_no="401310")
+    result = run_pipeline(tmp_path, cfg)
+    channel = next(c for c in result.claims if c.predicate is Predicate.HAS_CHANNEL)
+    assert channel.value["locations"] == ["BC-LCS13"]
+    assert any("BC" in s.note and "learned" in s.note for s in result.stages if s.name == "parse")
+
+
+def test_placeholder_is_never_learned_as_an_area(tmp_path, cfg):
+    """MCC and Holding have '+XXX-LCS1' style placeholders: XXX is unfinished drafting, not an area."""
+    add_sheet(tmp_path, "CBD", "014", [(cell_rect("C3"), "=K07.11+XXX-LCS1"), (cell_rect("D3"), "=K07.11+BC-LCS13")], drawing_no="401310")
+    result = run_pipeline(tmp_path, cfg)
+    note = next(s.note for s in result.stages if s.name == "parse")
+    assert "BC" in note and "XXX" not in note.split("areas learned")[1]

@@ -852,7 +852,7 @@ python -m venv .venv
       <div class="two">
         <div class="card"><h4>config/project.toml</h4>
           <p><code>[ingest]</code> folder aliases, types left out by default.</p>
-          <p><code>[identifiers]</code> tag pattern parts, known areas (LTL, RCL, SPL, SH, ES, EER1), panel types, panel-device prefixes (K, Q), <code>ffi_drawings</code> (TN → 401103, TV/TH → EXTERNAL), <code>superseded</code> (LTL-AUT1 → LTL-PLC).</p>
+          <p><code>[identifiers]</code> tag pattern parts, known areas (LTL, RCL, SPL, SH, ES, EER1; areas the drawings write as a <code>+AREA-…</code> designation are learned each run), panel types, panel-device prefixes (K, Q), <code>ffi_drawings</code> (TN → 401103, TV/TH → EXTERNAL), <code>superseded</code> (LTL-AUT1 → LTL-PLC).</p>
           <p><code>[placeholders]</code> tokens and phrases; <code>[spelling]</code> known real words.</p>
           <p><code>[cbd]</code> the line weights that identify cables (≥ 0.9 pt) and enclosure outlines (≤ 0.3 pt) on cable block diagrams.</p>
           <p><code>[plc.rack_panels]</code> which panel a PLC rack sits in when it is not <code>&lt;rack&gt;-PLC</code> (e.g. <code>MCC1 = "MCC-PLC"</code>). A run warns when the default names a panel no drawing shows, and says which line to add. Racks a package does not have are ignored, so several packages' entries can sit together.</p>

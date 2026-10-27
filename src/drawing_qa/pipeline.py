@@ -26,6 +26,7 @@ from drawing_qa.parsers.plc.wires import sheet_ffi
 from drawing_qa.parsers.registry import build_parsers
 from drawing_qa.parsers.titleblock import drawing_for_page
 from drawing_qa.common.grid import read_grid_frame
+from drawing_qa.common.identifiers import designated_areas
 from drawing_qa.common.titleblock import read_title_block
 from drawing_qa.pdf.extract import PageContent, _load_segments, extract_page, open_pdf
 from drawing_qa.pdf.shx.book import learn
@@ -128,8 +129,27 @@ def _run_rules(settings: Settings, result: RunResult) -> None:
     result.stages.append(StageResult(name="rules", status=StageStatus.FAILED if failed else StageStatus.DONE, note=note))
 
 
+def _package_text(files):
+    """Every SHX note and text-layer line in the package's PDFs, for a quick look before parsing."""
+    for found in files:
+        if found.record.doc_type is DocType.EQUIP:
+            continue
+        try:
+            with open_pdf(found.path) as doc:
+                for page in doc:
+                    yield from ((a.info or {}).get("content") or "" for a in page.annots() or [])
+                    yield page.get_text("text")
+        except Exception:  # unreadable files are reported by the parse itself
+            continue
+
+
 def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) -> None:
-    ctx = ParseContext(settings)
+    # Areas the package's own location designations use (=K07.11+BC-LCS13), so a bare BC-LCS13 in a
+    # channel row is a location too, without listing BC in the config.
+    placeholders = {t.upper() for t in settings.placeholders.tokens}
+    learned = sorted(a for a in designated_areas(_package_text(files)) - {a.upper() for a in settings.identifiers.areas}
+                     if a not in placeholders and set(a) != {"X"})  # +XXX-LCS1 is unfinished drafting, not an area
+    ctx = ParseContext(settings, learned)
     parsers = build_parsers()
     min_words = settings.pdf.min_words_for_vector
     # (drawing no, sheet) -> first drawing seen with that identity, to catch copies of one sheet.
@@ -215,6 +235,8 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
         + f" (planned: {p.planned_content})"
         for p in parsers.values()
     )
+    if learned:
+        notes += f"; areas learned from the drawings' location designations (not in the config): {', '.join(learned)}"
     equip = sum(f.record.doc_type is DocType.EQUIP for f in files)
     if equip:
         notes += f"; EQUIP: {equip} equipment list file(s) listed, not read yet (reader waits for the list format)"

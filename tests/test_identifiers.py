@@ -109,3 +109,23 @@ def test_configured_ffi_list_filters_wires():
     assert g.parse("AB23N2") is None
     # Devices with an unknown FFI are still parsed, and flagged for TAG-002.
     assert g.parse("S-AB23N2").parts["known_ffi"] is False
+
+
+def test_designated_location_needs_no_configured_area():
+    """'=K07.11+BC-LCS13': the '+' location designation makes it a location whatever the area (401310-022)."""
+    g = IdentifierGrammar(IdentifierConfig(areas=["LTL"]))
+    parsed = g.parse("=K07.11+BC-LCS13")
+    assert parsed.kind is EntityType.LOCATION and parsed.key == "BC-LCS13"
+    assert g.parse("+BTU-LCS1").key == "BTU-LCS1"
+    assert g.parse("BC-LCS13") is None  # bare: still needs a known area
+    assert g.parse("IN-12") is None and g.parse("CH-10") is None
+
+
+def test_areas_learned_from_designations():
+    from drawing_qa.common.identifiers import designated_areas
+
+    texts = ["=K07.11+BC-LCS13", "BOOM CONVEYOR", "+BH-LCS2 EXTRA", "=K07.11+SH-JB1", "IN-12"]
+    assert designated_areas(texts) == {"BC", "BH", "SH"}
+    g = IdentifierGrammar(IdentifierConfig(areas=["LTL"]), learned_areas={"BC"})
+    assert g.parse("BC-LCS13").kind is EntityType.LOCATION  # a bare mention, once the package uses the area
+    assert g.parse("BX-LCS13") is None

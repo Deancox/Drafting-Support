@@ -6,7 +6,9 @@ Formats (GAME_PLAN.md "Engineering conventions"):
     Junction box <AREA>-JB<n>                  SPL-JB1
     Terminal     <JunctionBox>:<Terminal>      SPL-JB1:1
     Panel        <AREA>-<PanelType>            LTL-PLC   (to confirm)
-    Location     <AREA>-<Code><n>              LTL-LCS3, LTL-AUT1 (known areas only)
+    Location     <AREA>-<Code><n>              LTL-LCS3, LTL-AUT1 (known areas only, or written as a
+                                               designation "+BC-LCS13", or an area the package's
+                                               designations use)
 
 Locations may carry an IEC 81346 reference designation prefix on the drawings,
 e.g. "=K07.11+LTL-JB1" (function =K07.11, location +LTL-JB1). The function
@@ -25,6 +27,13 @@ from drawing_qa.model.enums import EntityType
 
 _EDGE_PUNCTUATION = ".,;:()[]{}<>\"'`"
 _DESIGNATION = re.compile(r"^(?:=(?P<function>[A-Z0-9.]+))?\+(?P<location>[A-Z0-9][A-Z0-9:_ -]*)$")
+_DESIGNATED_AREA = re.compile(r"\+(?P<area>[A-Z][A-Z0-9]{1,4})-[A-Z]{2,5}\d*")
+
+
+def designated_areas(texts) -> set[str]:
+    """Areas used in location designations ("=K07.11+BC-LCS13" -> BC). The '+' marks a location, so the
+    area is the package's own, whether or not the config lists it."""
+    return {m["area"] for t in texts for m in _DESIGNATED_AREA.finditer(t.upper())}
 
 
 def clean_token(text: str) -> str:
@@ -47,11 +56,12 @@ class ParsedIdentifier:
 
 
 class IdentifierGrammar:
-    def __init__(self, config: IdentifierConfig) -> None:
+    def __init__(self, config: IdentifierConfig, learned_areas=()) -> None:
         self._config = config
         self._ffis = {f.upper() for f in config.ffis}
         self._prefixes = {p.upper() for p in config.prefixes}
-        self._areas = {a.upper() for a in config.areas}
+        # Configured areas, plus those the package's own location designations use (designated_areas).
+        self._areas = {a.upper() for a in config.areas} | {a.upper() for a in learned_areas}
         self._superseded = {k.upper(): v.upper() for k, v in config.superseded.items()}
         area = r"(?P<area>[A-Z][A-Z0-9]{1,4})"  # LTL, SPL, EER1
         jb = rf"{area}[-_ ]?JB[-_ ]?(?P<num>\d+)"
@@ -77,9 +87,10 @@ class IdentifierGrammar:
         if not token:
             return None
         function = None
+        designated = False
         if d := _DESIGNATION.match(token):
-            function, token = d["function"], d["location"]
-        parsed = self._parse_token(token, raw)
+            function, token, designated = d["function"], d["location"], True
+        parsed = self._parse_token(token, raw, designated)
         if parsed is None:
             return None
         parts = dict(parsed.parts)
@@ -89,7 +100,7 @@ class IdentifierGrammar:
             parts["superseded_by"] = replacement
         return ParsedIdentifier(parsed.kind, parsed.key, raw, parts, spelled=token)
 
-    def _parse_token(self, token: str, raw: str) -> ParsedIdentifier | None:
+    def _parse_token(self, token: str, raw: str, designated: bool = False) -> ParsedIdentifier | None:
         if m := self._terminal.match(token):
             jb_key = self._jb_key(m)
             return ParsedIdentifier(
@@ -117,7 +128,8 @@ class IdentifierGrammar:
                     "known_area": self._known_area(m["area"]),
                 },
             )
-        # Generic locations only for configured areas: the pattern is too loose otherwise.
+        # Generic locations only for known areas, or when written as a designation ("+BC-LCS13"):
+        # the bare pattern is too loose otherwise (IN-12, CH-10).
         if (m := self._location.match(token)) and m["code"] == "JB":
             # "SPL-JB" with no number: a junction box reference that does not fit the format.
             return ParsedIdentifier(
@@ -126,7 +138,7 @@ class IdentifierGrammar:
                 raw,
                 {"area": m["area"], "known_area": self._known_area(m["area"]), "format_valid": False},
             )
-        if (m := self._location.match(token)) and m["area"] in self._areas:
+        if (m := self._location.match(token)) and (m["area"] in self._areas or designated):
             return ParsedIdentifier(
                 EntityType.LOCATION,
                 token,
