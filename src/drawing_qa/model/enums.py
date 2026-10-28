@@ -65,6 +65,7 @@ class Predicate(StrEnum):
     CROSS_REF = "CROSS_REF"
     CONTACT_REF = "CONTACT_REF"  # relay coil contact table entry "43/D4": auxiliary contact on sheet 43 at D4
     SLOT_SHEET = "SLOT_SHEET"  # rack layout: this slot's schematic is on sheet N
+    SLOT_REF = "SLOT_REF"  # a note naming PLC slots ("... MODULE SLOT 22 & 23 (SHT 50 & 51)")
     WIRED_TO = "WIRED_TO"  # schematic channel row: channel -> device / JB / wire drawn in that row
     IN_ENCLOSURE = "IN_ENCLOSURE"  # CBD: device drawn inside a JB / LCS / panel outline
     WORD = "WORD"  # a plain word of drawing text (5+ letters), for the spelling check

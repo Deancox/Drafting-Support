@@ -52,8 +52,11 @@ class RuleContext:
         self.model = model
         self.traces = traces
         self.reference_sheets = reference_sheet_ids(drawings, settings)
-        # Legend and symbol sheets show example tags and placeholders; rules see only real content.
-        self.claims = [c for c in claims if c.source.drawing_id not in self.reference_sheets]
+        # Legend and symbol sheets show example tags and placeholders; rules see only real content. A note naming
+        # slots is real wherever it is: the index lists the drawings by slot ("PLC SLOT 12,12,14", 401103-003).
+        unchecked_ids = {d.id for d in drawings if d.doc_type in unchecked}
+        self.claims = [c for c in claims if c.source.drawing_id not in self.reference_sheets
+                       or (c.predicate is Predicate.SLOT_REF and c.source.drawing_id not in unchecked_ids)]
 
     @cached_property
     def available(self) -> frozenset[Requirement]:

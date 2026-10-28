@@ -1,6 +1,6 @@
 """PLC drawing parser (schematic sheets).
 
-Every sheet: abbreviated wire numbers are expanded (wires.py).
+Every sheet: abbreviated wire numbers are expanded (wires.py); notes naming slots are read (slot_refs.py).
 Template readers, first match wins:
   - RackLayoutReader: rack layout sheet (slot numbers, module per slot, schematic sheet per slot)
   - SlotSheetReader:  one I/O module per sheet (header block, channel rows)
@@ -12,6 +12,7 @@ from drawing_qa.model.enums import DocType
 from drawing_qa.model.source import Drawing
 from drawing_qa.parsers.base import DrawingParser, ParseContext
 from drawing_qa.parsers.plc.rack_layout import RackLayoutReader
+from drawing_qa.parsers.plc.slot_refs import read_slot_refs
 from drawing_qa.parsers.plc.slot_sheet import SlotSheetReader
 from drawing_qa.parsers.plc.legend import read_legend
 from drawing_qa.parsers.plc.wires import expand_wires
@@ -25,7 +26,7 @@ class PlcParser(DrawingParser):
     report_unmatched = False
 
     def supplement(self, page: PageContent, drawing: Drawing, ctx: ParseContext, prior: list[Claim]) -> list[Claim]:
-        return expand_wires(page, drawing, ctx, self) + read_legend(page, drawing, ctx, self)
+        return expand_wires(page, drawing, ctx, self) + read_legend(page, drawing, ctx, self) + read_slot_refs(page, drawing, ctx, self)
 
     @property
     def planned_content(self) -> str:

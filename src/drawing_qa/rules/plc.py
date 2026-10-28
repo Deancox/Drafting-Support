@@ -1,11 +1,13 @@
 """PLC Validation (PLC): rack layout, slot sheets and channel rows from the schematics.
 
+PLC-010 checks notes that name slots against the slot sheets they reference.
 PLC-001 and PLC-009 compare with the termination drawings (M2); PLC-002 (description match)
 waits for AI-assisted matching (M6).
 """
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 
@@ -387,3 +389,87 @@ class PanelSlotConsistency(Rule):
                 discriminator=f"{jb_key}|{panel_key}|{io}",
                 recommendation="Correct the destination panel / slot on the termination drawing",
             )
+
+
+_TYPE_NAMES = {"DI": "digital input", "DO": "digital output", "AI": "analogue input", "AO": "analogue output"}
+
+
+def _write_slots(slots: list[int], like: str) -> str:
+    """Slots written the way the note writes them: '12 TO 23', '22 & 23' or '12,13,14'."""
+    if len(slots) > 2 and re.search(r"\bTO\b", like, re.I) and slots == list(range(slots[0], slots[-1] + 1)):
+        return f"{slots[0]} TO {slots[-1]}"
+    if "," in like:
+        return ",".join(map(str, slots))
+    joiner = " AND " if re.search(r"\bAND\b", like, re.I) else " & "
+    return ", ".join(map(str, slots[:-1])) + joiner + str(slots[-1]) if len(slots) > 1 else str(slots[0])
+
+
+@rule
+class SlotReferences(Rule):
+    meta = RuleMeta(
+        rule_id="PLC-010",
+        title="Slot References",
+        category=Category.PLC,
+        default_severity=Severity.MINOR,
+        description=(
+            "A note that names PLC slots and the sheets they are on ('24VDC SUPPLY TO DIGITAL OUTPUT MODULE SLOT 22 & 23 "
+            "(SHT 50 & 51)') must name the slots, and the module type, of those slot sheets. A slot list that names a "
+            "slot twice ('PLC SLOT 12,12,14') is reported too. A reference to a sheet that is not a slot sheet in the "
+            "package is not checked."
+        ),
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        by_sheet: dict[str, list[Claim]] = defaultdict(list)  # drawing id -> slot sheet module claims
+        for claims in modules(ctx, "slot_sheet").values():
+            for c in claims:
+                by_sheet[c.source.drawing_id].append(c)
+        for c in ctx.claims_of(Predicate.SLOT_REF):
+            v = c.value
+            where = ctx.sheet_of(c)
+            said = f"SLOT {v['slots_text']}"
+            if len(set(v["slots"])) < len(v["slots"]):
+                n, named = len(v["slots"]), set(v["slots"])
+                runs = [s for s in range(min(named) - n + 1, min(named) + 1) if named <= set(range(s, s + n))]
+                twice = sorted({s for s in v["slots"] if v["slots"].count(s) > 1})
+                yield make(
+                    subject_type="TEXT",
+                    subject_key=said,
+                    message=f"{where.label}: '{v['note']}' names slot {', '.join(map(str, twice))} twice",
+                    evidence=[c],
+                    discriminator=f"{c.source.drawing_id}|repeat|{v['slots_text']}",
+                    recommendation=(f"Did you mean SLOT {_write_slots(list(range(runs[0], runs[0] + n)), v['slots_text'])}?"
+                                    if len(runs) == 1 else "Check the slot list"),
+                )
+                continue
+            if not v["sheets"]:
+                continue
+            targets = [ctx.sheets_by_number.get((where.drawing_no, s), []) for s in v["sheets"]]
+            found = [m for ds in targets for d in ds for m in by_sheet.get(d.id, [])]
+            if any(not any(by_sheet.get(d.id) for d in ds) for ds in targets):
+                continue  # a referenced sheet is missing or is not a slot sheet: nothing to compare with
+            actual = sorted({m.value["slot"] for m in found})
+            refs = f"SHT {v['sheets_text']}"
+            if set(actual) != set(v["slots"]):
+                right = _write_slots(actual, v["slots_text"])
+                yield make(
+                    subject_type="TEXT",
+                    subject_key=said,
+                    message=f"{where.label}: '{v['note']}' names {said}, but {refs} {'are slots' if len(actual) > 1 else 'is slot'} {right}",
+                    evidence=[c],
+                    evidence_b=found,
+                    discriminator=f"{c.source.drawing_id}|slots|{v['slots_text']}",
+                    recommendation=f"Change {said} to SLOT {right}, or the sheet reference if the slots are right",
+                )
+            types = {m.value.get("points_type") or m.value.get("module_type") for m in found} - {None}
+            if v["module_type"] and types and v["module_type"] not in types:
+                yield make(
+                    subject_type="TEXT",
+                    subject_key=said,
+                    message=(f"{where.label}: '{v['note']}' names a {_TYPE_NAMES[v['module_type']]} module, but {refs} "
+                             f"{'are' if len(found) > 1 else 'is'} {', '.join(sorted(types))}"),
+                    evidence=[c],
+                    evidence_b=found,
+                    discriminator=f"{c.source.drawing_id}|type|{v['slots_text']}",
+                    recommendation="Check the module type in the note against the slot sheets",
+                )
