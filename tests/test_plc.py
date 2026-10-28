@@ -354,3 +354,29 @@ def test_missing_row_device_close_to_the_next_address(tmp_path, cfg):
     add_sheet(tmp_path, "PLC", "036", items, **frame)
     ch = {c.subject_key: c.value["devices"] for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
     assert ch["LTL/S13/CH03"] == ["S-TN36L4"]
+
+
+def test_location_heading_belongs_to_the_device_below_it(tmp_path, cfg):
+    """401104-066: '=K07.11+BH-LCS1' is drawn above channel 20's device, just nearer channel 19's number,
+    and was put on channel 19. A heading goes to the channel of the device written directly under it."""
+    rows = [
+        channel_row(113, "00", "IN-0", "S-TN36D4", "B4", description=["A"]),
+        channel_row(182, "01", "IN-1", "S-TN36F4", "E4", description=["B"]),
+        [((500, 149, 580, 159), "=K07.11+LTL-LCS9")],  # centre 154: nearer channel 00 (124) than 01 (193)
+    ]
+    items, frame = slot_sheet(rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    ch = {c.subject_key: c.value["locations"] for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
+    assert ch["LTL/S13/CH01"] == ["LTL-LCS9"] and ch["LTL/S13/CH00"] == []
+
+
+def test_heading_with_no_device_below_keeps_its_row(tmp_path, cfg):
+    rows = [
+        channel_row(113, "00", "IN-0", "S-TN36D4", "B4", description=["A"]),
+        channel_row(182, "01", "IN-1", description=["B"]),
+        [((300, 119, 380, 129), "=K07.11+LTL-LCS9")],  # in channel 00's row, nothing under it
+    ]
+    items, frame = slot_sheet(rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    ch = {c.subject_key: c.value["locations"] for c in claims(run_pipeline(tmp_path, cfg), Predicate.HAS_CHANNEL)}
+    assert ch["LTL/S13/CH00"] == ["LTL-LCS9"]

@@ -48,6 +48,11 @@ def _cy(bbox: BBox) -> float:
     return (bbox[1] + bbox[3]) / 2
 
 
+def _is_heading(c: Claim) -> bool:
+    """Written as a location designation (=K07.11+BH-LCS1, +BH-LCS1): a heading, not a label on a wire."""
+    return (c.source.raw_text or "").strip().startswith(("=", "+"))
+
+
 class SlotSheetReader(TemplateReader):
     name = "plc-slot-sheet"
 
@@ -106,10 +111,24 @@ class SlotSheetReader(TemplateReader):
                     rows[i]["description"].append(ln)
 
         this_sheet = drawing.sheet_number
+
+        def device_y(c: Claim) -> float:
+            """A device tag's row: the one its grid names (labels sit above their symbol)."""
+            if int(c.value.get("sheet", -1)) == this_sheet and drawing.grid is not None:
+                return self._row_centre(drawing, c.value["grid"][0], _cy(c.source.bbox))
+            return _cy(c.source.bbox)
+
+        devices = [c for c in prior if c.source.drawing_id == drawing.id and c.predicate is Predicate.OCCURS
+                   and c.subject_type is EntityType.DEVICE and c.value.get("format_valid")]
         for c in prior:
             if c.source.drawing_id != drawing.id or c.predicate is not Predicate.OCCURS:
                 continue
             y = _cy(c.source.bbox)
+            if c.subject_type in (EntityType.JUNCTION_BOX, EntityType.LOCATION) and _is_heading(c):
+                # A location heading (=K07.11+BH-LCS1) is drawn above the device it labels, often halfway
+                # between two channel numbers (401104-066): it goes to the row of the device under it.
+                if under := self._device_under(c, devices):
+                    y = device_y(under)
             if c.subject_type in (EntityType.DEVICE, EntityType.WIRE):
                 if c.subject_type is EntityType.DEVICE and not c.value.get("format_valid"):
                     continue
@@ -185,6 +204,13 @@ class SlotSheetReader(TemplateReader):
             },
         )
         return module, claim
+
+    @staticmethod
+    def _device_under(heading: Claim, devices: list[Claim], reach: float = 30.0, sideways: float = 60.0) -> Claim | None:
+        """The device tag written directly under a heading: within `reach` pt below it, about the same column."""
+        hx0, _, hx1, hy1 = heading.source.bbox
+        below = [d for d in devices if 0 <= d.source.bbox[1] - hy1 <= reach and abs(_cx(d.source.bbox) - (hx0 + hx1) / 2) <= sideways]
+        return min(below, key=lambda d: d.source.bbox[1] - hy1, default=None)
 
     @staticmethod
     def _beside(page: PageContent, label: TextLine) -> TextLine | None:
