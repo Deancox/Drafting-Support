@@ -306,6 +306,68 @@ def _label_near(grid: str, cell: str | None) -> bool:
     return bool(cell) and GridValidation()._close(grid, cell)
 
 
+def ffi_typos(ctx: RuleContext) -> dict[str, tuple[str, list[Claim]]]:
+    """Device references to a separate package (or an FFI with no mapping) that match a device drawn on its home
+    sheet in this package except for one letter of the FFI (B-TH61H2 on 401310-016, B-TN61H2 drawn on
+    401103-061): {reference: (the tag it probably means, that tag's claims on its home sheet)}. A reference
+    with more than one such match is left out. Wires are not matched: a wire number is only a sheet and a grid,
+    and wires fill most cells, so two drawings' wires often share numbers (TV20T6, the DB3 supply on
+    401103-015, and TN20T6 on 401103-020)."""
+    drawn: dict[tuple, list[Claim]] = defaultdict(list)  # (prefix, sheet, grid) -> claims on the home sheet
+    refs: dict[str, list[Claim]] = defaultdict(list)
+    for c in ctx.claims_of(Predicate.OCCURS, EntityType.DEVICE):
+        v = c.value
+        if not all(k in v for k in ("prefix", "ffi", "sheet", "grid")):
+            continue
+        status, _, homes = ctx.home(v["ffi"], int(v["sheet"]))
+        if status in ("external", "unmapped"):
+            refs[c.subject_key].append(c)
+        elif status == "package" and v.get("format_valid", True) and c.source.drawing_id in {d.id for d in homes}:
+            drawn[(v["prefix"], int(v["sheet"]), v["grid"])].append(c)
+    out = {}
+    for key, claims in refs.items():
+        v = claims[0].value
+        ffi = v["ffi"].upper()
+        here = [c for c in drawn.get((v["prefix"], int(v["sheet"]), v["grid"]), [])
+                if len(c.value["ffi"]) == len(ffi) and sum(a != b for a, b in zip(c.value["ffi"].upper(), ffi)) == 1]
+        meant = {c.subject_key for c in here}
+        if len(meant) == 1:
+            out[key] = (meant.pop(), here)
+    return out
+
+
+@rule
+class MistypedFfi(Rule):
+    meta = RuleMeta(
+        rule_id="TAG-008",
+        title="Mistyped FFI",
+        category=Category.TAG,
+        default_severity=Severity.MINOR,
+        description=(
+            "A device tag whose FFI belongs to a separate package (or has no mapping) is, apart from one letter of "
+            "the FFI, a device drawn on its home sheet in this package: B-TH61H2 on 401310-016 where 401103-061 "
+            "draws B-TN61H2. Probably mistyped. It is left out of the separate-document list (DRW-009). Wire numbers "
+            "are not matched: two drawings' wires often share numbers."
+        ),
+        requires=frozenset({Requirement.CLAIMS, Requirement.DRAWINGS}),
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        for key, (meant, here) in sorted(ffi_typos(ctx).items()):
+            refs = [c for c in ctx.claims_of(Predicate.OCCURS) if c.subject_key == key]
+            where = sorted({ctx.sheet_of(c).label for c in refs})
+            ffi, meant_ffi = refs[0].value["ffi"], here[0].value["ffi"]
+            yield make(
+                subject_type="DEVICE",
+                subject_key=key,
+                message=(f"{key} on {', '.join(where)} has FFI {ffi} (a separate package), but {make.where(here[0].source)} "
+                         f"has {meant}: the same device except FFI {meant_ffi}. Probably a mistyped FFI"),
+                evidence=refs,
+                evidence_b=here,
+                recommendation=f"Did you mean {meant}?",
+            )
+
+
 @rule
 class SpellingVariant(Rule):
     meta = RuleMeta(

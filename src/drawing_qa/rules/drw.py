@@ -185,17 +185,23 @@ class ExternalReference(Rule):
         default_severity=Severity.INFO,
         description=(
             "Tags and wires whose FFI belongs to a separate package (config [identifiers.ffi_drawings] = EXTERNAL) are "
-            "listed as references to that document and not checked. An FFI with no mapping is reported so it can be added."
+            "listed as references to that document and not checked. An FFI with no mapping is reported so it can be added. "
+            "One that is a probable mistyped FFI of a tag drawn in this package is reported by TAG-008 instead."
         ),
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
         if not ctx.settings.identifiers.ffi_drawings:
             return
+        from drawing_qa.rules.tag import ffi_typos
+
+        typos = ffi_typos(ctx)
         groups: dict[tuple[str, str], list[Claim]] = defaultdict(list)
         for c in ctx.claims_of(Predicate.OCCURS):
             if c.subject_type not in (EntityType.DEVICE, EntityType.WIRE) or "ffi" not in c.value or "sheet" not in c.value:
                 continue
+            if c.subject_key in typos:
+                continue  # a probable mistyped FFI (TAG-008)
             status, _, _ = ctx.home(c.value["ffi"], int(c.value["sheet"]))
             if status in ("external", "unmapped"):
                 groups[(status, c.value["ffi"])].append(c)
