@@ -1,7 +1,9 @@
 """Generic occurrence reader, run on every sheet of every document type.
 
 Emits an OCCURS claim for each package identifier found anywhere on the sheet,
-and a PLACEHOLDER claim for each incomplete-drafting marker.
+and a PLACEHOLDER claim for each incomplete-drafting marker. A device label away from the grid
+its tag encodes may sit on top of a tall symbol in a dashed outline (a siren on 401103 sh 050);
+the outline's cell is recorded with it, as the device's drawn position.
 """
 
 from __future__ import annotations
@@ -12,7 +14,9 @@ from typing import TYPE_CHECKING
 from drawing_qa.common.identifiers import clean_token
 from drawing_qa.model.enums import EntityType, Predicate
 from drawing_qa.model.source import Drawing
+from drawing_qa.model.source import BBox
 from drawing_qa.parsers.base import ParseContext, ParseResult
+from drawing_qa.parsers.cbd.geometry import Run, merge_runs
 from drawing_qa.pdf.extract import PageContent
 
 if TYPE_CHECKING:
@@ -26,6 +30,8 @@ _NOT_A_REFERENCE = re.compile(r"\bEXAMPLE\b", re.I)
 _CONTACT_POINTER = re.compile(r"^(?P<sheet>\d{1,3})/(?P<grid>[A-Z]\d)$")
 _COIL_SEARCH_HEIGHT = 60.0  # points above a pointer to look for its coil's tag (table header)
 _WORD = re.compile(r"^[A-Z]+$")
+_DASH_GAP = 3.0  # largest gap between the dashes of an outline, in points
+_OUTLINE_REACH = 200.0  # how far below its label a device outline may reach, in points
 
 
 class OccurrenceReader:
@@ -115,7 +121,25 @@ class OccurrenceReader:
                     )
                 )
         result.claims.extend(self._contact_pointers(page, drawing, ctx, common, result.claims))
+        self._symbol_outlines(page, drawing, result.claims)
         return result
+
+    def _symbol_outlines(self, page: PageContent, drawing: Drawing, claims) -> None:
+        """For a device label not in the cell its tag encodes: the dashed outline directly under it, if any,
+        recorded as value["symbol_cell"] (its centre's cell) and value["symbol_bbox"]. The page's line work is
+        read only when such a label exists."""
+        if drawing.grid is None:
+            return
+        away = [c for c in claims if c.subject_type is EntityType.DEVICE and c.predicate is Predicate.OCCURS
+                and c.value.get("format_valid") and c.value.get("grid") and c.source.grid_cell != c.value["grid"]]
+        if not away:
+            return
+        segments = page.segments
+        for c in away:
+            box = _outline_under(c.source.bbox, segments)
+            if box is not None:
+                c.value["symbol_bbox"] = box
+                c.value["symbol_cell"] = drawing.grid.cell_at((box[0] + box[2]) / 2, (box[1] + box[3]) / 2)
 
     def _contact_pointers(self, page, drawing, ctx, common, claims):
         """Relay contact tables: each "43/D4" under a coil tag points to that coil's auxiliary
@@ -153,3 +177,27 @@ class OccurrenceReader:
                     "aux_tag": aux_tag,
                 },
             )
+
+
+def _outline_under(label: BBox, segments) -> BBox | None:
+    """A dashed rectangle whose top edge runs under the label (from its top to one label height below it,
+    across its centre), with dashed sides going down from both ends of that edge."""
+    x0, y0, x1, y1 = label
+    cx, height = (x0 + x1) / 2, y1 - y0
+    near = [s for s in segments if s.width > 0 and s.length < _OUTLINE_REACH  # width 0: a text note's outline
+            and min(s.y0, s.y1) >= y0 - 2 and max(s.y0, s.y1) <= y1 + _OUTLINE_REACH
+            and max(s.x0, s.x1) >= x0 - _OUTLINE_REACH and min(s.x0, s.x1) <= x1 + _OUTLINE_REACH]
+    runs = merge_runs(near, _DASH_GAP)
+    tops = sorted((r for r in runs if r.horizontal and r.pieces >= 3 and r.start <= cx <= r.end
+                   and y0 - 2 <= r.pos <= y1 + height), key=lambda r: r.pos)
+    sides = [r for r in runs if not r.horizontal and r.pieces >= 2]
+    for top in tops:
+        left = _side(sides, top.start, top.pos)
+        right = _side(sides, top.end, top.pos)
+        if left and right:
+            return (top.start, top.pos, top.end, max(left.end, right.end))
+    return None
+
+
+def _side(sides: list[Run], x: float, top: float, tol: float = 2.0) -> Run | None:
+    return next((r for r in sides if abs(r.pos - x) <= tol and abs(r.start - top) <= tol), None)

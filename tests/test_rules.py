@@ -108,6 +108,33 @@ def test_tag_004_label_tolerance(tmp_path, cfg, label_cell, expected):
     assert len(by_rule(run_pipeline(tmp_path, cfg), "TAG-004")) == expected
 
 
+def _dashed_box(x0, y0, x1, y1, dash=4.0, gap=2.0, width=0.12):
+    """A device outline drawn as AutoCAD plots a dashed line: short strokes with gaps."""
+    out = []
+    for a, b, fixed, horizontal in ((x0, x1, y0, True), (x0, x1, y1, True), (y0, y1, x0, False), (y0, y1, x1, False)):
+        pos = a
+        while pos < b:
+            end = min(pos + dash, b)
+            out.append((pos, fixed, end, fixed, width) if horizontal else (fixed, pos, fixed, end, width))
+            pos = end + gap
+    return out
+
+
+def test_tag_004_measures_a_tall_symbol_by_its_dashed_outline(tmp_path, cfg):
+    """401103 sh 050: H-TN50D7's siren is a tall symbol in a dashed box, its label above the box at A7, three rows
+    above D7. The device is placed by its outline (rows B-C), not by its label."""
+    box = _dashed_box(842, 64, 902, 128)  # from just under the label down to the C/D boundary
+    add_sheet(tmp_path, "PLC", "050", [(cell_rect("A7"), "H-TN50D7")], lines=box)
+    assert by_rule(run_pipeline(tmp_path, cfg), "TAG-004") == []
+
+
+def test_tag_004_outline_far_from_the_tag_grid_is_still_reported(tmp_path, cfg):
+    box = _dashed_box(842, 64, 902, 128)
+    add_sheet(tmp_path, "PLC", "050", [(cell_rect("A7"), "H-TN50H7")], lines=box)
+    [f] = by_rule(run_pipeline(tmp_path, cfg), "TAG-004")
+    assert f.subject_key == "H-TN50H7"
+
+
 def _coil_sheet(tmp_path, pointers):
     """Sheet 019 with coil K-TN19F1 and its contact table entries below it."""
     items = [(cell_rect("W1"), "K-TN19F1"), (cell_rect("E1"), "K-TN19F1")]

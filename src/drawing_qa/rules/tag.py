@@ -142,8 +142,8 @@ class GridValidation(Rule):
         default_severity=Severity.MINOR,
         description=(
             "On its home sheet, the tag label is not near the grid cell its tag encodes. Labels are drawn "
-            "above their symbol, so up to 2 rows above and 1 column either side is accepted. Uses the label "
-            "position until symbol positions are read (M3)."
+            "above their symbol, so up to 2 rows above and 1 column either side is accepted. A tall symbol drawn "
+            "in a dashed outline under its label is placed by the outline instead (its centre's cell)."
         ),
         requires=_NEEDS_GRID,
     )
@@ -157,13 +157,16 @@ class GridValidation(Rule):
             grid = claims[0].value["grid"]
             homes = {d.id for d in home_sheets(ctx, claims[0].value["ffi"], int(claims[0].value["sheet"]))}
             on_home = [c for c in claims if c.source.drawing_id in homes and c.source.grid_cell]
-            if not on_home or any(self._close(grid, c.source.grid_cell) for c in on_home):
+            if not on_home or any(self._close(grid, c.source.grid_cell)
+                                  or (c.value.get("symbol_cell") and self._close(grid, c.value["symbol_cell"]))
+                                  for c in on_home):
                 continue
             c = on_home[0]
+            outline = f" (its outline at grid {c.value['symbol_cell']})" if c.value.get("symbol_cell") else ""
             yield make(
                 subject_type="DEVICE",
                 subject_key=tag,
-                message=f"{tag} encodes grid {grid} but its label is at {make.where(c.source)}",
+                message=f"{tag} encodes grid {grid} but its label is at {make.where(c.source)}{outline}",
                 evidence=on_home,
                 recommendation=f"Re-number the device for its drawn position or move it to {grid}",
             )
