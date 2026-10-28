@@ -7,7 +7,7 @@ before its crossbar), so paths are joined when they touch any of the few drawn j
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pymupdf
 
@@ -22,6 +22,9 @@ class Glyph:
     key: GlyphKey
     first_seq: int
     on_line: bool = False  # touches a long stroke (a wire, a frame): a symbol or a letter overdrawn, not text
+    # Its points from the box's corner, unrounded, in the order drawn: the shape at any scale (SHX scales its
+    # strokes), and the order tells apart letters with the same corners (N and Z).
+    points: tuple[tuple[float, float], ...] = field(default=(), compare=False)
 
 
 def _segments(path: dict) -> list[tuple]:
@@ -128,7 +131,9 @@ def glyph_groups(
         # By coordinates: PyMuPDF's union skips the zero-area boxes of straight strokes.
         box = pymupdf.Rect(min(rects[i].x0 for i in idx), min(rects[i].y0 for i in idx),
                            max(rects[i].x1 for i in idx), max(rects[i].y1 for i in idx))
-        pts = sorted((round((p.x - box.x0) / quantum), round((p.y - box.y0) / quantum)) for i in idx for p in _points(paths[i]))
+        raw = [(p.x - box.x0, p.y - box.y0) for i in idx for p in _points(paths[i])]
+        pts = sorted((round(x / quantum), round(y / quantum)) for x, y in raw)
         key = (round(box.width / quantum), round(box.height / quantum), len(idx), tuple(pts))
-        glyphs.append(Glyph(box=(box.x0, box.y0, box.x1, box.y1), key=key, first_seq=paths[idx[0]]["seqno"], on_line=on_line(box)))
+        glyphs.append(Glyph(box=(box.x0, box.y0, box.x1, box.y1), key=key, first_seq=paths[idx[0]]["seqno"], on_line=on_line(box),
+                            points=tuple(raw)))
     return glyphs

@@ -17,7 +17,8 @@ def unreadable(tmp_path, lines, name="u.pdf"):
 
 
 def learned(tmp_path, items, lines=None) -> GlyphBook:
-    book = GlyphBook()
+    # The test font's characters differ by ticks 1/9 of the text height apart, finer than the client's font.
+    book = GlyphBook(scaled_tol=0.04)
     book.learn_page(readable(tmp_path, items, lines), TITLES)
     return book
 
@@ -167,4 +168,97 @@ def test_word_matched_only_within_a_rounding_step_is_dropped(tmp_path):
 
     book = learned(tmp_path, [((100, 100, 104, 106), "Q")], _custom(100, 100, 1.1249))
     words, _ = decode_page(unreadable(tmp_path, _custom(300, 300, 1.1251)), book)
+    assert texts(words) == []
+
+
+# --- letters at a text size no readable sheet uses: matched scaled to their line's height ------------
+
+
+def test_letters_at_an_unseen_size_are_read_by_scale(tmp_path):
+    """SHX draws one font at every size by scaling the same strokes: HOIST learned at 6 reads at 9."""
+    book = learned(tmp_path, [note("HOIST HIGH", 100, 200)])
+    words, stats = decode_page(unreadable(tmp_path, stroke_text("HOIST HIGH", 300, 500, h=9.0)), book)
+    assert texts(words) == ["HOIST", "HIGH"]
+    assert len({w.block for w in words}) == 1  # the learned spacing scales too: one line, two words
+    assert stats.scaled == 9
+
+
+def test_unseen_size_letters_mixed_with_known_ones(tmp_path):
+    """A letter never seen at this size (S) in a word of letters seen at it."""
+    book = learned(tmp_path, [note("-TL60F4", 100, 200), note("S", 100, 300, h=9.0)])
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("S-TL60F4", 300, 500)), book)
+    assert texts(words) == ["S-TL60F4"]
+
+
+def _shape(ch, x, baseline, h):
+    from tests.shx_font import _glyph
+
+    return [(*s, WIDTH) for s in _glyph(ch, x, baseline, h)]
+
+
+def test_scaled_reads_keep_lower_case_apart(tmp_path):
+    """'o' drawn as a smaller 'O' (as SHX fonts draw several lower-case letters) is told apart only by its
+    height against the line's tall letters: 'Xo' at another size still reads 'Xo'."""
+    lines = stroke_text("X", 100, 200) + _shape("O", 104.8, 200, 4.2) + stroke_text("O", 100, 300)
+    book = learned(tmp_path, [note("Xo", 100, 200), note("O", 100, 300)], lines)
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("X", 300, 500, h=8.0) + _shape("O", 306.4, 500, 5.6)), book)
+    assert texts(words) == ["Xo"]
+
+
+def test_near_match_beside_scaled_letters_is_dropped(tmp_path):
+    """At 9, the 'o' (6.3 tall) is within a rounding step of the 'O' learned at 6, so it near-matches 'O'.
+    The X beside it was read by scale, which is no exact match to vouch for the word: dropped, not 'XO'."""
+    lines = stroke_text("X", 100, 200) + _shape("O", 104.8, 200, 4.2) + stroke_text("O", 100, 300)
+    book = learned(tmp_path, [note("Xo", 100, 200), note("O", 100, 300)], lines)
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("X", 300, 500, h=9.0) + _shape("O", 307.2, 500, 6.3)), book)
+    assert texts(words) == []
+
+
+def test_line_of_only_case_ambiguous_letters_is_not_read_by_scale(tmp_path):
+    """'oo' alone at another size: the line's height is a lower-case height, so scaling it would make 'OO'."""
+    lines = stroke_text("X", 100, 200) + _shape("O", 104.8, 200, 4.2) + stroke_text("O", 100, 300)
+    book = learned(tmp_path, [note("Xo", 100, 200), note("O", 100, 300)], lines)
+    oo = _shape("O", 300, 500, 6.3) + _shape("O", 307.2, 500, 6.3)
+    words, _ = decode_page(unreadable(tmp_path, oo), book)
+    assert texts(words) == []
+
+
+def test_unknown_shape_at_any_size_still_drops_its_word(tmp_path):
+    book = learned(tmp_path, [note("-TL60F4 OK", 100, 200)])  # never sees an S
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("S-TL60F4 OK", 300, 500, h=9.0)), book)
+    assert texts(words) == ["OK"]
+
+
+def test_lone_shape_is_not_read_by_scale(tmp_path):
+    """401104-144 held out: a bubble round a number, alone in its line, came out 'O': a letter read by scale sets
+    its own line's height, so it needs a letter beside it in its word to show it is text."""
+    book = learned(tmp_path, [note("HOIST", 100, 200)])
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("O", 300, 500, h=9.0)), book)
+    assert texts(words) == []
+
+
+def test_scale_is_the_letters_height_not_a_taller_mark(tmp_path):
+    """A note's '(' reaches below its letters, so the note is taller than its letters: letters are scaled
+    to the tallest letter or digit, else 'c' in 'Checked' matched a 'C' learned beside a '(' (401002 held out)."""
+    lines = stroke_text("AB", 100, 200) + stroke_text("(", 109.6, 201.2, h=7.2)
+    book = learned(tmp_path, [((100, 192.8, 117, 201.2), "AB(")], lines)
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("AB", 300, 500, h=9.0)), book)
+    assert texts(words) == ["AB"]
+
+
+def test_punctuation_is_not_read_by_scale(tmp_path):
+    """Small marks are too alike scaled ('57,' came out '57.' on 401104-144 held out): only letters, digits
+    and '-' are read by scale."""
+    book = learned(tmp_path, [note("AB. C-D", 100, 200)])
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("AB. C-D", 300, 500, h=9.0)), book)
+    assert texts(words) == ["C-D"]
+
+
+def test_letter_learned_only_at_another_text_size_is_doubted_in_a_scaled_line(tmp_path):
+    """A capital at one size can be stroke for stroke a lower-case letter at a larger one (401310-020 held out:
+    CONVERTER read CONvERTER, its V the fingerprint of a 'v' learned in larger text). Once the line's text size
+    is known from scaling, a letter learned only at other sizes is in doubt: the word is dropped."""
+    lines = stroke_text("X", 100, 200) + _shape("O", 104.8, 200, 4.2) + stroke_text("O", 100, 300)
+    book = learned(tmp_path, [note("Xo", 100, 200), note("O", 100, 300)], lines)
+    words, _ = decode_page(unreadable(tmp_path, stroke_text("XO", 300, 500, h=4.2)), book)
     assert texts(words) == []

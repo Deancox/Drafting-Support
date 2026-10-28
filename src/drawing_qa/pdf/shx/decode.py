@@ -3,14 +3,21 @@
 Each letter is looked up in the book. Letters drawn one after another along one baseline (or one
 column, for rotated text) form a line; gaps wider than the learned word spacing split it into words.
 A word is used only if every letter in it was recognised and nothing about it is in doubt; otherwise
-it is dropped whole, so a partial read never becomes text:
+it is dropped whole, so a partial read never becomes text. A letter at a text size no readable sheet uses
+is matched scaled to its line's height, when a tall letter in the line shows that height is the text's.
+A word is dropped when:
 - a letter is not recognised, or its shape sits at the wrong height for its line (',' vs "'");
 - the word runs into a letter of another text size (two texts touching);
 - a neighbour drawn just before or after it sits right beside it but does not continue it
   (stacked parts of a character not learned, '=' or ':'; text in a reading direction not learned;
   a letter merged with line work);
 - an unrecognised letter-sized shape sits on it or beside it;
-- every letter in it matched only within a rounding step, not exactly.
+- it is a single letter read by scale (a shape alone sets its own line's height: a bubble round a number
+  is an 'O' at some size);
+- in a line read by scale, a letter in it was learned only at other text sizes (a capital at one size can be
+  a lower-case letter at a larger one, stroke for stroke);
+- a letter in it matched only within a rounding step, and no letter in it matched exactly (one read by scale
+  does not count: a near match can take an upper-case letter at one size for its lower case at another).
 """
 
 from __future__ import annotations
@@ -23,12 +30,13 @@ from drawing_qa.model.enums import ExtractionMethod
 from drawing_qa.model.source import BBox
 from drawing_qa.pdf.extract import Word
 from drawing_qa.pdf.shx.book import MAX_PARTS, QUANTUM, GlyphBook, combo_key
-from drawing_qa.pdf.shx.glyphs import glyph_groups
+from drawing_qa.pdf.shx.glyphs import Glyph, glyph_groups
 
 
 @dataclass
 class DecodeStats:
     letters: int = 0  # letters recognised
+    scaled: int = 0  # of which matched scaled to their line's height (a text size not learned)
     shapes: int = 0  # letter-sized shapes, recognised or not
     words_kept: int = 0
     words_dropped: int = 0
@@ -41,8 +49,10 @@ class _Letter:
     sizes: frozenset[float] = frozenset()  # text heights the shape was learned at
     positions: frozenset[float] = frozenset()  # where across its line the shape was learned (0 top .. 1 bottom)
     near: bool = False  # matched only within a rounding step
+    scaled: bool = False  # matched scaled to its line's height
     big: bool = False  # line work, or a shape touching it: never a letter, ends any line
     clash: bool = False  # in doubt (see the module docstring): its word is dropped
+    glyph: Glyph | None = None  # the shape, for a single-part letter
 
 
 def _union(a: BBox, b: BBox) -> BBox:
@@ -53,7 +63,8 @@ def _letters(page: pymupdf.Page, book: GlyphBook) -> list[_Letter]:
     """Letters and larger shapes, in drawing order."""
     groups = glyph_groups(page, quantum=QUANTUM)
     multi = book.multi
-    largest = max(book.heights, default=0.0) + 0.5
+    # Text up to half as tall again as any learned can still be read by scale; anything larger is line work.
+    largest = 1.5 * max(book.heights, default=0.0) + 0.5
     out: list[_Letter] = []
     i = 0
     while i < len(groups):
@@ -74,7 +85,8 @@ def _letters(page: pymupdf.Page, book: GlyphBook) -> list[_Letter]:
             else:
                 ch = book.char(g.key)
                 out.append(_Letter(ch, g.box, book.sizes(g.key) if ch else frozenset(),
-                                   book.positions(g.key) if ch else frozenset(), near=bool(ch) and not book.exact(g.key)))
+                                   book.positions(g.key) if ch else frozenset(), near=bool(ch) and not book.exact(g.key),
+                                   glyph=g))
             i += 1
     return out
 
@@ -123,6 +135,29 @@ def _follows(line: list[_Letter], vertical: bool | None, letter: _Letter, book: 
                 threshold = max(1.2 * letter_gap, 0.6 * height) if letter_gap else 0.6 * height
             return True, vert, gap >= threshold
     return False, bool(vertical), False
+
+
+def _read_by_scale(letters: list[_Letter], book: GlyphBook) -> int:
+    """Match the line's unrecognised letters scaled to its height (horizontal text): its tallest shape, leaving
+    out marks already recognised ('(' reaches lower than the letters). The height is used only if a letter
+    that tall is a capital or digit that sets it (book.sets_height): a line of only 'c's is as tall as a 'c',
+    and scaled to that a 'c' is a 'C'. Once the line's text size is known, a letter matched by its fingerprint
+    but learned only at other sizes is in doubt: a capital at one size can be a lower-case letter at a larger
+    one stroke for stroke. Returns how many letters were read."""
+    if not any(g.char is None and g.glyph for g in letters):
+        return 0
+    height = max((g.box[3] - g.box[1] for g in letters if g.char is None or g.char.isalnum()), default=0.0)
+    reads = {id(g): r for g in letters if g.char is None and g.glyph and (r := book.scaled(g.glyph, height))}
+    tallest = [g for g in letters if g.box[3] - g.box[1] >= height - 0.25]
+    if not reads or not any((c := g.char or reads.get(id(g), (None,))[0]) and book.sets_height(c) for g in tallest):
+        return 0
+    for g in letters:
+        if r := reads.get(id(g)):
+            g.char, g.positions = r
+            g.scaled = True
+        elif g.char and g.sizes and not _same_size(g.sizes, frozenset({round(height * 2) / 2})):
+            g.clash = True
+    return len(reads)
 
 
 def _check_positions(letters: list[_Letter], vertical: bool) -> None:
@@ -208,6 +243,10 @@ def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_00
     close()
 
     for letters, _, vert in lines:
+        if not vert:
+            n = _read_by_scale(letters, book)
+            stats.letters += n
+            stats.scaled += n
         _check_positions(letters, vert)
     unknown = [g.box for ln, _, _ in lines for g in ln if g.char is None]
     words: list[Word] = []
@@ -218,7 +257,9 @@ def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_00
                 groups.append([])
             groups[-1].append(letter)
         for group in groups:
-            if any(g.char is None or g.clash for g in group) or all(g.near for g in group):
+            exact = any(not g.near and not g.scaled for g in group)
+            alone = len(group) == 1 and group[0].scaled
+            if any(g.char is None or g.clash for g in group) or (any(g.near for g in group) and not exact) or alone:
                 stats.words_dropped += 1
                 continue
             box = group[0].box

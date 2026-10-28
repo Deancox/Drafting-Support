@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pymupdf
+import pytest
 
 from drawing_qa.pdf.shx.book import GlyphBook, learn
 from drawing_qa.pdf.shx.glyphs import glyph_groups
@@ -64,7 +65,7 @@ def test_multi_part_char_learned(tmp_path):
 def test_spacing_learned(tmp_path):
     book = book_from(tmp_path, [note("AB CD", 100, 200)])
     assert book.letter_gap(6.0) < book.space_gap(6.0)
-    assert book.space_gap(12.0) is None  # nothing learned at that size
+    assert book.space_gap(12.0) == pytest.approx(2 * book.space_gap(6.0))  # not learned at that size: scaled
 
 
 def test_learning_stops_when_nothing_new(tmp_path):

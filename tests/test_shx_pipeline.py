@@ -45,12 +45,16 @@ def readable_sheet(root, kind, sheet, items, **frame):
     build_pdf(root / FOLDER[kind] / f"{DRAWING}-{sheet}.pdf", [[]], lines=[as_strokes(everything, FILL)], shx=[everything])
 
 
-def unreadable_sheet(root, kind, sheet, items, *, title_sheet=None, text=(), scale=1.0, **frame):
+def unreadable_sheet(root, kind, sheet, items, *, title_sheet=None, text=(), scale=1.0, italic=False, **frame):
     """The same sheet plotted without SHX notes (PDFSHX=0): strokes only, plus any real text words."""
     everything = _items(kind, sheet, items, frame, title_sheet)
     if scale != 1.0:  # every text taller, as if plotted in another font size
         everything = [((r[0], r[3] - (r[3] - r[1]) * scale, r[2] + (r[2] - r[0]) * (scale - 1), r[3]), t) for r, t in everything]
-    build_pdf(root / FOLDER[kind] / f"{DRAWING}-{sheet}.pdf", [list(text)], lines=[as_strokes(everything, FILL)])
+    strokes = as_strokes(everything, FILL)
+    if italic:  # every letter slanted: another font, not another size
+        strokes = [(x0 + 0.3 * (r[3] - y0), y0, x1 + 0.3 * (r[3] - y1), y1, w)
+                   for r, t in everything for x0, y0, x1, y1, w in as_strokes([(r, t)], FILL)]
+    build_pdf(root / FOLDER[kind] / f"{DRAWING}-{sheet}.pdf", [list(text)], lines=[strokes])
 
 
 def slot_037(device="S-TN37D4", extra=()):
@@ -126,7 +130,7 @@ def test_grid_and_ffi_from_decoded_text(tmp_path, cfg):
 
 
 def test_unseen_font_leaves_sheet_unread(tmp_path, cfg):
-    result = run(package(tmp_path, scale=2.6), cfg)  # far from every size on the readable sheet
+    result = run(package(tmp_path, italic=True), cfg)  # a shape no size of the readable sheet's font has
     assert _claims_on(result, "037") == []
     assert any(i.code is IssueCode.SHX_NOT_DECODED and "not seen" in i.message for i in result.issues)
     d = _sheet(result, "037")

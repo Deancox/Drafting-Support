@@ -44,6 +44,7 @@ class DecodeInfo(BaseModel):
     """How much of a NO_SHX_TEXT sheet was read by decoding its letter strokes (--ocr)."""
 
     letters: int  # letters recognised
+    scaled: int = 0  # of which matched scaled to their line's height (a text size the readable sheets do not use)
     shapes: int  # letter-sized shapes, recognised or not
     words_kept: int
     words_dropped: int  # words with an unrecognised letter: never used

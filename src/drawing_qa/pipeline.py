@@ -312,7 +312,7 @@ def _decode_one(found, index: int, drawing: Drawing, content: PageContent, parse
                              _segment_loader=lambda page=page: _load_segments(page))
         drawing.grid = read_grid_frame(merged, settings.grid)
         drawing.ffi = sheet_ffi(merged) or drawing.ffi
-        drawing.decoded = DecodeInfo(letters=stats.letters, shapes=stats.shapes, words_kept=len(decoded),
+        drawing.decoded = DecodeInfo(letters=stats.letters, scaled=stats.scaled, shapes=stats.shapes, words_kept=len(decoded),
                                      words_dropped=stats.words_dropped)
         for issue in result.issues:
             if issue.code is IssueCode.NO_SHX_TEXT and issue.drawing_id == drawing.id:

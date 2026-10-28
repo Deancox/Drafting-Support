@@ -371,7 +371,8 @@ def _decoded(result: RunResult, w) -> None:
     w("## Sheets decoded from line work")
     w("")
     w("Plotted without SHX text notes, these sheets were read with `--ocr` by matching each letter's strokes against "
-      "letters learned from the readable sheets. Only words whose every letter matched exactly are used; nothing is "
+      "letters learned from the readable sheets; a letter at a text size those sheets do not use is matched scaled to "
+      "its line's height. Only words whose every letter matched are used; nothing is "
       f"reported as missing from them, and findings resting on them are marked {DECODED_MARK}. Re-plotting with "
       "PDFSHX = 1 is still the better fix.")
     w("")
@@ -379,7 +380,8 @@ def _decoded(result: RunResult, w) -> None:
         w("| Sheet | Letters recognised / letter shapes | Words used | Words dropped |")
         w("|---|---|---|---|")
         for d in decoded:
-            w(f"| {d.label} | {d.decoded.letters} / {d.decoded.shapes} | {d.decoded.words_kept} | {d.decoded.words_dropped} |")
+            scaled = f" ({d.decoded.scaled} by scale)" if d.decoded.scaled else ""
+            w(f"| {d.label} | {d.decoded.letters} / {d.decoded.shapes}{scaled} | {d.decoded.words_kept} | {d.decoded.words_dropped} |")
         w("")
     if quiet := quiet_rules(result.drawings):
         w(f"A cable block diagram or termination sheet was decoded, so these rules are quiet for the whole package "

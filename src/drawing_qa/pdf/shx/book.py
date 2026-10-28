@@ -3,6 +3,12 @@
 On a readable sheet each SHX text note lies over the strokes AutoCAD drew for it. The letters
 inside the note, in drawing order, are paired with the note's characters; each fingerprint then
 means that character. A fingerprint seen as two different characters is never used.
+
+SHX draws a font at every size by scaling the same strokes, so each letter, digit and '-' is also kept
+scaled to its text's height (its capitals' and digits'): a letter at a size no readable sheet uses is
+matched that way, stroke by stroke in drawing order, against its line's height. On the client's sheets
+one character scaled differs from itself by under 0.15 of the text height and from any other by over 0.25
+(C and c); other marks (comma, apostrophe, full stop) are too alike scaled to read that way.
 """
 
 from __future__ import annotations
@@ -10,6 +16,7 @@ from __future__ import annotations
 import logging
 from collections import defaultdict
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 
 import pymupdf
 
@@ -19,7 +26,30 @@ from drawing_qa.pdf.shx.glyphs import Glyph, GlyphKey, glyph_groups
 log = logging.getLogger(__name__)
 
 QUANTUM = 0.25
+CAPITALS = frozenset("ABCDEFGHIKLMNOPRSTUVWXYZ0123456789")  # the text height; J and Q may reach lower
+SCALED_TOL = 0.15  # in text heights (see the module docstring)
 MAX_PARTS = 3  # a character drawn in up to three separate parts (%, ", =, :)
+
+
+@dataclass(frozen=True)
+class _Scaled:
+    """A learned letter with its size divided out: its box and points (in drawing order) in text heights."""
+
+    char: str
+    width: float
+    height: float
+    points: tuple[tuple[float, float], ...]
+    position: float | None
+
+
+def _scale(glyph: Glyph, height: float) -> tuple[float, float, tuple[tuple[float, float], ...]]:
+    return ((glyph.box[2] - glyph.box[0]) / height, (glyph.box[3] - glyph.box[1]) / height,
+            tuple((x / height, y / height) for x, y in glyph.points))
+
+
+def _same_shape(a: _Scaled, width: float, height: float, points: tuple, tol: float) -> bool:
+    return (abs(a.width - width) <= tol and abs(a.height - height) <= tol
+            and all(abs(x[0] - y[0]) <= tol and abs(x[1] - y[1]) <= tol for x, y in zip(a.points, points)))
 
 
 def _within_a_step(a: GlyphKey, b: GlyphKey) -> bool:
@@ -65,7 +95,8 @@ def _alignments(chars: str, n_groups: int, limit: int = 32) -> list[list[int]]:
 
 
 class GlyphBook:
-    def __init__(self) -> None:
+    def __init__(self, scaled_tol: float = SCALED_TOL) -> None:
+        self.scaled_tol = scaled_tol  # how alike a shape scaled must be to a learned one: a property of the font
         self._chars: dict[GlyphKey, set[str]] = defaultdict(set)
         self._multi: dict[tuple, set[str]] = defaultdict(set)
         self._letter_gaps: dict[float, list[float]] = defaultdict(list)
@@ -77,6 +108,9 @@ class GlyphBook:
         self._key_heights: dict[GlyphKey | tuple, set[float]] = defaultdict(set)  # text heights a shape was learned at
         # Where a shape sits across its line (0 top .. 1 bottom), to one decimal: ',' and "'" are one stroke.
         self._positions: dict[GlyphKey, set[float]] = defaultdict(set)
+        self._scaled: dict[tuple[int, int], list[_Scaled]] = defaultdict(list)  # by (paths, points)
+        self._scaled_seen: set[_Scaled] = set()
+        self._height_set_by: set[str] | None = None
 
     # --- lookups --------------------------------------------------------------------------------
 
@@ -119,12 +153,41 @@ class GlyphBook:
             return frozenset(self._key_heights[key])
         return frozenset().union(*(self._key_heights.get(k, ()) for k in self._matches(key))) if len(key) == 4 else frozenset()
 
+    def scaled(self, glyph: Glyph, line_height: float) -> tuple[str, frozenset[float]] | None:
+        """(character, positions across the line) of the one character this shape is, scaled to its line's height
+        (horizontal text), or None. A shape matching two characters is neither."""
+        if not glyph.points or line_height <= 0:
+            return None
+        width, height, points = _scale(glyph, line_height)
+        found = [s for s in self._scaled.get((glyph.key[2], len(points)), ()) if _same_shape(s, width, height, points, self.scaled_tol)]
+        chars = {s.char for s in found}
+        if len(chars) != 1:
+            return None
+        return next(iter(chars)), frozenset(s.position for s in found if s.position is not None)
+
+    def sets_height(self, char: str) -> bool:
+        """A capital or digit whose shape at another size is no other character (a lower-case 'c' drawn as a
+        smaller 'C'): a line whose tallest letter is one is as tall as its text."""
+        if self._height_set_by is None:
+            unsure: set[str] = set()
+            for group in self._scaled.values():
+                for s in group:
+                    if s.height > 0:  # this shape as if it were as tall as its text
+                        points = tuple((x / s.height, y / s.height) for x, y in s.points)
+                        unsure |= {t.char for t in group if t.char != s.char and _same_shape(t, s.width / s.height, 1.0, points, self.scaled_tol)}
+            self._height_set_by = {s.char for group in self._scaled.values() for s in group} & CAPITALS - unsure
+        return char in self._height_set_by
+
     @property
     def size(self) -> int:
         return sum(1 for v in self._chars.values() if len(v) == 1)
 
     def _near(self, table: dict[float, list[float]], height: float) -> list[float]:
-        return [g for h, gaps in table.items() if abs(h - height) <= 0.5 for g in gaps]
+        """Gaps learned at this text height; at a height never seen, those of the nearest height learned, scaled."""
+        if near := [g for h, gaps in table.items() if abs(h - height) <= 0.5 for g in gaps]:
+            return near
+        nearest = min((h for h in table if h > 0), key=lambda h: abs(h - height), default=None)
+        return [g * height / nearest for g in table[nearest]] if nearest else []
 
     def space_gap(self, height: float) -> float | None:
         gaps = self._near(self._space_gaps, height)
@@ -186,15 +249,27 @@ class GlyphBook:
         if any(len(p) > 1 and max(g.box[axis[1]] for g in p) - min(g.box[axis[0]] for g in p) > height for p in spans):
             return  # parts wider than a letter: the box caught a neighbour's strokes, not a multi-part character
         h = round(height * 2) / 2
+        capitals = sorted(p[0].box[3] - p[0].box[1] for ch, p in zip(chars, spans) if len(p) == 1 and ch in CAPITALS)
+        text_size = capitals[len(capitals) // 2] if capitals else 0.0  # the median: one odd shape does not move it
         lo, hi = (0, 2) if vertical else (1, 3)
         band = min(g.box[lo] for g in glyphs), max(g.box[hi] for g in glyphs)
         for ch, parts in zip(chars, spans):
             key = parts[0].key if len(parts) == 1 else combo_key(parts)
             (self._chars if len(parts) == 1 else self._multi)[key].add(ch)
             self._key_heights[key].add(h)
+            position = None
             if len(parts) == 1 and band[1] > band[0]:
                 g = parts[0]
-                self._positions[key].add(round(((g.box[lo] + g.box[hi]) / 2 - band[0]) / (band[1] - band[0]), 1))
+                position = round(((g.box[lo] + g.box[hi]) / 2 - band[0]) / (band[1] - band[0]), 1)
+                self._positions[key].add(position)
+            if len(parts) == 1 and not vertical and parts[0].points and text_size > 0 and (ch.isalnum() or ch == "-"):
+                width, high, points = _scale(parts[0], text_size)
+                scaled = _Scaled(ch, round(width, 3), round(high, 3),
+                                 tuple((round(x, 3), round(y, 3)) for x, y in points), position)
+                if scaled not in self._scaled_seen:
+                    self._scaled_seen.add(scaled)
+                    self._scaled[(parts[0].key[2], len(points))].append(scaled)
+                    self._height_set_by = None
         self.heights.add(h)
         spaced = [False] * len(chars)  # spaced[i]: a space follows character i
         i = -1

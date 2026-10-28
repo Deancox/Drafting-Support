@@ -74,3 +74,12 @@ def test_decode_stage_is_recorded(tmp_path, cfg):
     result = run(package(tmp_path), cfg)
     [stage] = [s for s in result.stages if s.name == "decode"]
     assert "1 of 1" in stage.note
+
+
+def test_report_counts_letters_read_by_scale(tmp_path, cfg):
+    result = run(package(tmp_path), cfg)
+    d = next(d for d in result.drawings if d.sheet == "037")
+    d.decoded.scaled = 7
+    text = render_report(result, summarise(result))
+    row = next(line for line in text.splitlines() if line.startswith("| 401103 sh 037"))
+    assert f"{d.decoded.letters} / {d.decoded.shapes} (7 by scale)" in row
