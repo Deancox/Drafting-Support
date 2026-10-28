@@ -172,6 +172,23 @@ def test_wire_005_number_matches_where_it_is_drawn(tmp_path, cfg, label, cell, e
         assert f"TN36{label}" in findings[0].message and cell in findings[0].message
 
 
+def test_wire_005_label_at_the_far_end_of_its_wire(tmp_path, cfg):
+    """401103 sh 015: 'K2' is labelled at C2, but its wire starts at the power supply at K2, runs up column 2
+    and turns along row C. A number names where its wire starts; the label may sit anywhere along it."""
+    wire = [(300, 122, 420, 122, 0.48), (300, 122, 300, 310, 0.48)]  # row C, then down column 2 to K2
+    add_sheet(tmp_path, "PLC", "036", LEGEND + [(cell_rect("C2", 18), "K2")], lines=wire)
+    assert by_rule(run_pipeline(tmp_path, cfg), "WIRE-005") == []
+
+
+def test_wire_005_wire_that_never_reaches_its_numbered_cell(tmp_path, cfg):
+    """401104 sh 176: 'C2' at C6 sits on a wire from the JB at C5 to the module at C6; the sensor at C2 is on
+    the far side of the JB, another wire. Numbered from the wrong end."""
+    wire = [(700, 122, 770, 122, 0.48)]
+    add_sheet(tmp_path, "PLC", "036", LEGEND + [(cell_rect("C6", 18), "C2")], lines=wire)
+    [f] = by_rule(run_pipeline(tmp_path, cfg), "WIRE-005")
+    assert f.subject_key == "TN36C2" and "C5" in f.message
+
+
 def test_boxed_terminal_marking_is_not_a_wire(tmp_path, cfg):
     """Like the relay terminals A1 / T1 on 401103-018: boxed, in the wire's column but rows away."""
     x0, y0, x1, y1 = cell_rect("H1", 12)

@@ -7,6 +7,11 @@ sheet's "WIRE NUMBER / TN / FIRST FIELD IDENTIFIER" legend.
 A same-sheet abbreviation must sit near the grid cell it names (the convention says
 the number is its location), which also stops other short tokens such as the module
 terminal "T0" from being read as wires.
+
+A number names the cell where its wire starts, but the label may sit anywhere along the wire
+(401103-015: 'K2' labelled at C2, its wire starting at the power supply at K2). For a label
+outside its cell, the wire it sits on is followed through corners and junctions, and the
+cells of its ends are recorded (value["wire_ends"]).
 """
 
 from __future__ import annotations
@@ -18,12 +23,15 @@ from drawing_qa.model.claims import Claim
 from drawing_qa.model.enums import EntityType, Predicate
 from drawing_qa.model.source import Drawing
 from drawing_qa.parsers.base import DrawingParser, ParseContext
-from drawing_qa.pdf.extract import PageContent
+from drawing_qa.pdf.extract import PageContent, Segment
 
 _SAME_SHEET = re.compile(r"^(?P<grid>[A-Z]\d)$")
 _OTHER_SHEET = re.compile(r"^(?P<sheet>\d{2,3})(?P<grid>[A-Z]\d)$")
 _FFI = re.compile(r"^[A-Z]{2}$")
 _ROWS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
+_ON_WIRE = 10.0  # furthest a wire label sits from its wire, in points
+_JOIN = 1.0  # wire pieces meeting within this distance are one wire
+_MAX_PIECES = 60  # a wire followed further than this is a bus: its ends say nothing
 
 
 def sheet_ffi(page: PageContent) -> str | None:
@@ -101,6 +109,11 @@ def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser:
             sheet, grid = m["sheet"], m["grid"]
         else:
             continue
+        value = {"ffi": ffi, "sheet": sheet, "grid": grid, "abbreviated": text, "is_variant": False}
+        if sheet == this_sheet and not _beside_cell(grid, drawing.grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2)):
+            ends = _wire_ends(line.bbox, page.segments)
+            if ends:
+                value["wire_ends"] = sorted({drawing.grid.cell_at(x, y) for x, y in ends})
         claims.append(
             ctx.claim(
                 parser=parser.doc_type,
@@ -112,7 +125,51 @@ def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser:
                 subject_type=EntityType.WIRE,
                 subject_key=f"{ffi}{sheet}{grid}",
                 predicate=Predicate.OCCURS,
-                value={"ffi": ffi, "sheet": sheet, "grid": grid, "abbreviated": text, "is_variant": False},
+                value=value,
             )
         )
     return claims
+
+
+def _straight(s: Segment) -> bool:
+    return s.width > 0 and (s.horizontal or s.vertical) and s.length > 0.5  # width 0: text strokes, note outlines
+
+
+def _on(p: tuple[float, float], s: Segment) -> bool:
+    """The point lies on the segment (an end of it, or a junction along it)."""
+    x, y = p
+    if s.horizontal:
+        return abs(y - s.y0) <= _JOIN and min(s.x0, s.x1) - _JOIN <= x <= max(s.x0, s.x1) + _JOIN
+    return abs(x - s.x0) <= _JOIN and min(s.y0, s.y1) - _JOIN <= y <= max(s.y0, s.y1) + _JOIN
+
+
+def _wire_ends(label, segments: list[Segment]) -> list[tuple[float, float]]:
+    """Ends of the wire the label sits on: the nearest straight line within _ON_WIRE, followed through every
+    line of its stroke width that meets it end to end or at a junction. A device's own line work (a contact,
+    a terminal circle) is drawn otherwise and ends the wire. Empty when there is no wire, or it is a bus."""
+    x0, y0, x1, y1 = label
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+
+    def distance(s: Segment) -> float:
+        if s.horizontal:
+            return max(min(s.x0, s.x1) - cx, cx - max(s.x0, s.x1), 0) + max(abs(s.y0 - cy) - (y1 - y0) / 2, 0)
+        return max(min(s.y0, s.y1) - cy, cy - max(s.y0, s.y1), 0) + max(abs(s.x0 - cx) - (x1 - x0) / 2, 0)
+
+    lines = [s for s in segments if _straight(s)]
+    start = min((s for s in lines if s.length > 8), key=distance, default=None)
+    if start is None or distance(start) > _ON_WIRE:
+        return []
+    same = [s for s in lines if abs(s.width - start.width) < 0.01]
+    wire, todo = {id(start): start}, [start]
+    while todo:
+        s = todo.pop()
+        points = ((s.x0, s.y0), (s.x1, s.y1))
+        for t in same:
+            if id(t) not in wire and (any(_on(p, t) for p in points) or any(_on(q, s) for q in ((t.x0, t.y0), (t.x1, t.y1)))):
+                wire[id(t)] = t
+                todo.append(t)
+                if len(wire) > _MAX_PIECES:
+                    return []
+    ends = [p for s in wire.values() for p in ((s.x0, s.y0), (s.x1, s.y1))]
+    # A free end meets no other piece of the wire; one where pieces meet is a corner or a junction.
+    return [p for p in ends if sum(_on(p, t) for t in wire.values()) == 1]
