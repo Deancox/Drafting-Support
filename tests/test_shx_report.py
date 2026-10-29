@@ -23,7 +23,7 @@ def test_report_has_decoding_section(tmp_path, cfg):
     result = run(package(tmp_path), cfg)
     text = render_report(result, summarise(result))
     assert "## Sheets decoded from line work" in text
-    row = next(line for line in text.splitlines() if line.startswith("| 401103 sh 037"))
+    row = next(line for line in text.split("## Sheets decoded from line work")[1].splitlines() if line.startswith("| 401103 sh 037"))
     d = next(d for d in result.drawings if d.sheet == "037")
     assert f"{d.decoded.letters} / {d.decoded.shapes}" in row and str(d.decoded.words_kept) in row
 
@@ -81,5 +81,41 @@ def test_report_counts_letters_read_by_scale(tmp_path, cfg):
     d = next(d for d in result.drawings if d.sheet == "037")
     d.decoded.scaled = 7
     text = render_report(result, summarise(result))
-    row = next(line for line in text.splitlines() if line.startswith("| 401103 sh 037"))
+    row = next(line for line in text.split("## Sheets decoded from line work")[1].splitlines() if line.startswith("| 401103 sh 037"))
     assert f"{d.decoded.letters} / {d.decoded.shapes} (7 by scale)" in row
+
+
+def _readability(result):
+    from drawing_qa.report.summary import sheet_readability
+
+    return {s.sheet: s for s in sheet_readability(result)}
+
+
+def test_readability_of_each_sheet(tmp_path, cfg):
+    """Read from SHX notes, decoded (in full or in part) with --ocr, or not read at all: where the checker looks harder."""
+    result = run(package(tmp_path), cfg)
+    sheets = _readability(result)
+    assert sheets["401103 sh 036"].status == "Read"
+    d = next(d for d in result.drawings if d.sheet == "037")
+    assert sheets["401103 sh 037"].status == ("Decoded" if d.decoded.words_dropped == 0 else "Partially decoded")
+    assert f"{d.decoded.letters}/{d.decoded.shapes} letters" in sheets["401103 sh 037"].detail
+
+    assert _readability(run(package(tmp_path / "plain"), cfg, ocr=False))["401103 sh 037"].status == "Not read"
+    assert "PDFSHX" in _readability(run(package(tmp_path / "plain"), cfg, ocr=False))["401103 sh 037"].detail
+
+
+def test_summary_breaks_down_sheet_readability(tmp_path, cfg):
+    result = run(package(tmp_path), cfg, ocr=False)
+    summary = render_report(result, summarise(result)).split("## Findings by rule")[0]
+    assert "### Sheets read" in summary
+    assert "| PLC | 2 | 1 | 0 | 0 | 1 |" in summary  # sheets, read, decoded, partially decoded, not read
+    row = next(line for line in summary.splitlines() if line.startswith("| 401103 sh 037"))
+    assert "Not read" in row
+
+
+def test_register_summary_lists_sheets_to_check_harder(tmp_path, cfg):
+    result = run(package(tmp_path), cfg, ocr=False)
+    rows = list(build_register(result)["Summary"].iter_rows(values_only=True))
+    assert any(r[:6] == ("PLC", 2, 1, 0, 0, 1) for r in rows)
+    sheet = next(r for r in rows if r[0] == "401103 sh 037")
+    assert sheet[1] == "PLC" and sheet[2] == "Not read"

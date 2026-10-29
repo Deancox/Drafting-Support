@@ -22,6 +22,7 @@ from drawing_qa.common.descriptions import without_prefix
 from drawing_qa.model.enums import Decision, DocType, Predicate
 from drawing_qa.model.run import RunResult
 from drawing_qa.model.source import Drawing, SourceRef
+from drawing_qa.report.summary import READ, READABILITY, sheet_readability
 from drawing_qa.rules.base import Category
 from drawing_qa.rules.catalogue import PLANNED
 from drawing_qa.rules.registry import all_rules
@@ -278,6 +279,42 @@ def _summary_sheet(wb: Workbook, result: RunResult, last: int, review: bool) -> 
     for c in range(2, 7 + len(decisions)):
         col = get_column_letter(c)
         _cell(ws, total, c, f"=SUM({col}4:{col}{total - 1})", bold=True)
+    _readability_rows(ws, result, total + 2)
+
+
+def _readability_rows(ws, result: RunResult, row: int) -> None:
+    """Below the counts: how many sheets of each type were read, and the ones to check harder by hand."""
+    sheets = sheet_readability(result)
+    if not sheets:
+        return
+    ws.cell(row=row, column=1, value="Sheets read").font = Font(name=_FONT, bold=True, size=11)
+    _header(ws, row + 1, [("Type", 16, None), ("Sheets", 10, None), *((r, 10, None) for r in READABILITY[:-1]),
+                          (READABILITY[-1], 9, None)])
+    by_type: dict[str, list[str]] = defaultdict(list)
+    for s in sheets:
+        by_type[s.doc_type].append(s.status)
+    row += 2
+    for dt, statuses in by_type.items():
+        for c, v in enumerate([dt, len(statuses), *(statuses.count(r) for r in READABILITY)], start=1):
+            _cell(ws, row, c, v)
+        row += 1
+    attention = [s for s in sheets if s.status != READ or s.detail]
+    row += 1
+    ws.cell(row=row, column=1, value="Check these sheets harder by hand: nothing is reported from what could not be read"
+            if attention else "Every sheet was read from its SHX text notes").font = Font(name=_FONT, bold=True, size=11)
+    if not attention:
+        return
+    _header(ws, row + 1, [("Sheet", 16, None), ("Type", 10, None), ("Read", 10, None), ("Detail", 10, None)])
+    ws.merge_cells(start_row=row + 1, start_column=4, end_row=row + 1, end_column=6)
+    for s in attention:
+        row += 1
+        r = row + 1
+        for c, v in enumerate([s.sheet, s.doc_type, s.status, s.detail], start=1):
+            _cell(ws, r, c, v)
+        for c in (5, 6):
+            _cell(ws, r, c, None)
+        ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=6)
+        ws.row_dimensions[r].height = 12 * max(1, -(-len(s.detail) // 45))
 
 
 def _coverage_sheet(wb: Workbook, result: RunResult) -> None:

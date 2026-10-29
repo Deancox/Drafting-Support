@@ -9,7 +9,7 @@ from drawing_qa.common.descriptions import without_prefix
 from drawing_qa.model.enums import Decision, IssueCode, Severity, StageStatus
 from drawing_qa.model.findings import Finding
 from drawing_qa.model.run import RunResult
-from drawing_qa.report.summary import RunSummary
+from drawing_qa.report.summary import READ, READABILITY, RunSummary
 from drawing_qa.rules.context import quiet_rules
 
 # Issues that mean part of the package was not checked; listed in full.
@@ -245,6 +245,7 @@ def render_report(result: RunResult, summary: RunSummary) -> str:
     w(f"**{len(result.findings)} finding(s)**: " + " · ".join(f"{s.value.title()} {by_sev.get(s, 0)}" for s in _SEVERITIES))
     w("")
     _review(result, w)
+    _readability(summary, w)
     not_built = [s.name for s in result.stages if s.status is StageStatus.NOT_IMPLEMENTED]
     if not_built:
         w(f"> Not yet built: {', '.join(not_built)}. Checks that need linked connectivity or signal traces "
@@ -360,6 +361,34 @@ def render_report(result: RunResult, summary: RunSummary) -> str:
     w("")
     _decoded(result, w)
     return "\n".join(out)
+
+
+def _readability(summary: RunSummary, w) -> None:
+    """How much of each sheet was read: findings can only come from what was read, so look harder at the rest."""
+    if not summary.sheets:
+        return
+    w("### Sheets read")
+    w("")
+    w("| Type | Sheets | " + " | ".join(READABILITY) + " |")
+    w("|---|---|" + "---|" * len(READABILITY))
+    by_type: dict[str, Counter[str]] = defaultdict(Counter)
+    for s in summary.sheets:
+        by_type[s.doc_type][s.status] += 1
+    for dt, counts in by_type.items():
+        w(f"| {dt} | {sum(counts.values())} | " + " | ".join(str(counts[r]) for r in READABILITY) + " |")
+    w("")
+    attention = [s for s in summary.sheets if s.status != READ or s.detail]
+    if not attention:
+        w("Every sheet was read from its SHX text notes.")
+        w("")
+        return
+    w("Check these sheets harder by hand: nothing is reported from what could not be read.")
+    w("")
+    w("| Sheet | Type | Read | Detail |")
+    w("|---|---|---|---|")
+    for s in attention:
+        w(f"| {s.sheet} | {s.doc_type} | {s.status} | {s.detail.replace('|', '/')} |")
+    w("")
 
 
 def _decoded(result: RunResult, w) -> None:
