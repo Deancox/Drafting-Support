@@ -32,6 +32,8 @@ def test_map_runs_panel_to_module_to_jb_to_device(tmp_path, cfg):
     assert _link(m, "LTL/S13", "LTL-JB2")["state"] == "ok" and _link(m, "LTL-PLC", "LTL/S13")
     device = _node(m, "S-TN36D4")
     assert device["missing_from_cbd"] is True
+    assert (device["on_plc"], device["on_cbd"], device["via_field_jb"]) == (True, False, True)
+    assert _node(m, "LTL-JB2")["on_cbd"] is True
     assert [f["rule"] for f in device["findings"]] == ["COMP-005"]
     assert any(loc.startswith("401103 sh 036") for loc in device["locations"])
     [ch] = device["channels"]
@@ -45,6 +47,16 @@ def test_drawings_that_disagree_turn_the_line_red(tmp_path, cfg):
     m = build_map(run_pipeline(tmp_path, cfg))
     assert _link(m, "LTL-JB1", "S-TN36D4")["state"] == "conflict"
     assert _node(m, "S-TN36D4")["channels"][0]["cbd_via"] == ["LTL-JB8", "LTL-JB1"]
+
+
+def test_device_only_on_the_cbd(tmp_path, cfg):
+    """Drawn on a CBD, wired by no schematic channel: listed against the PLC devices for comparison."""
+    rows = [channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB2", ["BRAKE"])]
+    _package(tmp_path, rows, [((100, 200, 150, 212), "S-TN36D4"), ((100, 300, 150, 312), "S-TN37F4")])
+    m = build_map(run_pipeline(tmp_path, cfg))
+    extra = _node(m, "S-TN37F4")
+    assert extra["orphan"] is True and extra["on_cbd"] is True and extra["on_plc"] is False
+    assert _node(m, "S-TN36D4")["on_cbd"] is True
 
 
 def test_spare_channels_are_left_off(tmp_path, cfg):

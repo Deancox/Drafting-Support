@@ -109,8 +109,12 @@ def build_map(result: RunResult) -> dict:
             for b in ends:
                 link(a, b, i, t.channel or "", state)
 
+    types = {0: ("PANEL",), 1: ("PLC_MODULE",), 2: ("JUNCTION_BOX", "LOCATION"), 3: ("DEVICE",)}
     for (column, key), n in nodes.items():
         add_findings(n, [key])
+        parsers = {p for t in types[column] if (m := model_nodes.get((t, key))) for p in m.parsers}
+        n["on_plc"], n["on_cbd"] = "PLC" in parsers, "CBD" in parsers
+        n["via_field_jb"] = any(c["jbs"] for c in n["channels"])  # so it should be on a CBD
         if column == 1 and (m := model_nodes.get(("PLC_MODULE", key))):
             n["sub"] = " · ".join(str(v) for v in (m.attrs.get("module_type"), m.attrs.get("part")) if v)
         elif column == 2:
