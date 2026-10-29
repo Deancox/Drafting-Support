@@ -111,7 +111,7 @@ def _unseen_panels(model, settings: Settings) -> list[Issue]:
             code=IssueCode.PANEL_MAPPING,
             message=(f"Rack {names} is assumed to be in panel {panel}, which no drawing shows"
                      + (f" (the drawings show {', '.join(shown)})" if shown else "")
-                     + f". Set the rack's panel under [plc.rack_panels] in the config, e.g. {sorted(rack_names)[0]} = \"{shown[0] if shown else '<panel>'}\""),
+                     + f". Set the rack's panel under [project.rack_panels] in the config, e.g. {sorted(rack_names)[0]} = \"{shown[0] if shown else '<panel>'}\""),
         ))
     return issues
 

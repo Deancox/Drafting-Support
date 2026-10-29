@@ -255,16 +255,16 @@ html { scroll-behavior: smooth; }
 
       <!-- 03 -->
       <h2 id="setup"><span class="no">03</span>Set up a new package</h2>
-      <p>Most of the platform needs no setup: it learns tag numbering and each drawing's FFI from the sheets. A few project facts only a person knows live in <code>config/project.toml</code>. Do a first run, then go through this list: the run's warnings point at most of them.</p>
+      <p>Most of the platform needs no setup: it learns tag numbering and each drawing's FFI from the sheets. A few project facts only a person knows live in the <code>[project]</code> section at the top of <code>config/project.toml</code>. Do a first run, then go through this list: the run's warnings point at most of them.</p>
       <div class="table-wrap"><table>
         <thead><tr><th>Check</th><th>How you will know</th><th>Setting</th></tr></thead>
         <tbody>
-          <tr><td><b>Separate packages</b>: FFIs whose sheets you do not have (TV, TH on the sample)</td><td>DRW-009 "FFI … is not linked to a drawing number" (MINOR)</td><td><code>[identifiers.ffi_drawings]</code> <code>TV = "EXTERNAL"</code></td></tr>
+          <tr><td><b>Separate packages</b>: FFIs whose sheets you do not have (TV, TH on the sample)</td><td>DRW-009 "FFI … is not linked to a drawing number" (MINOR)</td><td><code>[project.ffi_drawings]</code> <code>TV = "EXTERNAL"</code></td></tr>
           <tr><td><b>FFI mapping that disagrees with the sheets</b></td><td>Console <code>WARNING: The config maps TH to EXTERNAL, but drawing 401002's schematic sheets show FFI TH</code></td><td>Same table; the sheets win automatically, update the line to stop the warning</td></tr>
-          <tr><td><b>Rack panels</b> not named <code>&lt;rack&gt;-PLC</code></td><td>Console <code>WARNING: Rack MCC1 is assumed to be in panel MCC1-PLC, which no drawing shows</code></td><td><code>[plc.rack_panels]</code> <code>MCC1 = "MCC-PLC"</code></td></tr>
-          <tr><td><b>Areas</b> never written as a designation (LTL, RCL, SH …)</td><td>A bare location such as <code>ES-LCS1</code> missing from traces. Areas written as <code>=K07.11+ES-LCS1</code> anywhere in the package are learned automatically (listed in the parse stage of <code>report.md</code>)</td><td><code>[identifiers] areas</code></td></tr>
-          <tr><td><b>Panel equipment prefixes</b> (relays, breakers) not expected on CBDs</td><td>COMP-005 lists relays as "not on the CBD"</td><td><code>[identifiers] panel_device_prefixes</code></td></tr>
-          <tr><td><b>Renamed designations</b> (once confirmed)</td><td>PLACEHOLDER-005 on <code>AUT1</code>; PATH-004 legend entries "on no other drawing"</td><td><code>[identifiers.superseded]</code> <code>"MCC-AUT1" = "MCC-PLC"</code></td></tr>
+          <tr><td><b>Rack panels</b> not named <code>&lt;rack&gt;-PLC</code></td><td>Console <code>WARNING: Rack MCC1 is assumed to be in panel MCC1-PLC, which no drawing shows</code></td><td><code>[project.rack_panels]</code> <code>MCC1 = "MCC-PLC"</code></td></tr>
+          <tr><td><b>Areas</b> never written as a designation (LTL, RCL, SH …)</td><td>A bare location such as <code>ES-LCS1</code> missing from traces. Areas written as <code>=K07.11+ES-LCS1</code> anywhere in the package are learned automatically (listed in the parse stage of <code>report.md</code>)</td><td><code>[project] areas</code></td></tr>
+          <tr><td><b>Panel equipment prefixes</b> (relays, breakers) not expected on CBDs</td><td>COMP-005 lists panel relays as "not on the CBD" even where the schematic keeps them in the panel (one wired out through a field JB is always reported)</td><td><code>[identifiers] panel_device_prefixes</code></td></tr>
+          <tr><td><b>Renamed designations</b> (once confirmed)</td><td>PLACEHOLDER-005 on <code>AUT1</code>; PATH-004 legend entries "on no other drawing"</td><td><code>[project.superseded]</code> <code>"MCC-AUT1" = "MCC-PLC"</code></td></tr>
           <tr><td><b>Placeholder words</b> this project uses</td><td>Unfinished text not being reported, or real words reported</td><td><code>[placeholders]</code> tokens, phrases, <code>hold_exceptions</code></td></tr>
           <tr><td><b>Real words</b> flagged as misspellings</td><td>DRW-010 on a correct word</td><td><code>[spelling] known_words</code></td></tr>
           <tr><td><b>CBD line weights</b> from another drafting house</td><td>No cable routes; PATH-001 everywhere; Tag Index "CBD route via" empty</td><td><code>[cbd]</code> <code>cable_min_width</code>, <code>outline_max_width</code></td></tr>
@@ -379,7 +379,7 @@ approved_by = "DC"
 expires = 2027-06-30       # optional: listed but not applied after this date</code></pre>
       <p>The Waivers tab of the register shows every waiver, how many findings it matched, and where your own decision overrode it. A waiver that matches nothing is named in the run notes, so stale ones are easy to clear out.</p>
       <h3>Renames</h3>
-      <p>When a designation has been renamed (AUT renamed to PLC), add <code>"OLD" = "NEW"</code> under <code>[identifiers.superseded]</code> once it is confirmed. Every use of the old name is then reported with the new one as the fix, and traces join up through the rename.</p>
+      <p>When a designation has been renamed (AUT renamed to PLC), add <code>"OLD" = "NEW"</code> under <code>[project.superseded]</code> once it is confirmed. Every use of the old name is then reported with the new one as the fix, and traces join up through the rename.</p>
       <h3>Rules that do not fit a project</h3>
       <p>In <code>config/rules.toml</code> you can change a rule's severity or turn it off. Prefer marking findings up (or a waiver) over turning a rule off: a disabled rule also stops catching the cases that are real.</p>
       <pre><code>[rules."PLACEHOLDER-004"]
@@ -416,7 +416,7 @@ enabled = false         # e.g. a package written in mixed languages</code></pre>
         <tbody>
           <tr><td>"title block missing", empty sheets, <code>NO_SHX_TEXT</code></td><td>Plotted with PDFSHX = 0</td><td>Re-plot with PDFSHX = 1, or run with <code>--ocr</code></td></tr>
           <tr><td>Few TAG / WIRE findings on a package you expected many on; DRW-009 "not checked"</td><td>The package's FFI is marked EXTERNAL or mapped to a drawing you did not supply</td><td>Check the <code>FFIs:</code> line; fix <code>[identifiers.ffi_drawings]</code></td></tr>
-          <tr><td>Traces end at a panel no drawing shows</td><td>Rack panel default guessed wrong</td><td>Add the <code>[plc.rack_panels]</code> line the warning names</td></tr>
+          <tr><td>Traces end at a panel no drawing shows</td><td>Rack panel default guessed wrong</td><td>Add the <code>[project.rack_panels]</code> line the warning names</td></tr>
           <tr><td>No cable routes, PATH-001 on everything</td><td>CBD line weights differ from the client standard</td><td>Adjust <code>[cbd]</code></td></tr>
           <tr><td>Many <code>NO_TEMPLATE</code> issues</td><td>A layout the readers do not recognise (another drafting standard)</td><td>Only generic checks run on those sheets; the readers need extending</td></tr>
           <tr><td><code>QA_Register-&lt;run id&gt;.xlsx</code> appeared</td><td>The register was open in Excel</td><td>Close Excel; the next run tidies up</td></tr>

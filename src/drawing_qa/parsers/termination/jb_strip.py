@@ -40,7 +40,7 @@ _STRIP_COLUMN = 90.0  # strips sit in one column; a JB / LCS further right is a 
 
 
 def rack_for_panel(panel: str, settings) -> str | None:
-    """LTL-PLC -> LTL (the rack in that panel): config [plc.rack_panels], else <rack>-PLC."""
+    """LTL-PLC -> LTL (the rack in that panel): config [project.rack_panels], else <rack>-PLC."""
     for rack, p in settings.plc.rack_panels.items():
         if p.upper() == panel.upper():
             return rack

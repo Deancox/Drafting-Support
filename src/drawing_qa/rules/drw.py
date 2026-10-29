@@ -184,7 +184,7 @@ class ExternalReference(Rule):
         category=Category.DRW,
         default_severity=Severity.INFO,
         description=(
-            "Tags and wires whose FFI belongs to a separate package (config [identifiers.ffi_drawings] = EXTERNAL) are "
+            "Tags and wires whose FFI belongs to a separate package (config [project.ffi_drawings] = EXTERNAL) are "
             "listed as references to that document and not checked. An FFI with no mapping is reported so it can be added. "
             "One that is a probable mistyped FFI of a tag drawn in this package is reported by TAG-008 instead."
         ),
@@ -226,7 +226,7 @@ class ExternalReference(Rule):
                     evidence=claims,
                     discriminator=status,
                     severity=Severity.MINOR,
-                    recommendation=f"Add {ffi} to [identifiers.ffi_drawings] in config/project.toml (drawing number, or EXTERNAL)",
+                    recommendation=f"Add {ffi} to [project.ffi_drawings] in config/project.toml (drawing number, or EXTERNAL)",
                 )
 
 
@@ -237,7 +237,7 @@ class SupersededDesignation(Rule):
         title="Superseded Designation",
         category=Category.DRW,
         default_severity=Severity.MAJOR,
-        description="A designation that has been renamed (config [identifiers.superseded]) is still used.",
+        description="A designation that has been renamed (config [project.superseded]) is still used.",
     )
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:

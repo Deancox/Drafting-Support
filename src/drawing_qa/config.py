@@ -13,6 +13,10 @@ from drawing_qa.model.enums import DocType
 
 DEFAULT_FOLDERS: dict[str, DocType] = {
     "plc": DocType.PLC,
+    "schematic": DocType.PLC,
+    "schem": DocType.PLC,
+    "schematics": DocType.PLC,
+    "schems": DocType.PLC,
     "cableblocks": DocType.CBD,
     "cableblock": DocType.CBD,
     "cbd": DocType.CBD,
@@ -188,8 +192,19 @@ class ReviewConfig(BaseModel):
 
 
 class ProjectInfo(BaseModel):
-    code: str = ""
+    code: str = ""  # labels for whoever reads the file; checks take drawing numbers from the sheets
     name: str = ""
+
+
+# Settings specific to one project, written in its [project] section and read into the section that uses them.
+# They may also sit in the old places ([identifiers], [plc]); the [project] section wins.
+_PROJECT_KEYS = {
+    "areas": "identifiers",
+    "ffi_drawings": "identifiers",
+    "superseded": "identifiers",
+    "rack_panels": "plc",
+    "description_prefix": "plc",
+}
 
 
 class Settings(BaseModel):
@@ -226,6 +241,10 @@ class Settings(BaseModel):
             waivers_raw = waivers_path.read_bytes()
             data["waivers"] = tomllib.loads(waivers_raw.decode("utf-8")).get("waiver", [])
             raw += waivers_raw
+        project = data.get("project", {})
+        for key, section in _PROJECT_KEYS.items():
+            if key in project:
+                data.setdefault(section, {})[key] = project.pop(key)
         settings = cls.model_validate(data)
         settings.config_hash = hashlib.sha256(raw).hexdigest()[:16]
         return settings

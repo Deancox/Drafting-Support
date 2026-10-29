@@ -126,7 +126,7 @@ class RuleContext:
         Returns (status, drawing number, sheets):
           "package"  - the FFI's drawing is in the package; sheets is empty if that sheet is not supplied
           "external" - the FFI belongs to a separate package (config "EXTERNAL", or its drawing is not here)
-          "unmapped" - the FFI is not in [identifiers.ffi_drawings]
+          "unmapped" - the FFI is not in [project.ffi_drawings]
         With no mapping configured, any PLC sheet with that number is the home (older behaviour).
         """
         mapping = {k.upper(): v for k, v in self.settings.identifiers.ffi_drawings.items()}

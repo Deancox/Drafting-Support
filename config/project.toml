@@ -1,16 +1,103 @@
-# Project configuration for the Controls Drawing QA Platform.
-# Edited by the checker; read at the start of every run.
+# Configuration for the Controls Drawing QA Platform. Edited by the checker; read at the start of every run.
+#
+# Three parts:
+#   1. PROJECT                  what belongs to this one job: check it when you start a new project
+#   2. CLIENT DRAFTING STANDARD how this client's drawings are drawn: the same for every package from them
+#   3. RUN PREFERENCES          how you want to review
+# Rules on/off and severities are in rules.toml; accepted exceptions in waivers.toml.
+
+
+# =====================================================================================================
+# 1. PROJECT
+# Most of this is also learned from the drawings, and a run warns when an entry is needed.
+# =====================================================================================================
 
 [project]
+# Labels only, for whoever reads this file: checks take drawing numbers from each sheet's title block.
 code = "401103"
 name = "Sample package"
 
-[ingest]
-# Input types left out of the review: read and listed, but not checked or used by other checks.
-# Empty = all four (PLC, CBD, TERM, EQUIP) are reviewed. Per run, use the command line instead:
-#   python -m drawing_qa run --input input/Main --exclude term
-# (--include puts back a type listed here.)
-unchecked_types = []
+# Areas. Any area written in a location designation ("=K07.11+BC-LCS13" -> BC) is learned for the run,
+# and the parse stage lists them. Only areas that never appear with a "+" designation need listing here.
+areas = ["LTL", "RCL", "SPL", "EER1", "SH", "ES"]
+
+# The project / area text that starts every channel description ("07.11 SHIPLOADER / LONG TRAVEL ...").
+# Left out, it is detected: the first description line shared by at least half of the channels. "" for none.
+# description_prefix = "07.11 SHIPLOADER"
+
+# Which drawing each First Field Identifier belongs to. A tag or wire is checked against <drawing>-<sheet>
+# of its FFI's drawing. "EXTERNAL" = a separate package we don't have: its references are listed in the
+# report as separate documents. The run also learns this from each schematic sheet's "WIRE NUMBER / FIRST
+# FIELD IDENTIFIER" box: an FFI shown on a supplied drawing's schematics maps to that drawing even if this
+# list says otherwise (with a warning to update it). This list decides FFIs no supplied sheet shows.
+[project.ffi_drawings]
+TN = "401103"
+TV = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
+TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
+
+# Designations that have been renamed. Any drawing still using the old one is an incorrect reference;
+# the finding recommends the replacement.
+[project.superseded]
+"LTL-AUT1" = "LTL-PLC"   # AUT renamed to PLC (confirmed by checker 2026-10-21)
+
+# Which panel each PLC rack sits in, when it is not "<rack>-PLC" (rack LTL -> panel LTL-PLC needs no entry).
+# A run warns ("Rack ... is assumed to be in panel ..., which no drawing shows") when an entry is needed.
+# Racks a package does not have are ignored, so entries for several packages can sit here together.
+[project.rack_panels]
+MCC1 = "MCC-PLC"   # 401002 package: racks MCC1 and MCC2 are in the MCC PLC panel
+MCC2 = "MCC-PLC"
+SH1 = "SH-PLC"
+SH2 = "SH-PLC"
+
+
+# =====================================================================================================
+# 2. CLIENT DRAFTING STANDARD
+# Change only for a different client or drafting house.
+# =====================================================================================================
+
+[identifiers]
+# Tag and wire number grammar: S-TN23N2 = prefix S, FFI TN, sheet 23, grid N2; wire TN36D6 = FFI, sheet, grid.
+# Patterns are regular-expression fragments; they are combined into full-token patterns.
+prefix = "[A-Z]{1,4}"
+ffi = "[A-Z]{2}"
+# Two digits per the convention; three-digit sheets also occur (R-TH157V0, K-CD011M4).
+sheet = "\\d{2,3}"
+grid = "[A-Z]\\d"
+# Known values. Empty list = accept any value that matches the pattern.
+prefixes = []
+ffis = []
+# Panel suffixes after "<AREA>-" (to confirm).
+panel_types = ["PLC"]
+# Device prefixes for equipment normally inside the panel (K relays, Q breakers). Still reported as missing
+# from the CBD when the schematic wires one out through a field JB (COMP-005).
+panel_device_prefixes = ["K", "Q"]
+
+[pdf]
+# A page with fewer words than this, and at least one image, is treated as raster (needs OCR).
+min_words_for_vector = 5
+# AutoCAD plots SHX fonts as geometry but embeds the text as annotations with these titles.
+shx_annotation_titles = ["AutoCAD SHX Text"]
+
+[cbd]
+# Line weights (pt) on cable block diagrams. Cables and enclosure outlines are found by their
+# stroke width; text and symbols are drawn in between. Client standard: cables 0.96, outlines 0.24.
+# Another drafting house may draw them differently: adjust these if CBD cables are not found.
+outline_max_width = 0.3
+cable_min_width = 0.9
+solid_min_width = 0.3
+cable_label_gap = 40.0
+
+[placeholders]
+# Exact tokens that always indicate incomplete drafting.
+tokens = ["XXXX", "XXX", "TNXXXX", "PXXXXX", "CXXXXX", "HOLD", "AUT1"]
+# Phrases matched against whole text lines.
+phrases = ["REF TERM XXX"]
+# Lines containing these phrases are not reported for HOLD (to confirm with checker).
+hold_exceptions = []
+
+[spelling]
+# Words one letter away from a common word in the package that are spelled correctly.
+known_words = ["CLOSE", "LATER", "LOWER", "POWER", "TOWER", "WATER", "LEVEL"]
 
 # Input subfolder name -> document type. Matching is case-insensitive.
 [ingest.folders]
@@ -28,50 +115,17 @@ equipment = "EQUIP"
 equiplist = "EQUIP"
 eel = "EQUIP"
 
-[pdf]
-# A page with fewer words than this, and at least one image, is treated as raster (needs OCR).
-min_words_for_vector = 5
-# AutoCAD plots SHX fonts as geometry but embeds the text as annotations with these titles.
-shx_annotation_titles = ["AutoCAD SHX Text"]
 
-[identifiers]
-# Package naming conventions (GAME_PLAN.md "Engineering conventions").
-# Patterns are regular-expression fragments; they are combined into full-token patterns.
-prefix = "[A-Z]{1,4}"
-ffi = "[A-Z]{2}"
-# Two digits per the convention; three-digit sheets also occur (R-TH157V0, K-CD011M4).
-sheet = "\\d{2,3}"
-grid = "[A-Z]\\d"
-# Known values. Empty list = accept any value that matches the pattern.
-prefixes = []
-ffis = []
-# Areas are also learned from the drawings: any area written in a location designation
-# ("=K07.11+BC-LCS13" -> BC) is known for the run, and the parse stage lists them. Only areas that
-# never appear with a "+" designation need listing here.
-areas = ["LTL", "RCL", "SPL", "EER1", "SH", "ES"]
-# Panel suffixes after "<AREA>-" (to confirm).
-panel_types = ["PLC"]
-# Device prefixes for equipment inside the panel (K relays, Q breakers): not expected on cable block diagrams.
-panel_device_prefixes = ["K", "Q"]
+# =====================================================================================================
+# 3. RUN PREFERENCES
+# =====================================================================================================
 
-# Which drawing each First Field Identifier belongs to. A tag or wire is checked
-# against <drawing>-<sheet> of its FFI's drawing. "EXTERNAL" = a separate package we
-# don't have: its references are listed in the report as separate documents.
-# The run also learns this from each schematic sheet's "WIRE NUMBER / FIRST FIELD
-# IDENTIFIER" box: an FFI shown on a supplied drawing's schematics maps to that drawing
-# even if this list says otherwise (with a warning to update it). This list is what
-# decides FFIs no supplied sheet shows, such as separate packages (EXTERNAL).
-[identifiers.ffi_drawings]
-TN = "401103"
-TV = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
-TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
-
-# Designations that have been renamed. Any drawing still using the old one is
-# an incorrect reference; the finding recommends the replacement.
-[identifiers.superseded]
-"LTL-AUT1" = "LTL-PLC"   # AUT renamed to PLC (confirmed by checker 2026-10-21)
-
-
+[ingest]
+# Input types left out of the review: read and listed, but not checked or used by other checks.
+# Empty = all four (PLC, CBD, TERM, EQUIP) are reviewed. Per run, use the command line instead:
+#   python -m drawing_qa run --input input/Main --exclude term
+# (--include puts back a type listed here.)
+unchecked_types = []
 
 [review]
 # false: the QA register is for printing and marking up by hand (no Decision / comment columns,
@@ -84,34 +138,3 @@ enabled = false
 # enabled = false
 # true: hold back findings whose every piece of evidence is on decoded sheets (false: raise them, marked).
 # confirm_decoded = false
-
-[plc.rack_panels]
-# Which panel each PLC rack sits in, when it is not "<rack>-PLC" (rack LTL -> panel LTL-PLC needs no entry).
-# A run warns ("Rack ... is assumed to be in panel ..., which no drawing shows") when an entry is needed.
-# Racks a package does not have are ignored, so entries for several packages can sit here together.
-MCC1 = "MCC-PLC"   # 401002 package: racks MCC1 and MCC2 are in the MCC PLC panel
-MCC2 = "MCC-PLC"
-
-SH1 = "SH-PLC"
-SH2 = "SH-PLC"
-
-[cbd]
-# Line weights (pt) on cable block diagrams. Cables and enclosure outlines are found by their
-# stroke width; text and symbols are drawn in between. Client standard: cables 0.96, outlines 0.24.
-# Another drafting house may draw them differently: adjust these if CBD cables are not found.
-outline_max_width = 0.3
-cable_min_width = 0.9
-solid_min_width = 0.3
-cable_label_gap = 40.0
-
-[spelling]
-# Words one letter away from a common word in the package that are spelled correctly.
-known_words = ["CLOSE", "LATER", "LOWER", "POWER", "TOWER", "WATER", "LEVEL"]
-
-[placeholders]
-# Exact tokens that always indicate incomplete drafting.
-tokens = ["XXXX", "XXX", "TNXXXX", "PXXXXX", "CXXXXX", "HOLD", "AUT1"]
-# Phrases matched against whole text lines.
-phrases = ["REF TERM XXX"]
-# Lines containing these phrases are not reported for HOLD (to confirm with checker).
-hold_exceptions = []

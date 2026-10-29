@@ -204,7 +204,7 @@ Rule IDs follow `<CATEGORY>-<nnn>`. This replaces the earlier IDs in GAME_PLAN; 
 | DRW-008 | File Name / Title Block Match | drawing | `<drawing>-<sheet>.pdf` file name disagrees with the title block |
 | DRW-009 | Separate Document Reference | FFI | Tags / wires whose FFI is a separate package (`EXTERNAL`) are listed as separate-document references (INFO); an FFI with no drawing mapping is reported (MINOR) |
 | DRW-010 | Spelling ✅ | word | A word used at most twice in the package that is one letter from a word used 3+ times (STOBE vs STROBE). Word endings (S / D / ED, SUPPLIES / SUPPLIED) are ignored; real words go in `[spelling] known_words` |
-| DRW-006 | Superseded Designation | occurrence | A designation listed in `[identifiers.superseded]` is still used; the recommendation is the replacement (e.g. `=K07.11+LTL-AUT1` → `=K07.11+LTL-PLC`) |
+| DRW-006 | Superseded Designation | occurrence | A designation listed in `[project.superseded]` is still used; the recommendation is the replacement (e.g. `=K07.11+LTL-AUT1` → `=K07.11+LTL-PLC`) |
 | PLACEHOLDER-001 | XXXX Detection | occurrence | `XXX`, `XXXX`, or any run of ≥ 3 X as a token |
 | PLACEHOLDER-002 | Identifier Placeholder | occurrence | `TNXXXX`, `PXXXXX`, `CXXXXX`, identifiers with X-run parts (`S-TNXXXX`, `SPL-JBX`, `SPL-JB1:XX`) |
 | PLACEHOLDER-003 | REF TERM XXX | occurrence | Phrase match on the text line |

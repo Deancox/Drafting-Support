@@ -231,7 +231,7 @@ Received 2026-10-21. These replace the earlier ISA-5.1 assumption.
 ### FFI → drawing number (confirmed 2026-10-21)
 - A tag's or wire's sheet number only means something within its drawing. The **FFI decides which drawing**: `TN` → 401103, so `S-TN23N2` is drawn on 401103 sheet 023.
 - An FFI can belong to a **separate package** we don't have, e.g. `TV` (`TV20T6` on sheet 015). Its references are listed in the report as a separate document, not checked.
-- The mapping is in `config/project.toml` `[identifiers.ffi_drawings]`. `TV` and `TH` are separate packages. An FFI not listed there is reported so it can be added.
+- The mapping is in `config/project.toml` `[project.ffi_drawings]`. `TV` and `TH` are separate packages. An FFI not listed there is reported so it can be added.
 
 ### Relay auxiliary contacts (confirmed 2026-10-21)
 - A relay coil's contact table lists where its contacts are used, as `<sheet>/<grid>` entries. For example, coil `K-TN19F1` on sheet 019 has `43/D4`.

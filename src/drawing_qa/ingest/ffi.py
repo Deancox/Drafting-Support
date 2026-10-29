@@ -27,7 +27,7 @@ EXTERNAL = "EXTERNAL"
 
 
 def resolve_ffis(settings: Settings, drawings: list[Drawing], claims: list[Claim]) -> tuple[Settings, dict, list[Issue]]:
-    """Return settings with the effective [identifiers.ffi_drawings], the mapping with where each
+    """Return settings with the effective ffi_drawings ([project.ffi_drawings]), the mapping with where each
     entry came from (for the reports), and the issues to raise."""
     left_out = set(settings.ingest.unchecked_types)
     learned: dict[str, Counter] = defaultdict(Counter)
@@ -63,7 +63,7 @@ def resolve_ffis(settings: Settings, drawings: list[Drawing], claims: list[Claim
         elif configured is not None:
             source = "sheets, overrides the config"
             warn(f"The config maps {ffi} to {configured}, but drawing {drawing}'s schematic sheets show FFI {ffi}: "
-                 f"{ffi} tags are checked against {drawing}. Set {ffi} = \"{drawing}\" in [identifiers.ffi_drawings] for this package")
+                 f"{ffi} tags are checked against {drawing}. Set {ffi} = \"{drawing}\" in [project.ffi_drawings] for this package")
         mapping[ffi] = {"drawing": drawing, "source": source}
 
     for ffi, configured in sorted(config.items()):
