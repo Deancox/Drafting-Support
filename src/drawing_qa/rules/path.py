@@ -63,7 +63,10 @@ class JbConsistency(Rule):
         default_severity=Severity.MAJOR,
         description=(
             "The schematic channel row and the cable block diagram route the same device through different "
-            "JBs / field locations."
+            "JBs / field locations, including a route that leaves out one JB the other passes through (S-TN24H3: "
+            "LTL-JB1 on the schematic, LTL-JB8 then LTL-JB1 on the cable block diagram). A schematic row that lists "
+            "more locations than the cable block diagram route is not reported: an e-stop series loop runs through "
+            "other stations."
         ),
         requires=_NEEDS_TRACES,
     )
@@ -73,18 +76,23 @@ class JbConsistency(Rule):
         for t in _field_traces(ctx):
             schematic = next((h.values for h in t.hops if h.hop == "JB" and h.status.value == "FOUND"), [])
             schematic = [v for v in schematic if v != "direct to panel"]
-            if not schematic or not t.cbd_via or set(schematic) & set(t.cbd_via) or t.device in seen:
+            extra = [j for j in t.cbd_via if j not in schematic]  # on the CBD route, not in the schematic row
+            # A row that lists more locations than the CBD route is an e-stop series loop through other stations
+            # (S-TN22T4: LTL-JB2, LTL-LCS1, LTL-LCS2, LTL-LCS5 on the schematic, LTL-LCS5 then LTL-JB2 on the CBD).
+            overlap = set(schematic) & set(t.cbd_via)
+            if not schematic or not t.cbd_via or (overlap and not extra) or t.device in seen:
                 continue
             seen.add(t.device)
             claim = _channel_claim(ctx, t)
             term = next((c.other for c in t.conflicts if c.hop == "JB" and c.other_source == "TERM"), None)
             agree = " (the termination drawings agree with the cable block diagram)" if term and set(term) <= set(t.cbd_via) else ""
+            gap = f": {', '.join(extra)} {'is' if len(extra) == 1 else 'are'} not on the schematic" if overlap else ""
             yield make(
                 subject_type="DEVICE",
                 subject_key=t.device,
                 message=(
                     f"{t.device} ({t.channel}): the schematic shows it via {', '.join(schematic)}, "
-                    f"the cable block diagram routes it via {', '.join(t.cbd_via)}{agree}"
+                    f"the cable block diagram routes it via {', '.join(t.cbd_via)}{gap}{agree}"
                 ),
                 evidence=[claim] if claim else [],
                 discriminator=",".join(sorted(schematic)) + "|" + ",".join(sorted(t.cbd_via)),

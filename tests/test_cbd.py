@@ -72,6 +72,48 @@ def test_path_002_schematic_and_cbd_disagree_on_jb(tmp_path, cfg):
     assert len(findings) == 1 and "via LTL-JB2" in findings[0].message and "via LTL-JB1" in findings[0].message
 
 
+def two_jb_cbd(root):
+    """Device S-TN36D4 -> LTL-JB8 (small box) -> LTL-JB1 -> LTL-PLC, like S-TN24H3 on CBD 015."""
+    items = [
+        ((60, 140, 110, 150), "S-TN36D4"),
+        ((175, 105, 245, 115), "=K07.11+LTL-JB8"),
+        ((330, 105, 410, 115), "=K07.11+LTL-JB1"),
+        ((620, 105, 700, 115), "=K07.11+LTL-PLC"),
+    ]
+    lines = box(170, 100, 250, 300) + box(300, 100, 420, 300) + box(600, 100, 720, 600)
+    lines += [(120, 160, 170, 160, THICK), (250, 160, 300, 160, THICK), (420, 160, 600, 160, THICK)]
+    cbd_sheet(root, items, lines)
+
+
+def test_path_002_schematic_leaves_out_a_jb_the_cbd_routes_through(tmp_path, cfg):
+    """S-TN24H3: LTL-JB1 on schematic 024, LTL-JB8 then LTL-JB1 on CBD 015."""
+    two_jb_cbd(tmp_path)
+    items, frame = slot_sheet(rows=[channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB1", ["COW CATCHER"])])
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    [f] = by_rule(run_pipeline(tmp_path, cfg), "PATH-002")
+    assert "via LTL-JB1" in f.message and "LTL-JB8, LTL-JB1" in f.message and "LTL-JB8 is not on the schematic" in f.message
+
+
+def test_path_002_quiet_when_the_schematic_lists_both_jbs(tmp_path, cfg):
+    """S-TN28D2: the schematic row shows LTL-JB1 and LTL-JB6, as the CBD does."""
+    two_jb_cbd(tmp_path)
+    row = channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB1", ["COW CATCHER"]) + [((520, 128, 552, 139), "LTL-JB8")]
+    items, frame = slot_sheet(rows=[row])
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    result = run_pipeline(tmp_path, cfg)
+    assert set(next(h for h in next(t for t in result.traces if t.key == "LTL/S13/CH00").hops if h.hop == "JB").values) == {"LTL-JB1", "LTL-JB8"}
+    assert by_rule(result, "PATH-002") == []
+
+
+def test_path_002_quiet_when_the_schematic_lists_more_stations(tmp_path, cfg):
+    """S-TN22T4: an e-stop loop; the schematic row lists the other stations, the CBD only the device's own cable."""
+    basic_cbd(tmp_path)
+    row = channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB1", ["ESTOP"]) + [((520, 128, 552, 139), "LTL-LCS2")]
+    items, frame = slot_sheet(rows=[row])
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    assert by_rule(run_pipeline(tmp_path, cfg), "PATH-002") == []
+
+
 def test_direct_to_panel_is_not_a_missing_jb(tmp_path, cfg):
     """Like S-TN36R4: no JB in the schematic row, and the CBD shows a direct cable to the panel."""
     basic_cbd(tmp_path, device_to="PANEL")
