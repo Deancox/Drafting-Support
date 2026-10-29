@@ -67,8 +67,18 @@
   ul.locs { margin: 0; padding-left: 18px; font-family: Consolas, monospace; font-size: 12px; }
   .muted { color: var(--dim); }
   .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 10px 0; }
-  .stats div { background: #f3f5f9; padding: 6px 8px; border-radius: 4px; }
+  .stats button { font: inherit; text-align: left; color: inherit; background: #f3f5f9; padding: 6px 8px;
+    border-radius: 4px; border: 1px solid transparent; cursor: pointer; }
+  .stats button:hover { border-color: var(--accent); background: #e8edf7; }
   .stats b { font-size: 18px; display: block; }
+  .back { font: inherit; background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; margin-bottom: 8px; }
+  .back:hover { text-decoration: underline; }
+  .item { display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0;
+    border-bottom: 1px dashed var(--line); padding: 6px 2px; cursor: pointer; }
+  .item:hover { background: #f3f5f9; }
+  .item b { font-family: Consolas, monospace; }
+  .item .count { float: right; background: var(--conflict); color: #fff; border-radius: 9px; padding: 0 6px; font-size: 11px; font-weight: 700; }
+  .node.picked rect.body { stroke: var(--accent); stroke-width: 2.2; }
 </style>
 </head>
 <body>
@@ -100,7 +110,18 @@
   const KIND = ["panel", "module", "station", "device"];
   const byId = Object.fromEntries(data.nodes.map(n => [n.id, n]));
   const canvas = document.getElementById("canvas"), side = document.getElementById("side");
-  let selected = null;
+  let selected = null, category = null;
+  // Overview tiles: each opens the list of its items and highlights them on the map.
+  const CATEGORIES = {
+    panels: {label: "Panels", test: n => n.column === 0},
+    modules: {label: "PLC modules", test: n => n.column === 1},
+    stations: {label: "JBs / field locations", test: n => n.column === 2},
+    devices: {label: "Field devices", test: n => n.column === 3},
+    findings: {label: "Items with findings", test: n => n.findings.length > 0},
+    nocbd: {label: "Devices on no CBD", test: n => n.missing_from_cbd,
+            note: "Wired out through a field JB on the schematic, but shown on no cable block diagram."},
+  };
+  const members = cat => data.nodes.filter(CATEGORIES[cat].test);
 
   document.getElementById("run").textContent = "Run " + data.run.id;
   const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
@@ -202,16 +223,20 @@
   function highlight() {
     const {nodes, links, gLabels} = data._shown;
     gLabels.innerHTML = "";
-    const active = selected ? new Set(selected.traces) : null;
+    const picked = !selected && category ? new Set(members(category).map(n => n.id)) : null;
+    const active = selected ? new Set(selected.traces)
+      : picked && !["panels", "devices"].includes(category) ? new Set(data.nodes.filter(n => picked.has(n.id)).flatMap(n => n.traces))
+      : null;  // all panels / all devices: every trace, so nothing to dim
     for (const n of nodes) {
       n._el.classList.toggle("selected", n === selected);
-      n._el.classList.toggle("dimmed", !!active && !n.traces.some(t => active.has(t)));
+      n._el.classList.toggle("picked", !!picked && picked.has(n.id) && !["panels", "devices"].includes(category));
+      n._el.classList.toggle("dimmed", !!active && !n.traces.some(t => active.has(t)) && !(picked && picked.has(n.id)));
     }
     for (const l of links) {
       const on = active && l.traces.some(t => active.has(t));
       l._el.classList.toggle("dimmed", !!active && !on);
       l._el.classList.toggle("hot", !!on);
-      if (on && l.channels.length && selected.column !== 0) {
+      if (on && l.channels.length && selected && selected.column !== 0) {
         const chans = l.channels.filter(c => !active || selected.channels.some(d => d.channel === c));
         if (chans.length) {
           const t = el("text", {x: l._mid[0], y: l._mid[1] - 3, class: "link-label", "text-anchor": "middle"}, gLabels);
@@ -238,14 +263,13 @@
   }
 
   function summary() {
-    const count = c => data.nodes.filter(n => n.column === c).length;
-    const states = {ok: 0, gap: 0, conflict: 0};
-    data.links.forEach(l => states[l.state]++);
+    selected = null; category = null;
+    highlight();
+    const tile = cat => `<button data-cat="${cat}" title="List them and highlight them on the map">
+      <b>${members(cat).length}</b>${CATEGORIES[cat].label}</button>`;
     side.innerHTML = `<h2>Package overview</h2><div class="sub">${esc(data.run.input)}</div>
-      <div class="stats"><div><b>${count(0)}</b>panels</div><div><b>${count(1)}</b>PLC modules</div>
-      <div><b>${count(2)}</b>JBs / field locations</div><div><b>${count(3)}</b>field devices</div>
-      <div><b>${data.nodes.filter(n => n.findings.length).length}</b>items with findings</div>
-      <div><b>${data.nodes.filter(n => n.missing_from_cbd).length}</b>devices on no CBD</div></div>
+      <div class="stats">${Object.keys(CATEGORIES).map(tile).join("")}</div>
+      <div class="muted">Click a box to list its items.</div>
       <h3>Reading the map</h3>
       <p>Columns run the way a signal does: panel → PLC module → JB or field location → field device.
       Each line is a connection; hover it for its channels.</p>
@@ -257,20 +281,42 @@
       <p>Click an item to highlight its channels and see its sheets, channels and findings. Click empty space to clear.</p>
       <p class="muted">Built from what the tool read and linked. Spare and internal channels are left out.
       Something not on the map was not read: check the report's "Sheets read" section.</p>`;
+    side.querySelectorAll("[data-cat]").forEach(b => b.addEventListener("click", () => showCategory(b.dataset.cat)));
+    side.scrollTop = 0;
   }
 
-  function select(n) {
-    selected = n;
+  function showCategory(cat) {
+    selected = null; category = cat;
     highlight();
+    const kind = ["Panel", "PLC module", "", "Field device"];
+    const items = members(cat).sort((a, b) => a.column - b.column || a.key.localeCompare(b.key, undefined, {numeric: true}));
+    side.innerHTML = `<button class="back" data-back>← Overview</button>
+      <h2>${esc(CATEGORIES[cat].label)} (${items.length})</h2>
+      ${CATEGORIES[cat].note ? `<div class="sub">${esc(CATEGORIES[cat].note)}</div>` : ""}
+      ${items.map(n => `<button class="item" data-id="${n.id}">
+        ${n.findings.length ? `<span class="count">${n.findings.length}</span>` : ""}<b>${esc(n.key)}</b>
+        <div class="muted">${esc(cat === "findings" ? [kind[n.column] || n.sub, [...new Set(n.findings.map(f => f.rule))].join(", ")].join(" · ") : (n.sub || kind[n.column]))}</div>
+      </button>`).join("") || `<div class="muted">None.</div>`}`;
+    side.querySelector("[data-back]").addEventListener("click", summary);
+    side.querySelectorAll("[data-id]").forEach(b => b.addEventListener("click", () => goTo(byId[b.dataset.id], cat)));
+    side.scrollTop = 0;
+  }
+
+  function select(n, from) {
+    selected = n;
     if (!n) return summary();
+    highlight();
     const kind = ["Panel", "PLC module", n.sub || "JB / field location", "Field device"][n.column];
-    side.innerHTML = `<h2>${esc(n.key)}</h2><div class="sub">${esc(kind)}${n.column === 3 && n.sub ? "" : ""}</div>
+    const back = from ? `← ${CATEGORIES[from].label}` : "← Overview";
+    side.innerHTML = `<button class="back" data-back>${esc(back)}</button>
+      <h2>${esc(n.key)}</h2><div class="sub">${esc(kind)}</div>
       ${n.column === 3 && n.sub ? `<div class="sub">${esc(n.sub)}</div>` : ""}
       ${n.missing_from_cbd ? `<div class="warn">Wired out through a field JB on the schematic, but not on any cable block diagram.</div>` : ""}
       ${n.orphan ? `<div class="warn">Drawn on the CBD or its home sheet, but no PLC channel reaches it.</div>` : ""}
       <h3>Findings (${n.findings.length})</h3>${n.findings.map(findingHtml).join("") || `<div class="muted">None.</div>`}
       ${n.column ? `<h3>Channels (${n.channels.length})</h3>${n.channels.map(channelHtml).join("") || `<div class="muted">None.</div>`}` : ""}
       <h3>Drawn on</h3>${n.locations.length ? `<ul class="locs">${n.locations.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<div class="muted">—</div>`}`;
+    side.querySelector("[data-back]").addEventListener("click", () => from ? showCategory(from) : summary());
     side.scrollTop = 0;
   }
 
@@ -278,11 +324,14 @@
     const q = text.trim().toUpperCase();
     if (!q) return;
     const n = data.nodes.find(n => n.key.toUpperCase() === q) || data.nodes.find(n => n.key.toUpperCase().includes(q));
-    if (!n) return;
+    if (n) goTo(n);
+  }
+
+  function goTo(n, from) {
     if (!n._el || !n._el.isConnected) {
       panelSelect.value = ""; document.getElementById("onlyFindings").checked = false; draw();
     }
-    select(n);
+    select(n, from);
     canvas.scrollTo({top: Math.max(0, n._y - canvas.clientHeight / 2),
                      left: Math.max(0, COL_X[n.column] + COL_W[n.column] / 2 - canvas.clientWidth / 2), behavior: "smooth"});
   }
