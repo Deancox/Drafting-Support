@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "ipykernel>=6"]  # ipykernel: run commands.ipynb in this environment
 
 [project.scripts]
 drawing-qa = "drawing_qa.cli:main"

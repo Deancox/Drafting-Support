@@ -1,14 +1,8 @@
 # Controls Drawing QA Platform
 
-Automated QA of controls drawing packages: PLC drawings, cable block diagrams and termination drawings.
+Automated QA of controls drawing packages: PLC drawings, cable block diagrams and termination drawings. It only reports issues for a person to check and fix; it never changes a drawing.
 
-| Document | What it covers |
-|---|---|
-| [GAME_PLAN.md](GAME_PLAN.md) | Goals, conventions, signal trace model, parsers |
-| [DATA_MODEL.md](DATA_MODEL.md) | Entities, claims, engineering graph |
-| [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | Stack, parsing, rule engine, milestones |
-
-**Status:** milestones M0, M1, M2 (termination parser), M3a (PLC parser), M3b (linker, graph, signal traces), M4 (CBD routing) and M5 (QA register, review carry-forward, coverage, waivers). The register is printed and marked up by hand by default; recording decisions in it is switched on with `[review] enabled = true`.
+**What it does:** the QA register is printed and marked up by hand by default; recording decisions in it is printed and marked up by hand by default; recording decisions in it is switched on with `[review] enabled = true`.
 - Every sheet's title block and grid frame are read; identifiers, placeholders and words (for spelling) are extracted with their grid cells.
 - Schematic sheets are read as a PLC system: rack layout, modules, channels (device, JB, wire, description per channel), abbreviated wire numbers.
 - Cable block diagrams are read from the drawn lines: enclosures (JB / LCS / panel), the devices in them, and every cable between them with its spec and number.
@@ -22,8 +16,11 @@ Termination drawings are read as JB terminal strips (terminal, wire, device, des
 python -m venv .venv
 ```
 ```bash
-.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pip install -r requirements.txt
 ```
+`requirements.txt` installs the tool with its dependencies (listed in `pyproject.toml`), plus pytest and ipykernel.
+
+**`commands.ipynb`** has the main commands one cell each: install, survey, run (with `--exclude` / `--ocr` variations), open the outputs, run the tests, help. Pick the `.venv` as its kernel.
 
 ## Run
 Put one package in a folder with three subfolders:
@@ -56,9 +53,11 @@ It counts the sheets that are SHX readable, that need decoding (`--ocr`), that a
 The outputs are written to `reports/Main/` (change this with `--output`):
 - `review.json`: files, sheets, every extracted claim with its position, and parse issues
 - `findings.json`: QA findings, each with rule, severity, evidence (sheet + grid) and recommendation
-- `report.md`: a summary for the checker
+- `report.md`: a summary for the checker, including which sheets could not be fully read
+- `QA_Register.xlsx`: the findings register to print and mark up
+- `system_map.html`: the package as an interactive map (panel → PLC module → JB → field device); opens in any browser, offline
 
-Project conventions (areas, tag patterns, placeholder tokens) are in `config/project.toml`.
+Configuration is in `config/project.toml`, in three parts: the project (FFI drawings, renamed designations, rack panels, areas), the client's drafting standard (tag grammar, CBD line weights, placeholders) and run preferences. Per-rule settings are in `config/rules.toml`, accepted exceptions in `config/waivers.toml`.
 
 ## Test
 ```bash
@@ -78,6 +77,6 @@ src/drawing_qa/
   model/                enums, source, claims, findings, run records
   rules/                rule engine + TAG, WIRE, PLC, PATH, COMP, PLACEHOLDER, DRW rules
   linker/ graph/ traces/  claims -> engineering model -> networkx graph -> signal traces
-  report/               review.json, findings.json, report.md
+  report/               review.json, findings.json, report.md, QA_Register.xlsx, system_map.html
 tests/                  pytest suite with synthetic PDF fixtures
 ```

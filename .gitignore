@@ -15,3 +15,13 @@ extracted/
 reports/
 *.sqlite
 QA_Register*.xlsx
+
+# Planning documents and guides: kept locally, not in the repository (software only)
+/GAME_PLAN.md
+/IMPLEMENTATION_PLAN.md
+/DATA_MODEL.md
+/Drawing QA Handbook.html
+/Drawing QA User Guide.html
+
+# Local tool settings (preview server)
+.claude/
