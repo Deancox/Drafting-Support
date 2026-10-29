@@ -150,7 +150,9 @@ class NotOnCableBlockDiagram(Rule):
         default_severity=Severity.MINOR,
         description=(
             "A field device in a channel trace whose JB / field location is on the supplied cable block diagrams, "
-            "but the device itself is not. Skipped when the CBD shows a near-identical tag (TAG-003 reports that)."
+            "but the device itself is not. Skipped when the CBD shows a near-identical tag (TAG-003 reports that). "
+            "Panel devices (K- relays, Q- breakers) are reported too, noting that either the CBD or the schematic's "
+            "JB terminals are wrong (K-TN18F1..F8: PLC cubicle relays drawn between LTL-JB1 terminals on 401103-042)."
         ),
         requires=_NEEDS_TRACES,
     )
@@ -164,20 +166,24 @@ class NotOnCableBlockDiagram(Rule):
         for t in ctx.traces:
             if t.status not in (TraceStatus.PARTIAL, TraceStatus.COMPLETE) or not t.device or t.on_cbd or t.device in seen:
                 continue
-            if t.device.split("-", 1)[0] in internal:
-                continue  # relays, breakers: inside the panel
             jbs = next((h.values for h in t.hops if h.hop == "JB"), [])
             on_cbd_jbs = [j for j in jbs if _node_on_cbd(ctx, j)]
             if not on_cbd_jbs or any(near_tags(t.device, o) for o in orphan_tags):
                 continue
             seen.add(t.device)
+            via = ", ".join(on_cbd_jbs)
+            message = f"{t.device} ({t.channel} via {via}) is not on the cable block diagrams, which do show {via}"
+            recommendation = f"Add {t.device} to the cable block diagram for {on_cbd_jbs[0]}"
+            if t.device.split("-", 1)[0] in internal:  # relays, breakers: normally inside the panel
+                message += "; it is a panel device, yet the schematic wires it out through a field JB"
+                recommendation += f", or if it is in the panel, correct the {via} terminals the schematic draws it between"
             yield make(
                 subject_type="DEVICE",
                 subject_key=t.device,
-                message=f"{t.device} ({t.channel} via {', '.join(on_cbd_jbs)}) is not on the cable block diagrams, which do show {', '.join(on_cbd_jbs)}",
+                message=message,
                 evidence=[c for c in [_claim(ctx, t)] if c] + _occurrences(ctx, t.device)[:1],
                 discriminator="not-on-cbd",
-                recommendation=f"Add {t.device} to the cable block diagram for {on_cbd_jbs[0]}",
+                recommendation=recommendation,
             )
 
 

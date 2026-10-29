@@ -125,8 +125,11 @@ def test_comp_005_field_device_not_on_cbd(tmp_path, cfg):
         channel_row(182, "01", "IN-1", "K-TN36F4", "E4", "F6", "LTL-JB2", ["RELAY"]),
     ]
     _package(tmp_path, rows, [(cell_rect("C5"), "LTL-JB2")])
-    findings = by_rule(run_pipeline(tmp_path, cfg), "COMP-005")
-    assert [f.subject_key for f in findings] == ["S-TN36D4"]  # K- relays are panel devices
+    findings = {f.subject_key: f for f in by_rule(run_pipeline(tmp_path, cfg), "COMP-005")}
+    assert sorted(findings) == ["K-TN36F4", "S-TN36D4"]
+    # a relay is normally a panel device: wired out through a field JB, either the CBD or the JB marking is wrong
+    assert "panel device" in findings["K-TN36F4"].message and "LTL-JB2" in findings["K-TN36F4"].recommendation
+    assert "panel device" not in findings["S-TN36D4"].message
 
 
 def test_superseded_designation_links_to_replacement(tmp_path, cfg):
