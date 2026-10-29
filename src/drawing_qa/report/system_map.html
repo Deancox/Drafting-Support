@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>System Map</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2433; --dim: #6b7385; --line: #d5d9e2;
+    --ok: #2e7d32; --gap: #d98a00; --conflict: #c62828; --accent: #1f3864; --select: #fff4c2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font: 13px/1.4 "Segoe UI", Arial, sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 10px 16px;
+    background: var(--accent); color: #fff; }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; }
+  header .run { opacity: .75; font-size: 12px; }
+  header input[type=search], header select { font: inherit; padding: 4px 8px; border-radius: 4px; border: 0; }
+  header input[type=search] { width: 220px; }
+  header label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+  .legend { display: flex; gap: 14px; margin-left: auto; font-size: 12px; align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .swatch { width: 22px; height: 0; border-top: 3px solid; display: inline-block; }
+  .box { width: 18px; height: 12px; border: 1.5px dashed #555; background: #fff; display: inline-block; }
+  .dot { width: 14px; height: 14px; border-radius: 50%; background: var(--conflict); color: #fff; font-size: 9px;
+    display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+  main { display: flex; height: calc(100% - 52px); }
+  #canvas { flex: 1; overflow: auto; position: relative; }
+  #side { width: 400px; max-width: 45%; overflow: auto; background: var(--panel); border-left: 1px solid var(--line);
+    padding: 14px 16px; }
+  svg { display: block; }
+  .col-title { font-weight: 600; fill: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  .node rect.body { fill: #fff; stroke: #9aa3b5; stroke-width: 1.2; rx: 4; }
+  .node.panel rect.body { fill: #e8edf7; stroke: var(--accent); }
+  .node.module rect.body { fill: #eef3fb; }
+  .node.station rect.body { fill: #f3f6ee; }
+  .node.missing rect.body { stroke-dasharray: 5 3; stroke: #333; stroke-width: 1.5; }
+  .node.orphan rect.body { stroke: var(--conflict); fill: #fdecec; }
+  .node.selected rect.body { fill: var(--select); stroke: #b8860b; stroke-width: 2; }
+  .node { cursor: pointer; }
+  .node text.key { font-weight: 600; font-size: 12px; fill: var(--ink); }
+  .node text.sub { font-size: 10.5px; fill: var(--dim); }
+  .node .badge circle { fill: var(--conflict); }
+  .node .badge text { fill: #fff; font-size: 9.5px; font-weight: 700; text-anchor: middle; }
+  .link { fill: none; stroke-width: 1.6; opacity: .55; }
+  .link.ok { stroke: var(--ok); } .link.gap { stroke: var(--gap); } .link.conflict { stroke: var(--conflict); stroke-width: 2.2; opacity: .8; }
+  .dimmed { opacity: .08 !important; }
+  .node.dimmed { opacity: .18 !important; }
+  .link.hot { opacity: 1; stroke-width: 2.6; }
+  .link-label { font-size: 10px; fill: var(--ink); paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+  #side h2 { font-size: 17px; margin: 0 0 2px; }
+  #side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--dim); margin: 18px 0 6px;
+    border-bottom: 1px solid var(--line); padding-bottom: 3px; }
+  #side .sub { color: var(--dim); margin-bottom: 8px; }
+  #side .warn { background: #fdecec; border-left: 3px solid var(--conflict); padding: 6px 8px; margin: 8px 0; }
+  #side .note { background: #f3f5f9; padding: 6px 8px; margin: 8px 0; }
+  .finding { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .finding .meta { font-size: 11px; color: var(--dim); }
+  .finding .rec { color: var(--accent); margin-top: 2px; }
+  .sev { font-weight: 700; } .sev.Critical { color: #8b0000; } .sev.Major { color: var(--conflict); }
+  .sev.Minor { color: #9a6700; } .sev.Info { color: var(--dim); }
+  .chan { padding: 6px 0; border-bottom: 1px dashed var(--line); }
+  .chan b { font-family: Consolas, monospace; }
+  .state { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .state.ok { background: var(--ok); } .state.gap { background: var(--gap); } .state.conflict { background: var(--conflict); }
+  ul.locs { margin: 0; padding-left: 18px; font-family: Consolas, monospace; font-size: 12px; }
+  .muted { color: var(--dim); }
+  .stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin: 10px 0; }
+  .stats div { background: #f3f5f9; padding: 6px 8px; border-radius: 4px; }
+  .stats b { font-size: 18px; display: block; }
+</style>
+</head>
+<body>
+<header>
+  <h1>System Map</h1>
+  <span class="run" id="run"></span>
+  <input type="search" id="search" list="keys" placeholder="Find a tag, JB or slot…">
+  <datalist id="keys"></datalist>
+  <select id="panel"><option value="">All panels</option></select>
+  <label><input type="checkbox" id="onlyFindings"> Only items with findings</label>
+  <div class="legend">
+    <span><i class="swatch" style="border-color:var(--ok)"></i>Traced</span>
+    <span><i class="swatch" style="border-color:var(--gap)"></i>Gap</span>
+    <span><i class="swatch" style="border-color:var(--conflict)"></i>Drawings disagree</span>
+    <span><i class="box"></i>Not on any CBD</span>
+    <span><i class="dot">3</i>Findings</span>
+  </div>
+</header>
+<main>
+  <div id="canvas"></div>
+  <aside id="side"></aside>
+</main>
+<script type="application/json" id="map-data">/*DATA*/</script>
+<script>
+(function () {
+  const data = JSON.parse(document.getElementById("map-data").textContent);
+  const NS = "http://www.w3.org/2000/svg";
+  const COL_X = [20, 230, 500, 790], COL_W = [170, 230, 240, 260], ROW = 34, BOX_H = 28, TOP = 46;
+  const KIND = ["panel", "module", "station", "device"];
+  const byId = Object.fromEntries(data.nodes.map(n => [n.id, n]));
+  const canvas = document.getElementById("canvas"), side = document.getElementById("side");
+  let selected = null;
+
+  document.getElementById("run").textContent = "Run " + data.run.id;
+  const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  const el = (tag, attrs, parent) => {
+    const e = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs || {})) e.setAttribute(k, v);
+    if (parent) parent.appendChild(e);
+    return e;
+  };
+
+  // Filters
+  const panelSelect = document.getElementById("panel");
+  data.nodes.filter(n => n.column === 0).forEach(n => panelSelect.add(new Option(n.key, n.id)));
+  const keys = document.getElementById("keys");
+  data.nodes.forEach(n => keys.appendChild(new Option(n.key)));
+
+  function visibleTraces() {
+    let set = null;
+    const panel = panelSelect.value;
+    if (panel) set = new Set(byId[panel].traces);
+    if (document.getElementById("onlyFindings").checked) {
+      const f = new Set(data.nodes.filter(n => n.findings.length && n.column > 0).flatMap(n => n.traces));
+      set = set ? new Set([...set].filter(t => f.has(t))) : f;
+    }
+    return set;
+  }
+
+  // Layout: modules evenly spaced; everything else placed level with what feeds it, then spread apart.
+  function layout(nodes, links) {
+    const feeds = {}, fedBy = {};
+    links.forEach(l => { (feeds[l.dst] ||= []).push(l.src); (fedBy[l.src] ||= []).push(l.dst); });
+    const cols = [0, 1, 2, 3].map(c => nodes.filter(n => n.column === c).sort((a, b) => a.order - b.order));
+    const y = {};
+    const tallest = Math.max(1, ...cols.map(c => c.length));
+    const span = tallest * ROW;
+    cols[1].forEach((n, i) => { y[n.id] = TOP + (cols[1].length > 1 ? i * (span - ROW) / (cols[1].length - 1) : 0); });
+    const spread = col => {
+      col.sort((a, b) => y[a.id] - y[b.id]);
+      for (let i = 1; i < col.length; i++) y[col[i].id] = Math.max(y[col[i].id], y[col[i - 1].id] + ROW);
+    };
+    const level = (col, from) => {
+      col.forEach(n => {
+        const ys = (from[n.id] || []).map(id => y[id]).filter(v => v !== undefined);
+        y[n.id] = ys.length ? ys.reduce((a, b) => a + b) / ys.length : TOP + span;
+      });
+      spread(col);
+    };
+    level(cols[2], feeds);
+    level(cols[3], feeds);
+    level(cols[0], fedBy);
+    if (!cols[1].length) cols.forEach(spread);
+    return y;
+  }
+
+  function draw() {
+    const traces = visibleTraces();
+    const shows = n => !traces || n.traces.some(t => traces.has(t));
+    const nodes = data.nodes.filter(shows);
+    const ids = new Set(nodes.map(n => n.id));
+    const links = data.links.filter(l => ids.has(l.src) && ids.has(l.dst) && (!traces || l.traces.some(t => traces.has(t))));
+    const y = layout(nodes, links);
+    const height = Math.max(...Object.values(y), TOP) + ROW * 2;
+    canvas.innerHTML = "";
+    const svg = el("svg", {width: COL_X[3] + COL_W[3] + 30, height}, canvas);
+    data.columns.forEach((t, i) => { el("text", {x: COL_X[i], y: 24, class: "col-title"}, svg).textContent = t; });
+    svg.addEventListener("click", e => { if (e.target === svg) select(null); });
+
+    const gLinks = el("g", {}, svg), gLabels = el("g", {}, svg), gNodes = el("g", {}, svg);
+    for (const l of links) {
+      const a = byId[l.src], b = byId[l.dst];
+      const x1 = COL_X[a.column] + COL_W[a.column], y1 = y[a.id] + BOX_H / 2;
+      const x2 = COL_X[b.column], y2 = y[b.id] + BOX_H / 2, mx = (x1 + x2) / 2;
+      const p = el("path", {d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, class: "link " + l.state}, gLinks);
+      el("title", {}, p).textContent = `${a.key} → ${b.key}` + (l.channels.length ? "\n" + l.channels.join(", ") : "");
+      l._el = p; l._mid = [mx, (y1 + y2) / 2];
+    }
+    for (const n of nodes) {
+      const cls = ["node", KIND[n.column], n.missing_from_cbd ? "missing" : "", n.orphan ? "orphan" : ""].join(" ");
+      const g = el("g", {class: cls, transform: `translate(${COL_X[n.column]},${y[n.id]})`}, gNodes);
+      el("rect", {class: "body", width: COL_W[n.column], height: BOX_H}, g);
+      el("text", {class: "key", x: 8, y: n.sub ? 12 : 18}, g).textContent = n.key;
+      if (n.sub || n.orphan) {
+        const sub = n.orphan ? "Not reached from any PLC channel" : n.sub;
+        el("text", {class: "sub", x: 8, y: 24}, g).textContent = sub.length > 38 ? sub.slice(0, 37) + "…" : sub;
+      }
+      if (n.findings.length) {
+        const b = el("g", {class: "badge", transform: `translate(${COL_W[n.column] - 2},2)`}, g);
+        el("circle", {r: 8}, b);
+        el("text", {y: 3.5}, b).textContent = n.findings.length;
+      }
+      el("title", {}, g).textContent = n.key + (n.findings.length ? ` · ${n.findings.length} finding(s)` : "");
+      g.addEventListener("click", e => { e.stopPropagation(); select(n); });
+      n._el = g; n._y = y[n.id];
+    }
+    data._shown = {nodes, links, gLabels};
+    highlight();
+  }
+
+  function highlight() {
+    const {nodes, links, gLabels} = data._shown;
+    gLabels.innerHTML = "";
+    const active = selected ? new Set(selected.traces) : null;
+    for (const n of nodes) {
+      n._el.classList.toggle("selected", n === selected);
+      n._el.classList.toggle("dimmed", !!active && !n.traces.some(t => active.has(t)));
+    }
+    for (const l of links) {
+      const on = active && l.traces.some(t => active.has(t));
+      l._el.classList.toggle("dimmed", !!active && !on);
+      l._el.classList.toggle("hot", !!on);
+      if (on && l.channels.length && selected.column !== 0) {
+        const chans = l.channels.filter(c => !active || selected.channels.some(d => d.channel === c));
+        if (chans.length) {
+          const t = el("text", {x: l._mid[0], y: l._mid[1] - 3, class: "link-label", "text-anchor": "middle"}, gLabels);
+          t.textContent = chans.map(c => c.split("/").slice(1).join("/")).join(", ");
+        }
+      }
+    }
+  }
+
+  function findingHtml(f) {
+    return `<div class="finding"><div class="meta"><span class="sev ${esc(f.severity)}">${esc(f.severity)}</span>
+      · ${esc(f.rule)} · ${esc(f.id)}</div><div>${esc(f.message)}</div>
+      ${f.recommendation ? `<div class="rec">→ ${esc(f.recommendation)}</div>` : ""}</div>`;
+  }
+
+  function channelHtml(c) {
+    const via = (c.cbd_via || []).join(", "), jbs = (c.jbs || []).join(", ");
+    const differs = via && via !== jbs;
+    const label = {ok: "traced as far as the drawings go", gap: "a hop is missing", conflict: "drawings disagree"}[c.state];
+    return `<div class="chan"><span class="state ${c.state}" title="${label}"></span><b>${esc(c.channel)}</b>
+      <span class="muted">· ${label}</span><div>${esc(c.description)}</div>
+      <div class="muted">Wires: ${esc((c.wires || []).join(", ") || "—")} · Schematic via: ${esc(jbs || "—")}</div>
+      ${differs ? `<div class="muted">CBD routes via: ${esc(via)}</div>` : ""}</div>`;
+  }
+
+  function summary() {
+    const count = c => data.nodes.filter(n => n.column === c).length;
+    const states = {ok: 0, gap: 0, conflict: 0};
+    data.links.forEach(l => states[l.state]++);
+    side.innerHTML = `<h2>Package overview</h2><div class="sub">${esc(data.run.input)}</div>
+      <div class="stats"><div><b>${count(0)}</b>panels</div><div><b>${count(1)}</b>PLC modules</div>
+      <div><b>${count(2)}</b>JBs / field locations</div><div><b>${count(3)}</b>field devices</div>
+      <div><b>${data.nodes.filter(n => n.findings.length).length}</b>items with findings</div>
+      <div><b>${data.nodes.filter(n => n.missing_from_cbd).length}</b>devices on no CBD</div></div>
+      <h3>Reading the map</h3>
+      <p>Columns run the way a signal does: panel → PLC module → JB or field location → field device.
+      Each line is a connection; hover it for its channels.</p>
+      <p><b style="color:var(--ok)">Green</b>: traced as far as the supplied drawings go.
+      <b style="color:var(--gap)">Amber</b>: a hop the drawings should show is missing.
+      <b style="color:var(--conflict)">Red</b>: two drawings disagree (e.g. the CBD routes through a JB the schematic leaves out).</p>
+      <p>A <b>dashed</b> device is wired out through a field JB on the schematic but shown on no cable block diagram.
+      A red number is how many findings name the item.</p>
+      <p>Click an item to highlight its channels and see its sheets, channels and findings. Click empty space to clear.</p>
+      <p class="muted">Built from what the tool read and linked. Spare and internal channels are left out.
+      Something not on the map was not read: check the report's "Sheets read" section.</p>`;
+  }
+
+  function select(n) {
+    selected = n;
+    highlight();
+    if (!n) return summary();
+    const kind = ["Panel", "PLC module", n.sub || "JB / field location", "Field device"][n.column];
+    side.innerHTML = `<h2>${esc(n.key)}</h2><div class="sub">${esc(kind)}${n.column === 3 && n.sub ? "" : ""}</div>
+      ${n.column === 3 && n.sub ? `<div class="sub">${esc(n.sub)}</div>` : ""}
+      ${n.missing_from_cbd ? `<div class="warn">Wired out through a field JB on the schematic, but not on any cable block diagram.</div>` : ""}
+      ${n.orphan ? `<div class="warn">Drawn on the CBD or its home sheet, but no PLC channel reaches it.</div>` : ""}
+      <h3>Findings (${n.findings.length})</h3>${n.findings.map(findingHtml).join("") || `<div class="muted">None.</div>`}
+      ${n.column ? `<h3>Channels (${n.channels.length})</h3>${n.channels.map(channelHtml).join("") || `<div class="muted">None.</div>`}` : ""}
+      <h3>Drawn on</h3>${n.locations.length ? `<ul class="locs">${n.locations.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<div class="muted">—</div>`}`;
+    side.scrollTop = 0;
+  }
+
+  function find(text) {
+    const q = text.trim().toUpperCase();
+    if (!q) return;
+    const n = data.nodes.find(n => n.key.toUpperCase() === q) || data.nodes.find(n => n.key.toUpperCase().includes(q));
+    if (!n) return;
+    if (!n._el || !n._el.isConnected) {
+      panelSelect.value = ""; document.getElementById("onlyFindings").checked = false; draw();
+    }
+    select(n);
+    canvas.scrollTo({top: Math.max(0, n._y - canvas.clientHeight / 2),
+                     left: Math.max(0, COL_X[n.column] + COL_W[n.column] / 2 - canvas.clientWidth / 2), behavior: "smooth"});
+  }
+
+  const search = document.getElementById("search");
+  search.addEventListener("change", () => find(search.value));
+  search.addEventListener("keydown", e => { if (e.key === "Enter") find(search.value); });
+  panelSelect.addEventListener("change", () => { draw(); select(null); });
+  document.getElementById("onlyFindings").addEventListener("change", () => { draw(); select(null); });
+  draw();
+  summary();
+})();
+</script>
+</body>
+</html>

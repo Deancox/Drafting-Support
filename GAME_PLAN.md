@@ -206,6 +206,7 @@ Terminals and channels marked SPARE are not orphans. They're listed as spares.
 - `traces.xlsx`: the trace register. One row per trace with Trace ID, status, Conflicted flag, the value at each hop, the break point, and a findings count.
 - `trace_hops.xlsx`: one row per link, with its sources and whether they agree.
 - **Coverage**: % complete / partial / orphan per area, JB, panel and PLC slot.
+- 🆕 `system_map.html` *(added 2026-10-29)*: the package as an interactive map, panel → PLC module → JB / field location → field device, built from the traces every run. Lines green (traced), amber (gap), red (drawings disagree); devices wired through a field JB but on no CBD dashed; findings counted per item. Click for sheets, channels and findings; search by tag; filter by panel or findings. Self-contained, works offline.
 
 ## Engineering conventions (package standard)
 Received 2026-10-21. These replace the earlier ISA-5.1 assumption.
