@@ -18,11 +18,14 @@ A word is dropped when:
   a lower-case letter at a larger one, stroke for stroke);
 - a letter in it matched only within a rounding step, and no letter in it matched exactly (one read by scale
   does not count: a near match can take an upper-case letter at one size for its lower case at another).
+Each drop is counted by its reason. A lone unrecognised shape with nothing joined to it is counted apart: mostly a
+symbol, an arrowhead or a piece of line work, not a word. A word missing a letter or two among letters read
+(MO?ULE) is kept aside as unresolved text, for the checker to look at; it is never a word and no check sees it.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import pymupdf
 
@@ -39,7 +42,16 @@ class DecodeStats:
     scaled: int = 0  # of which matched scaled to their line's height (a text size not learned)
     shapes: int = 0  # letter-sized shapes, recognised or not
     words_kept: int = 0
-    words_dropped: int = 0
+    unknown_letter: int = 0  # words dropped: a letter in it not recognised
+    clash: int = 0  # words dropped: touching another text or line work, or a shape beside it not continuing it
+    crowded: int = 0  # words dropped: an unrecognised shape on it or at its ends
+    doubtful: int = 0  # words dropped: matched only within a rounding step, or a single letter read by scale
+    lone_shapes: int = 0  # unrecognised shapes with nothing joined to them: mostly not text
+    unresolved: list[Word] = field(default_factory=list)  # words missing a letter or two, '?' for each: never used
+
+    @property
+    def words_dropped(self) -> int:
+        return self.unknown_letter + self.clash + self.crowded + self.doubtful
 
 
 @dataclass
@@ -193,6 +205,13 @@ def _overlaps_core(u: BBox, box: BBox) -> bool:
     return (u[1] < box[3] and u[3] > box[1]) if horizontal else (u[0] < box[2] and u[2] > box[0])
 
 
+def _unresolved(group: list[_Letter]) -> bool:
+    """Worth showing the checker as unresolved text: at least two letters or digits read, and no more letters
+    missing than read (a run of dots and dashes with a shape among them is a dotted line, not text)."""
+    missing = sum(g.char is None for g in group)
+    return sum(1 for g in group if g.char and g.char.isalnum()) >= 2 and missing <= len(group) - missing
+
+
 def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_000) -> tuple[list[Word], DecodeStats]:
     stats = DecodeStats()
     lines: list[tuple[list[_Letter], list[bool], bool]] = []  # letters, whether a space precedes each, vertical
@@ -258,15 +277,26 @@ def decode_page(page: pymupdf.Page, book: GlyphBook, *, block_base: int = 200_00
             groups[-1].append(letter)
         for group in groups:
             exact = any(not g.near and not g.scaled for g in group)
-            alone = len(group) == 1 and group[0].scaled
-            if any(g.char is None or g.clash for g in group) or (any(g.near for g in group) and not exact) or alone:
-                stats.words_dropped += 1
-                continue
             box = group[0].box
             for g in group[1:]:
                 box = _union(box, g.box)
+            if any(g.char is None for g in group):
+                if len(group) == 1:
+                    stats.lone_shapes += 1
+                else:
+                    stats.unknown_letter += 1
+                    if _unresolved(group):
+                        stats.unresolved.append(Word(text="".join(g.char or "?" for g in group), bbox=box,
+                                                     block=block_base + n, line=0, method=ExtractionMethod.SHX_STROKES))
+                continue
+            if any(g.clash for g in group):
+                stats.clash += 1
+                continue
+            if (any(g.near for g in group) and not exact) or (len(group) == 1 and group[0].scaled):
+                stats.doubtful += 1
+                continue
             if _crowded(box, unknown, group):
-                stats.words_dropped += 1
+                stats.crowded += 1
                 continue
             words.append(Word(text="".join(g.char for g in group), bbox=box, block=block_base + n, line=0,
                               method=ExtractionMethod.SHX_STROKES))

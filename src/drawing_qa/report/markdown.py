@@ -406,12 +406,33 @@ def _decoded(result: RunResult, w) -> None:
       "PDFSHX = 1 is still the better fix.")
     w("")
     if decoded:
-        w("| Sheet | Letters recognised / letter shapes | Words used | Words dropped |")
-        w("|---|---|---|---|")
-        for d in decoded:
-            scaled = f" ({d.decoded.scaled} by scale)" if d.decoded.scaled else ""
-            w(f"| {d.label} | {d.decoded.letters} / {d.decoded.shapes}{scaled} | {d.decoded.words_kept} | {d.decoded.words_dropped} |")
+        w("Words dropped, by reason: **letter not recognised** (a shape in it the readable sheets never showed), "
+          "**touching** (run into another text or line work, or beside a shape that does not continue it), "
+          "**crowded** (an unrecognised shape on it or at its ends), **doubtful** (matched only within a rounding "
+          "step, or a single letter read by scale). **Lone shapes** are unrecognised shapes with nothing joined to "
+          "them: mostly symbols, arrowheads and line work rather than words, though one can be a one-character text.")
         w("")
+        w("| Sheet | Letters recognised / letter shapes | Words used | Letter not recognised | Touching | Crowded "
+          "| Doubtful | Lone shapes |")
+        w("|---|---|---|---|---|---|---|---|")
+        for d in decoded:
+            k = d.decoded
+            scaled = f" ({k.scaled} by scale)" if k.scaled else ""
+            w(f"| {d.label} | {k.letters} / {k.shapes}{scaled} | {k.words_kept} | {k.unknown_letter} | {k.clash} "
+              f"| {k.crowded} | {k.doubtful} | {k.lone_shapes} |")
+        w("")
+        if unresolved := [d for d in decoded if d.decoded.unresolved]:
+            w("### Unreadable text")
+            w("")
+            w("Words missing a letter or two, `?` for each. They are not used: nothing is found or cleared from them. "
+              "Look at these places on the drawing.")
+            w("")
+            w("| Sheet | Text (grid) |")
+            w("|---|---|")
+            for d in unresolved:
+                texts = ", ".join(f"`{u.text}`" + (f" ({u.grid})" if u.grid else "") for u in d.decoded.unresolved)
+                w(f"| {d.label} | {texts.replace('|', '/')} |")
+            w("")
     if quiet := quiet_rules(result.drawings):
         w(f"A cable block diagram or termination sheet was decoded, so these rules are quiet for the whole package "
           f"(what they report missing could be on a decoded sheet): {', '.join(quiet)}.")

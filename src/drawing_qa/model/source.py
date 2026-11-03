@@ -40,6 +40,14 @@ class GridFrame(BaseModel):
         return [r[0] for r in self.rows]
 
 
+class UnresolvedText(BaseModel):
+    """A word on a decoded sheet missing a letter or two ('?' for each): shown to the checker, never used."""
+
+    text: str  # e.g. MO?ULE
+    grid: str | None = None  # grid reference, when the sheet's grid was read
+    bbox: BBox
+
+
 class DecodeInfo(BaseModel):
     """How much of a NO_SHX_TEXT sheet was read by decoding its letter strokes (--ocr)."""
 
@@ -47,7 +55,13 @@ class DecodeInfo(BaseModel):
     scaled: int = 0  # of which matched scaled to their line's height (a text size the readable sheets do not use)
     shapes: int  # letter-sized shapes, recognised or not
     words_kept: int
-    words_dropped: int  # words with an unrecognised letter: never used
+    words_dropped: int  # words never used, the four reasons below together
+    unknown_letter: int = 0  # dropped: a letter in it not recognised
+    clash: int = 0  # dropped: touching another text or line work, or a shape beside it not continuing it
+    crowded: int = 0  # dropped: an unrecognised shape on it or at its ends
+    doubtful: int = 0  # dropped: matched only within a rounding step, or a single letter read by scale
+    lone_shapes: int = 0  # unrecognised shapes with nothing joined to them: mostly symbols and line work, not words
+    unresolved: list[UnresolvedText] = []  # words missing a letter or two: for the checker, never used
 
 
 class Drawing(BaseModel):

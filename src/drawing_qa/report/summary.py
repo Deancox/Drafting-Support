@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 from drawing_qa.model.enums import DocType, IssueCode, Predicate
 from drawing_qa.model.run import RunResult
+from drawing_qa.model.source import DecodeInfo
 
 
 class DocTypeSummary(BaseModel):
@@ -79,6 +80,13 @@ def summarise(result: RunResult) -> RunSummary:
     )
 
 
+def drop_reasons(k: DecodeInfo) -> str:
+    """Why a decoded sheet's words were dropped, e.g. '120 letter not recognised, 80 touching, 10 crowded'."""
+    reasons = [(k.unknown_letter, "letter not recognised"), (k.clash, "touching"), (k.crowded, "crowded"),
+               (k.doubtful, "doubtful match")]
+    return ", ".join(f"{n} {why}" for n, why in reasons if n) or "none"
+
+
 def sheet_readability(result: RunResult) -> list[SheetReadability]:
     """Every sheet: read from its SHX text notes, decoded from its letter strokes (--ocr) with every word or only
     some, or not read at all (plotted without SHX notes and not decoded, scanned, empty, or the parser failed)."""
@@ -91,9 +99,9 @@ def sheet_readability(result: RunResult) -> list[SheetReadability]:
         own = issues.get(d.id, {})
         if d.decoded is not None and IssueCode.PARSER_ERROR not in own:
             k = d.decoded
-            status = DECODED if k.words_dropped == 0 else PARTIAL
+            status = DECODED if k.words_dropped == 0 and k.lone_shapes == 0 else PARTIAL
             detail = (f"decoded from line work (--ocr): {k.letters}/{k.shapes} letters, {k.words_kept} words used, "
-                      f"{k.words_dropped} dropped")
+                      f"{k.words_dropped} dropped ({drop_reasons(k)}); {k.lone_shapes} lone shapes not read")
         elif d.text_unreadable or any(c in own for c in _NOT_READ):
             status = NOT_READ
             detail = "; ".join(own[c] for c in _NOT_READ if c in own)

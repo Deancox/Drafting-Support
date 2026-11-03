@@ -49,7 +49,7 @@ To see how many sheets a set has of each kind before running anything (quick: no
 ```
 It counts the sheets that are SHX readable, that need decoding (`--ocr`), that are scans and that are blank, by folder, and lists the files to re-plot or decode with the AutoCAD version that plotted them.
 
-`--ocr` learns each letter's strokes from the package's readable sheets and decodes the unreadable ones by exact match (no OCR program or service is involved). Only words whose every letter matched are used, nothing is reported as missing from a decoded sheet, and findings resting on decoded text are marked "(decoded from line work)". A package with no readable sheets to learn from stays unread. `report.md` lists what was decoded under "Sheets decoded from line work".
+`--ocr` learns each letter's strokes from the package's readable sheets and decodes the unreadable ones by exact match (no OCR program or service is involved). Only words whose every letter matched are used, nothing is reported as missing from a decoded sheet, and findings resting on decoded text are marked "(decoded from line work)". A package with no readable sheets to learn from stays unread. `report.md` lists what was decoded under "Sheets decoded from line work", with dropped words counted by reason and words missing a letter or two (`MO?ULE`) under "Unreadable text" (also the register's Unreadable Text tab); those are for the checker only and no rule uses them.
 The outputs are written to `reports/Main/` (change this with `--output`):
 - `review.json`: files, sheets, every extracted claim with its position, and parse issues
 - `findings.json`: QA findings, each with rule, severity, evidence (sheet + grid) and recommendation

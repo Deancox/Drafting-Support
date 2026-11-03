@@ -20,7 +20,7 @@ from drawing_qa.graph import build_graph
 from drawing_qa.linker import link
 from drawing_qa.model.enums import DocType, ExtractionMethod, IssueCode, PageKind, StageStatus
 from drawing_qa.model.run import RunInfo, RunResult, StageResult
-from drawing_qa.model.source import DecodeInfo, Drawing, Issue
+from drawing_qa.model.source import DecodeInfo, Drawing, Issue, UnresolvedText
 from drawing_qa.parsers.base import ParseContext
 from drawing_qa.parsers.plc.wires import sheet_ffi
 from drawing_qa.parsers.registry import build_parsers
@@ -312,8 +312,14 @@ def _decode_one(found, index: int, drawing: Drawing, content: PageContent, parse
                              _segment_loader=lambda page=page: _load_segments(page))
         drawing.grid = read_grid_frame(merged, settings.grid)
         drawing.ffi = sheet_ffi(merged) or drawing.ffi
+        unresolved = [UnresolvedText(text=w.text, bbox=w.bbox,
+                                     grid=drawing.grid.cell_at((w.bbox[0] + w.bbox[2]) / 2, (w.bbox[1] + w.bbox[3]) / 2)
+                                     if drawing.grid else None)
+                      for w in stats.unresolved if not any(_overlaps(w.bbox, r.bbox) for r in content.words)]
         drawing.decoded = DecodeInfo(letters=stats.letters, scaled=stats.scaled, shapes=stats.shapes, words_kept=len(decoded),
-                                     words_dropped=stats.words_dropped)
+                                     words_dropped=stats.words_dropped, unknown_letter=stats.unknown_letter,
+                                     clash=stats.clash, crowded=stats.crowded, doubtful=stats.doubtful,
+                                     lone_shapes=stats.lone_shapes, unresolved=unresolved)
         for issue in result.issues:
             if issue.code is IssueCode.NO_SHX_TEXT and issue.drawing_id == drawing.id:
                 issue.message += (f"; decoded from line work (--ocr): {stats.letters}/{stats.shapes} letters, "

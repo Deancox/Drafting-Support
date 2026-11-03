@@ -119,3 +119,30 @@ def test_register_summary_lists_sheets_to_check_harder(tmp_path, cfg):
     assert any(r[:6] == ("PLC", 2, 1, 0, 0, 1) for r in rows)
     sheet = next(r for r in rows if r[0] == "401103 sh 037")
     assert sheet[1] == "PLC" and sheet[2] == "Not read"
+
+
+UNREAD = [((505, 430, 567, 440), "LTLQ4")]  # Q is on no readable sheet: L, T and 4 are
+
+
+def test_unreadable_text_is_listed_not_used(tmp_path, cfg):
+    result = run(package(tmp_path, extra=UNREAD), cfg)
+    d = next(d for d in result.drawings if d.sheet == "037")
+    assert "LTL?4" in [u.text for u in d.decoded.unresolved]
+    assert all(c.subject_key != "LTL?4" and "?" not in c.subject_key for c in result.claims)
+    section = render_report(result, summarise(result)).split("### Unreadable text")[1]
+    assert "`LTL?4`" in section.split("##")[0]
+
+
+def test_register_lists_unreadable_text(tmp_path, cfg):
+    result = run(package(tmp_path, extra=UNREAD), cfg)
+    ws = build_register(result)["Unreadable Text"]
+    assert any(r[2] == "LTL?4" for r in ws.iter_rows(min_row=4, values_only=True))
+
+
+def test_report_counts_drops_by_reason(tmp_path, cfg):
+    result = run(package(tmp_path, extra=UNREAD), cfg)
+    d = next(d for d in result.drawings if d.sheet == "037")
+    assert d.decoded.unknown_letter >= 1
+    row = next(line for line in render_report(result, summarise(result)).splitlines()
+               if line.startswith("| 401103 sh 037") and line.count("|") == 9)
+    assert f"| {d.decoded.unknown_letter} | {d.decoded.clash} |" in row

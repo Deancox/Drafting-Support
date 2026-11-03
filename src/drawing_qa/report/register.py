@@ -340,6 +340,22 @@ def _coverage_sheet(wb: Workbook, result: RunResult) -> None:
     )
 
 
+def _unresolved_sheet(wb: Workbook, result: RunResult) -> None:
+    """Words on decoded sheets missing a letter or two: places for the checker to look, never used by a check."""
+    rows = [(d.label, u.grid, u.text) for d in result.drawings if d.decoded for u in d.decoded.unresolved]
+    if not rows:
+        return
+    ws = wb.create_sheet("Unreadable Text")
+    _title(ws, "Unreadable Text", "Words on sheets decoded from line work (--ocr) missing a letter or two, '?' for each. "
+           "Not used: nothing is found or cleared from them.")
+    _header(ws, 3, [("Sheet", 16, None), ("Grid", 8, None), ("Text", 30, None)])
+    for r, values in enumerate(rows, start=4):
+        for c, v in enumerate(values, start=1):
+            _cell(ws, r, c, v)
+    ws.freeze_panes = "A4"
+    ws.auto_filter.ref = f"A3:C{3 + len(rows)}"
+
+
 def _waiver_sheet(wb: Workbook, result: RunResult) -> None:
     ws = wb.create_sheet("Waivers")
     uses = result.review.waivers if result.review else []
@@ -442,6 +458,7 @@ def build_register(result: RunResult) -> Workbook:
         _gone_sheet(wb, result)
     _summary_sheet(wb, result, last, review)
     _coverage_sheet(wb, result)
+    _unresolved_sheet(wb, result)
     if review:
         _waiver_sheet(wb, result)
     _key_sheet(wb, result, review)

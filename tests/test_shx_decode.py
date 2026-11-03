@@ -262,3 +262,32 @@ def test_letter_learned_only_at_another_text_size_is_doubted_in_a_scaled_line(tm
     book = learned(tmp_path, [note("Xo", 100, 200), note("O", 100, 300)], lines)
     words, _ = decode_page(unreadable(tmp_path, stroke_text("XO", 300, 500, h=4.2)), book)
     assert texts(words) == []
+
+
+def test_dropped_words_counted_by_reason(tmp_path):
+    book = learned(tmp_path, [note("BHB-JB1 OK", 100, 200)])
+    crossing = [(301, 495, 301, 500, WIDTH)]  # line work over the first B of BHB-JB1
+    _, stats = decode_page(unreadable(tmp_path, stroke_text("BHB-JB1 OK", 300, 500) + crossing
+                                      + stroke_text("SOK", 300, 600)), book)  # never sees an S
+    assert stats.unknown_letter == 1 and stats.words_kept == 1  # SOK dropped, OK kept
+    assert stats.clash + stats.crowded >= 1  # BHB-JB1
+    assert stats.words_dropped == stats.unknown_letter + stats.clash + stats.crowded + stats.doubtful
+
+
+def test_lone_unrecognised_shape_is_not_a_dropped_word(tmp_path):
+    book = learned(tmp_path, [note("OK", 100, 200)])
+    _, stats = decode_page(unreadable(tmp_path, stroke_text("OK", 300, 500) + stroke_text("S", 600, 700)), book)
+    assert (stats.words_kept, stats.words_dropped, stats.lone_shapes) == (1, 0, 1)
+
+
+def test_word_missing_a_letter_is_unresolved_text_not_a_word(tmp_path):
+    book = learned(tmp_path, [note("MOULE", 100, 200)])  # never sees a D
+    words, stats = decode_page(unreadable(tmp_path, stroke_text("MODULE", 300, 500)), book)
+    assert texts(words) == []
+    assert [w.text for w in stats.unresolved] == ["MO?ULE"]
+
+
+def test_mostly_unread_word_is_not_unresolved_text(tmp_path):
+    book = learned(tmp_path, [note("A1", 100, 200)])
+    _, stats = decode_page(unreadable(tmp_path, stroke_text("A1XYZW", 300, 500)), book)
+    assert stats.unknown_letter == 1 and stats.unresolved == []
