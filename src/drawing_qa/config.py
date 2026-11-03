@@ -57,6 +57,10 @@ class IdentifierConfig(BaseModel):
     panel_types: list[str] = Field(default_factory=lambda: ["PLC"])
     # Device prefixes for equipment inside the panel (relays, breakers): not expected on cable block diagrams.
     panel_device_prefixes: list[str] = Field(default_factory=lambda: ["K", "Q"])
+    # Device type, as the end of the caption under its tag names it -> the prefix it must carry (TAG-010).
+    # {"SOLENOID": "Y"}: "... RELEASE SOLENOID SV3" must be Y-...; "SOLENOID DE-ENERGISED" (a switch) is not
+    # a solenoid. Empty: no check.
+    type_prefixes: dict[str, str] = Field(default_factory=dict)
     # FFI -> the drawing number whose sheets that FFI's tags and wires live on.
     # TN -> 401103: S-TN23N2 is drawn on 401103 sheet 023. Use "EXTERNAL" for an FFI from a
     # separate package that is not supplied (its references are listed, not checked).

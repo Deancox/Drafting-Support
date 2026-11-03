@@ -384,3 +384,38 @@ def test_tag_001_leaves_malformed_wires_to_wire_001(tmp_path, cfg):
     result = run_pipeline(tmp_path, cfg)
     assert [f.subject_key for f in by_rule(result, "WIRE-001")] == ["TN3D6"]
     assert by_rule(result, "TAG-001") == []
+
+
+def test_tag_009_device_drawn_twice_on_a_cbd(tmp_path, cfg):
+    add_sheet(tmp_path, "CBD", "022", [(cell_rect("L6"), "S-TN40M7"), (cell_rect("E9"), "S-TN40M7")], drawing_no="401310")
+    [f] = by_rule(run_pipeline(tmp_path, cfg), "TAG-009")
+    assert f.subject_key == "S-TN40M7" and "2 places" in f.message
+
+
+# --- TAG-010 -------------------------------------------------------------------
+
+
+def _captioned(x, y, tag, *lines):
+    """A tag label with its caption lines stacked under it, as drawn on a CBD."""
+    return [((x, y, x + 40, y + 6), tag)] + [((x, y + 8 * (i + 1), x + 70, y + 8 * (i + 1) + 6), ln) for i, ln in enumerate(lines)]
+
+
+def _solenoids(tmp_path):
+    items = (_captioned(500, 200, "S-TN40M7", "BOOM CONVEYOR", "HYDRAULIC PRESSURE", "RELEASE SOLENOID SV2")
+             + _captioned(500, 300, "S-TN62J4", "BRAKE RELEASED", "SOLENOID", "DE-ENERGISED")
+             + _captioned(500, 400, "Y-TN44N7", "BRAKE RELEASE", "SOLENOID SV1")
+             + _captioned(800, 200, "S-TNXXXX", "WEST BRAKE", "BRAKE RELEASE", "SOLENOID"))
+    add_sheet(tmp_path, "CBD", "022", items, drawing_no="401310")
+
+
+def test_tag_010_solenoid_with_another_prefix(tmp_path, cfg):
+    cfg.identifiers.type_prefixes = {"SOLENOID": "Y"}
+    _solenoids(tmp_path)
+    found = {f.subject_key: f for f in by_rule(run_pipeline(tmp_path, cfg), "TAG-010")}
+    assert set(found) == {"S-TN40M7", "S-TNXXXX"}  # not the switch (DE-ENERGISED), not the Y solenoid
+    assert found["S-TN40M7"].recommendation == "Re-tag as Y-TN40M7"
+
+
+def test_tag_010_quiet_without_type_prefixes(tmp_path, cfg):
+    _solenoids(tmp_path)
+    assert by_rule(run_pipeline(tmp_path, cfg), "TAG-010") == []

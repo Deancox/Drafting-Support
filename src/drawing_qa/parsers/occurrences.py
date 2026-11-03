@@ -32,6 +32,8 @@ _COIL_SEARCH_HEIGHT = 60.0  # points above a pointer to look for its coil's tag 
 _WORD = re.compile(r"^[A-Z]+$")
 _DASH_GAP = 3.0  # largest gap between the dashes of an outline, in points
 _OUTLINE_REACH = 200.0  # how far below its label a device outline may reach, in points
+# A device tag written alone on its line, as labels are (S-TL140M7, or a placeholder S-TLXXXX).
+_TAG_LABEL = re.compile(r"^(?P<prefix>[A-Z]{1,4})-[A-Z]{1,3}(?:\d|XX)[A-Z0-9]*$")  # not DE-ENERGISED
 
 
 class OccurrenceReader:
@@ -122,6 +124,7 @@ class OccurrenceReader:
                 )
         result.claims.extend(self._contact_pointers(page, drawing, ctx, common, result.claims))
         self._symbol_outlines(page, drawing, result.claims)
+        _captions(page, result.claims)
         return result
 
     def _symbol_outlines(self, page: PageContent, drawing: Drawing, claims) -> None:
@@ -201,3 +204,41 @@ def _outline_under(label: BBox, segments) -> BBox | None:
 
 def _side(sides: list[Run], x: float, top: float, tol: float = 2.0) -> Run | None:
     return next((r for r in sides if abs(r.pos - x) <= tol and abs(r.start - top) <= tol), None)
+
+
+def _captions(page: PageContent, claims) -> None:
+    """A device label's caption: the lines of the same text height stacked directly under it, as drawn
+    (S-TL140M7 / BOOM CONVEYOR / EAST BRAKE / HYDRAULIC PRESSURE / RELEASE SOLENOID), up to a gap, a line of
+    another size, or another tag. Recorded as value["caption"], lines joined by " / "; also on placeholder
+    tags (S-TLXXXX)."""
+    labels = [c for c in claims if (c.predicate is Predicate.OCCURS and c.subject_type is EntityType.DEVICE)
+              or (c.predicate is Predicate.PLACEHOLDER and _TAG_LABEL.match(c.source.raw_text or ""))]
+    if not labels:
+        return
+    lines = sorted(page.lines, key=lambda ln: ln.bbox[1])
+    for c in labels:
+        own = next((ln for ln in lines if len(ln.words) == 1 and tuple(ln.words[0].bbox) == tuple(c.source.bbox)), None)
+        if own is None or not _TAG_LABEL.match(own.text.strip()):
+            continue
+        # Note boxes (SHX) are taller than the line pitch and overlap; decoded words are boxed tight. The next
+        # line starts below the last one's top, within 1.8 heights of it and 0.8 heights of its bottom, and lines
+        # up with the label: left, right or centred. Marks of a symbol drawn beside it ('P', 'mA') are passed over.
+        height = own.bbox[3] - own.bbox[1]
+        lx0, lx1 = own.bbox[0], own.bbox[2]
+
+        def aligned(b) -> bool:
+            return abs(b[0] - lx0) <= height or abs(b[2] - lx1) <= height or abs((b[0] + b[2] - lx0 - lx1) / 2) <= height
+
+        block, last = [], own.bbox
+        while True:
+            nxt = min((ln for ln in lines
+                       if ln is not own and ln not in block and len(ln.text.strip()) > 2
+                       and 0 < ln.bbox[1] - last[1] <= 1.8 * height and ln.bbox[1] - last[3] <= 0.8 * height
+                       and aligned(ln.bbox) and abs((ln.bbox[3] - ln.bbox[1]) - height) <= 0.4 * height),
+                      key=lambda ln: ln.bbox[1], default=None)
+            if nxt is None or _TAG_LABEL.match(nxt.text.strip()):
+                break
+            block.append(nxt)
+            last = nxt.bbox
+        if block:
+            c.value["caption"] = " / ".join(ln.text.strip() for ln in block)

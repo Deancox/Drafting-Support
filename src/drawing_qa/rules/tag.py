@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 
@@ -400,8 +401,9 @@ class TagRepeatedOnSheet(Rule):
         category=Category.TAG,
         default_severity=Severity.MAJOR,
         description=(
-            "One device tag labels two or more places on the same schematic sheet, more than a cell apart: several "
-            "devices given one tag (S-T1363F4 on seven switches of 401104-136), typically copied and not renumbered. "
+            "One device tag labels two or more places on the same schematic or cable block diagram sheet, more than a "
+            "cell apart: several devices given one tag (S-T1363F4 on seven switches of 401104-136), or one device drawn "
+            "twice (S-TL140M7 at L6 and E9 of 401310-022), typically copied and not renumbered. "
             "Relay coils with a contact table, and panel devices (relays, breakers: their contacts carry the coil's "
             "tag), are left out."
         ),
@@ -414,7 +416,7 @@ class TagRepeatedOnSheet(Rule):
         on_sheet: dict[tuple[str, str], list[Claim]] = defaultdict(list)
         for c in ctx.claims_of(Predicate.OCCURS, EntityType.DEVICE):
             if (c.source.grid_cell and c.subject_key not in coils and c.value.get("prefix", "").upper() not in internal
-                    and ctx.sheet_of(c).doc_type is DocType.PLC):
+                    and ctx.sheet_of(c).doc_type in (DocType.PLC, DocType.CBD)):
                 on_sheet[(c.subject_key, c.source.drawing_id)].append(c)
         for (tag, sheet_id), claims in sorted(on_sheet.items()):
             places = _places(claims)
@@ -445,3 +447,58 @@ def _places(claims: list[Claim]) -> list[list[Claim]]:
         else:
             places.append([c])
     return places
+
+
+# A trailing identifier after the device type: SV3, 2, (A).
+_TRAILING_ID = re.compile(r"^(?:[A-Z]{1,3}\d+|\d+|\(.*\))$")
+
+
+def device_type(caption: str, types: Iterable[str]) -> str | None:
+    """The configured device type the caption ends with, longest first (SOLENOID VALVE before SOLENOID),
+    after dropping a trailing identifier (SV3)."""
+    words = caption.replace(" / ", " ").upper().split()
+    while words and _TRAILING_ID.match(words[-1]):
+        words.pop()
+    text = " ".join(words)
+    return next((t for t in sorted(types, key=len, reverse=True) if text == t or text.endswith(" " + t)), None)
+
+
+@rule
+class PrefixForDeviceType(Rule):
+    meta = RuleMeta(
+        rule_id="TAG-010",
+        title="Prefix For Device Type",
+        category=Category.TAG,
+        default_severity=Severity.MAJOR,
+        description=(
+            "A device whose caption names its type ('... RELEASE SOLENOID SV3') carries another prefix than "
+            "[identifiers] type_prefixes gives that type (solenoids are Y: S-TL140M7 on 401310-022). Placeholder "
+            "tags (S-TLXXXX) are checked too. A caption ending in a state ('SOLENOID DE-ENERGISED', a switch) does "
+            "not name a type. No output while type_prefixes is empty."
+        ),
+        requires=frozenset({Requirement.CLAIMS}),
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        types = {t.upper(): p.upper() for t, p in ctx.settings.identifiers.type_prefixes.items()}
+        if not types:
+            return
+        for c in ctx.claims:
+            caption = c.value.get("caption") if isinstance(c.value, dict) else None
+            if not caption or c.predicate not in (Predicate.OCCURS, Predicate.PLACEHOLDER):
+                continue
+            kind = device_type(caption, types)
+            prefix = (c.source.raw_text or "").split("-", 1)[0].upper()
+            if kind is None or not prefix or prefix == types[kind]:
+                continue
+            tag = c.source.raw_text
+            meant = f"{types[kind]}-{tag.split('-', 1)[1]}"
+            yield make(
+                subject_type="DEVICE",
+                subject_key=tag,
+                message=f"{tag} at {make.where(c.source)} is a {kind.lower()} ({caption.split(' / ')[-1]}) but has prefix "
+                        f"{prefix}: a {kind.lower()} is {types[kind]}",
+                evidence=[c],
+                discriminator=f"{c.source.drawing_id}:{c.source.grid_cell}",
+                recommendation=f"Re-tag as {meant}",
+            )

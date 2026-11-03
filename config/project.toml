@@ -72,6 +72,10 @@ panel_types = ["PLC"]
 # Device prefixes for equipment normally inside the panel (K relays, Q breakers). Still reported as missing
 # from the CBD when the schematic wires one out through a field JB (COMP-005).
 panel_device_prefixes = ["K", "Q"]
+# The prefix each device type must carry (TAG-010). The type is read from the end of the caption under the
+# tag, ignoring a trailing number such as SV3: "HYDRAULIC PRESSURE / RELEASE SOLENOID SV3" is a SOLENOID,
+# "BRAKE RELEASED / SOLENOID / DE-ENERGISED" (a switch) is not. Solenoids are Y (checker, 2026-11-04).
+type_prefixes = { "SOLENOID" = "Y", "SOLENOID VALVE" = "Y" }
 
 [pdf]
 # A page with fewer words than this, and at least one image, is treated as raster (needs OCR).
