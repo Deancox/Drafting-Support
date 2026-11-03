@@ -100,7 +100,7 @@ def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser:
             continue  # title block
         if m := _SAME_SHEET.match(text):
             cell = drawing.grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2)
-            if not _near(m["grid"], cell):
+            if cell is None or not _near(m["grid"], cell):
                 continue
             if not _beside_cell(m["grid"], cell) and _boxed(line.bbox, page.segments):
                 continue
@@ -110,10 +110,11 @@ def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser:
         else:
             continue
         value = {"ffi": ffi, "sheet": sheet, "grid": grid, "abbreviated": text, "is_variant": False}
-        if sheet == this_sheet and not _beside_cell(grid, drawing.grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2)):
+        here = drawing.grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2)
+        if sheet == this_sheet and here and not _beside_cell(grid, here):
             ends = _wire_ends(line.bbox, page.segments)
             if ends:
-                value["wire_ends"] = sorted({drawing.grid.cell_at(x, y) for x, y in ends})
+                value["wire_ends"] = sorted({c for x, y in ends if (c := drawing.grid.cell_at(x, y))})
         claims.append(
             ctx.claim(
                 parser=parser.doc_type,

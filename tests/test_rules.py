@@ -376,3 +376,11 @@ def test_tag_009_quiet_for_one_place_and_for_relays(tmp_path, cfg):
     add_sheet(tmp_path, "PLC", "136", [(cell_rect("F4"), "S-TN136F4"), (cell_rect("G4"), "S-TN136F4"),
                                        (cell_rect("D2"), "K-TN136D2"), (cell_rect("M2"), "K-TN136D2")])
     assert by_rule(run_pipeline(tmp_path, cfg), "TAG-009") == []
+
+
+def test_tag_001_leaves_malformed_wires_to_wire_001(tmp_path, cfg):
+    cfg.identifiers.ffi_drawings = {"TN": "401103"}
+    add_sheet(tmp_path, "PLC", "036", [(cell_rect("N6"), "TN3D6")])
+    result = run_pipeline(tmp_path, cfg)
+    assert [f.subject_key for f in by_rule(result, "WIRE-001")] == ["TN3D6"]
+    assert by_rule(result, "TAG-001") == []

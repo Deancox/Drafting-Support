@@ -31,17 +31,24 @@ def read_grid_frame(page: PageContent, config: GridConfig) -> GridFrame | None:
 
     rows: dict[int, list[tuple[float, str]]] = defaultdict(list)
     cols: dict[int, list[tuple[float, str]]] = defaultdict(list)
+    edges: tuple[list[float], list[float]] = ([], [])  # x of row letters down the left and the right edge
     for line in page.lines:
         text = line.text.strip()
         x0, y0, x1, y1 = line.bbox
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
         if _ROW.match(text) and x1 <= left:
             rows[round(cx / _ALIGN)].append((cy, text))
+            edges[0].append(cx)
+        elif _ROW.match(text) and x0 >= page.width - left:
+            edges[1].append(cx)
         elif _COL.match(text) and y1 <= top:
             cols[round(cy / _ALIGN)].append((cx, text))
 
     best_rows = _fill_gaps(_best_line(rows, key=lambda label: label), list(_ROW_ORDER))
-    best_cols = _fill_gaps(_best_line(cols, key=int), [str(i) for i in range(100)])
+    numbers = [str(i) for i in range(100)]
+    best_cols = _fill_gaps(_best_line(cols, key=int), numbers)
+    if all(edges):
+        best_cols = _extend(best_cols, numbers, sorted(edges[0])[len(edges[0]) // 2], sorted(edges[1])[len(edges[1]) // 2])
     if len(best_rows) < config.min_labels or len(best_cols) < config.min_labels:
         return None
     return GridFrame(rows=[(lbl, pos) for pos, lbl in best_rows], cols=[(lbl, pos) for pos, lbl in best_cols])
@@ -71,6 +78,21 @@ def _fill_gaps(run: list[tuple[float, str]], order: list[str]) -> list[tuple[flo
         if n > 1 and abs((pb - pa) / n - spacing) <= 0.15 * spacing:
             out += [(pa + (pb - pa) * k / n, order[order.index(la) + k]) for k in range(1, n)]
         out.append((pb, lb))
+    return out
+
+
+def _extend(run: list[tuple[float, str]], order: list[str], lo: float, hi: float) -> list[tuple[float, str]]:
+    """Put back labels missing past the outermost read ones (the end columns of a decoded sheet, in a size
+    not learned), at the usual spacing, while they stay inside the frame: between the row letters drawn
+    down its left (lo) and right (hi) edges."""
+    if len(run) < 3 or any(label not in order for _, label in run):
+        return run
+    spacing = sorted(b[0] - a[0] for a, b in zip(run, run[1:]))[(len(run) - 1) // 2]
+    out = list(run)
+    while (i := order.index(out[0][1])) > 0 and out[0][0] - spacing > lo + 0.25 * spacing:
+        out.insert(0, (out[0][0] - spacing, order[i - 1]))
+    while (i := order.index(out[-1][1])) < len(order) - 1 and out[-1][0] + spacing < hi - 0.25 * spacing:
+        out.append((out[-1][0] + spacing, order[i + 1]))
     return out
 
 

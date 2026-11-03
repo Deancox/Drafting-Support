@@ -35,7 +35,8 @@ def resolve_ffis(settings: Settings, drawings: list[Drawing], claims: list[Claim
         if (d.doc_type is DocType.PLC and d.ffi and d.duplicate_of is None and d.doc_type not in left_out
                 and d.title_block_method is ExtractionMethod.TEMPLATE):
             learned[d.ffi.upper()][d.drawing_no] += 1
-    present = {d.drawing_no for d in drawings if d.title_block_method is ExtractionMethod.TEMPLATE}
+    # A sheet decoded from its line work (--ocr) is in the package under its file name's drawing number.
+    present = {d.drawing_no for d in drawings if d.title_block_method is ExtractionMethod.TEMPLATE or d.decoded is not None}
     config = {k.upper(): v for k, v in settings.identifiers.ffi_drawings.items()}
     used: Counter = Counter(
         str(c.value["ffi"]).upper() for c in claims

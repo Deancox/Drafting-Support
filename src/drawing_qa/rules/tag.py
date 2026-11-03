@@ -47,6 +47,8 @@ class DeviceTagFormat(Rule):
         for c in ctx.claims:
             if c.predicate is not Predicate.OCCURS or c.value.get("format_valid", True):
                 continue
+            if c.subject_type is EntityType.WIRE:
+                continue  # WIRE-001
             expected = "<AREA>-JB<n>" if c.subject_type is EntityType.JUNCTION_BOX else "<Prefix>-<FFI><Sheet><Grid>, e.g. S-TN23N2"
             yield make(
                 subject_type=c.subject_type.value,

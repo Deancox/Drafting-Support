@@ -20,20 +20,33 @@ class InputFile(BaseModel):
     readable: bool = True
 
 
+def _band(bands: list[tuple[str, float]], at: float) -> str | None:
+    """The nearest band's label, or None more than 3/4 of a band's spacing past either end."""
+    label, centre = min(bands, key=lambda b: abs(b[1] - at))
+    if len(bands) >= 2:
+        steps = sorted(abs(b[1] - a[1]) for a, b in zip(bands, bands[1:]))
+        spacing = steps[len(steps) // 2]
+        lo, hi = min(b[1] for b in bands), max(b[1] for b in bands)
+        if at < lo - 0.75 * spacing or at > hi + 0.75 * spacing:
+            return None
+    return label
+
+
 class GridFrame(BaseModel):
     """The sheet's border zones: row letters down the side, column numbers across the top.
 
     Each label is stored with the centre of its band; a point belongs to the
-    nearest row band and the nearest column band.
+    nearest row band and the nearest column band. A point well past the outermost
+    band read (a label not read, or the title block below the frame) has no cell:
+    it is not given to the last band.
     """
 
     rows: list[tuple[str, float]]  # (label, centre y) in top-to-bottom order
     cols: list[tuple[str, float]]  # (label, centre x) in left-to-right order
 
-    def cell_at(self, x: float, y: float) -> str:
-        row = min(self.rows, key=lambda r: abs(r[1] - y))[0]
-        col = min(self.cols, key=lambda c: abs(c[1] - x))[0]
-        return f"{row}{col}"
+    def cell_at(self, x: float, y: float) -> str | None:
+        row, col = _band(self.rows, y), _band(self.cols, x)
+        return f"{row}{col}" if row and col else None
 
     @property
     def row_labels(self) -> list[str]:

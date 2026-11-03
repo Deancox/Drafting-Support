@@ -98,3 +98,29 @@ def test_grid_fills_a_missing_label(tmp_path, make_pdf):
     assert [c[0] for c in grid.cols] == [str(i) for i in range(10)]
     x0, y0, x1, y1 = cell_rect("S4")
     assert grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2 + 3) == "S4"
+
+
+def test_grid_puts_back_end_columns_inside_the_frame(tmp_path, make_pdf):
+    """Decoded sheets lose their end column numbers (0, 8, 9 in a size not learned): without them every
+    cell in columns 8-9 was put in column 7 (E-TL18Q9 'at Q7' on 401104-018)."""
+    items = [it for it in sheet_frame() if it[1] not in ("0", "8", "9")]
+    doc, page = _page(tmp_path, make_pdf, items)
+    grid = read_grid_frame(page, GridConfig())
+    doc.close()
+    assert [c[0] for c in grid.cols] == [str(i) for i in range(10)]
+    x0, y0, x1, y1 = cell_rect("Q9")
+    assert grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2) == "Q9"
+
+
+def test_point_past_the_grid_read_has_no_cell(tmp_path, make_pdf):
+    """Without the right-edge row letters the end columns cannot be put back: a point there gets no cell
+    rather than the last column read."""
+    items = [it for it in sheet_frame() if it[1] not in ("8", "9") and it[0][0] != 1145]
+    doc, page = _page(tmp_path, make_pdf, items)
+    grid = read_grid_frame(page, GridConfig())
+    doc.close()
+    assert grid.cols[-1][0] == "7"
+    x0, y0, x1, y1 = cell_rect("Q9")
+    assert grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2) is None
+    x0, y0, x1, y1 = cell_rect("Q7")
+    assert grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2) == "Q7"

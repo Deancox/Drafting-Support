@@ -102,3 +102,19 @@ def test_wire_numbers_are_not_matched(tmp_path, cfg):
     result = run_pipeline(tmp_path, cfg)
     assert by_rule(result, "TAG-008") == []
     assert "TV20T6" in next(f for f in by_rule(result, "DRW-009") if f.subject_key == "TV").message
+
+
+def test_decoded_sheets_count_as_their_drawing_being_supplied(cfg):
+    """--ocr sheets keep their file name's identity; their drawing is in the package all the same."""
+    from types import SimpleNamespace
+
+    from drawing_qa.ingest.ffi import resolve_ffis
+    from drawing_qa.model.enums import DocType, EntityType, PageKind, Predicate
+    from drawing_qa.model.source import DecodeInfo, Drawing
+
+    cfg.identifiers.ffi_drawings = {"TL": "401104"}
+    decoded = Drawing(id="d", file_path="401104-136.pdf", page_index=0, doc_type=DocType.PLC, drawing_no="401104",
+                      sheet="136", page_kind=PageKind.VECTOR, width=1191, height=842, decoded=DecodeInfo(letters=1, shapes=1, words_kept=1, words_dropped=0))
+    tag = SimpleNamespace(predicate=Predicate.OCCURS, subject_type=EntityType.DEVICE, value={"ffi": "TL"})
+    _, mapping, issues = resolve_ffis(cfg, [decoded], [tag])
+    assert issues == [] and mapping["TL"] == {"drawing": "401104", "source": "config"}

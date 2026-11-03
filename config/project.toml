@@ -32,6 +32,7 @@ areas = ["LTL", "RCL", "SPL", "EER1", "SH", "ES"]
 # list says otherwise (with a warning to update it). This list decides FFIs no supplied sheet shows.
 [project.ffi_drawings]
 TN = "401103"
+TL = "401104"     # FFI box on the 401104 schematics (shuttle / boom hoist)
 TV = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
 TH = "EXTERNAL"   # separate package, not supplied (confirmed by checker 2026-10-21)
 
