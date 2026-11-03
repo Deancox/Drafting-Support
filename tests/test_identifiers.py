@@ -86,7 +86,7 @@ def test_generic_location_needs_known_area():
     assert IdentifierGrammar(IdentifierConfig(areas=["LTL"])).parse("ABC-LCS3") is None
 
 
-@pytest.mark.parametrize("raw", ["H-TN51F", "S-TN5", "S-TN23N", "S-TN2N2"])
+@pytest.mark.parametrize("raw", ["H-TN51F", "S-TN5", "S-TN23N", "S-TN2N2", "S-T1363F4", "S-1L136F4"])
 def test_malformed_device_tags_are_kept_and_flagged(grammar, raw):
     parsed = grammar.parse(raw)
     assert parsed.kind is EntityType.DEVICE
@@ -129,3 +129,8 @@ def test_areas_learned_from_designations():
     g = IdentifierGrammar(IdentifierConfig(areas=["LTL"]), learned_areas={"BC"})
     assert g.parse("BC-LCS13").kind is EntityType.LOCATION  # a bare mention, once the package uses the area
     assert g.parse("BX-LCS13") is None
+
+
+@pytest.mark.parametrize("raw", ["IN-0", "CH-10", "AB-1756IB32", "B-T1", "K-T12"])
+def test_short_or_part_number_text_is_not_a_mistyped_tag(grammar, raw):
+    assert grammar.parse(raw) is None

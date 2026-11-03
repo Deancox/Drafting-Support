@@ -388,3 +388,58 @@ class SpellingVariant(Rule):
                     evidence=[c],
                     recommendation=f"Write as {c.subject_key}",
                 )
+
+
+@rule
+class TagRepeatedOnSheet(Rule):
+    meta = RuleMeta(
+        rule_id="TAG-009",
+        title="Tag Repeated On One Sheet",
+        category=Category.TAG,
+        default_severity=Severity.MAJOR,
+        description=(
+            "One device tag labels two or more places on the same schematic sheet, more than a cell apart: several "
+            "devices given one tag (S-T1363F4 on seven switches of 401104-136), typically copied and not renumbered. "
+            "Relay coils with a contact table, and panel devices (relays, breakers: their contacts carry the coil's "
+            "tag), are left out."
+        ),
+        requires=_NEEDS_GRID,
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        coils = {c.value["coil"] for c in ctx.claims_of(Predicate.CONTACT_REF) if c.value.get("coil")}
+        internal = {p.upper() for p in ctx.settings.identifiers.panel_device_prefixes}
+        on_sheet: dict[tuple[str, str], list[Claim]] = defaultdict(list)
+        for c in ctx.claims_of(Predicate.OCCURS, EntityType.DEVICE):
+            if (c.source.grid_cell and c.subject_key not in coils and c.value.get("prefix", "").upper() not in internal
+                    and ctx.sheet_of(c).doc_type is DocType.PLC):
+                on_sheet[(c.subject_key, c.source.drawing_id)].append(c)
+        for (tag, sheet_id), claims in sorted(on_sheet.items()):
+            places = _places(claims)
+            if len(places) < 2:
+                continue
+            cells = ", ".join(p[0].source.grid_cell for p in places)
+            yield make(
+                subject_type="DEVICE",
+                subject_key=tag,
+                message=f"{tag} labels {len(places)} places on {ctx.drawing[sheet_id].label}: grid {cells}",
+                evidence=[p[0] for p in places],
+                discriminator=ctx.drawing[sheet_id].label,
+                recommendation="Give each device its own tag for its grid position (copied without renumbering?)",
+            )
+
+
+def _places(claims: list[Claim]) -> list[list[Claim]]:
+    """Occurrences grouped into places: labels within a row and a column of one another are one place
+    (one label read as two words, or a label at a cell boundary)."""
+    places: list[list[Claim]] = []
+    for c in sorted(claims, key=lambda c: c.source.grid_cell):
+        for place in places:
+            if any((dr := row_offset(c.source.grid_cell, p.source.grid_cell)) is not None
+                   and (dc := col_offset(c.source.grid_cell, p.source.grid_cell)) is not None
+                   and abs(dr) <= 1 and abs(dc) <= 1 for p in place):
+                place.append(c)
+                break
+        else:
+            places.append([c])
+    return places

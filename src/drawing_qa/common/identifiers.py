@@ -76,6 +76,8 @@ class IdentifierGrammar:
         # Looks like a device tag but does not fit the format (e.g. H-TN51F, missing grid digit).
         # Kept as a DEVICE claim with format_valid=False so TAG-001 can report it.
         self._device_malformed = re.compile(rf"^(?P<prefix>{config.prefix})-(?P<ffi>{config.ffi})\d[A-Z0-9]*$")
+        # A digit for one of the FFI's letters, the rest a tag (S-T1363F4 for S-TL136F4): also TAG-001.
+        self._device_mistyped = re.compile(rf"^(?P<prefix>{config.prefix})-(?P<ffi>[A-Z]\d|\d[A-Z])\d+{config.grid}$")
         # A known FFI followed by a digit that does not fit <FFI><Sheet><Grid> (TN36D, TN3D6): WIRE-001.
         # Only for FFIs the package uses, so part numbers and words (THERMISTOR) are not caught.
         self._wire_ffis = self._ffis | {f.upper() for f in config.ffi_drawings}
@@ -172,6 +174,14 @@ class IdentifierGrammar:
                 {"ffi": m["ffi"], "sheet": m["sheet"], "grid": m["grid"]},
             )
         if (m := self._device_malformed.match(token)) and (not self._ffis or m["ffi"] in self._ffis):
+            return ParsedIdentifier(
+                EntityType.DEVICE,
+                token,
+                raw,
+                {"prefix": m["prefix"], "ffi": m["ffi"], "format_valid": False},
+            )
+        if (m := self._device_mistyped.match(token)) and (
+                not self._ffis or any(c in f for f in self._ffis for c in m["ffi"] if c.isalpha())):
             return ParsedIdentifier(
                 EntityType.DEVICE,
                 token,

@@ -354,3 +354,25 @@ def test_tag_005_quiet_when_the_home_sheet_is_decoded(tmp_path, cfg):
     assert not rule_ids(recheck(result, cfg, lambda d: d.sheet == "027"), "TAG-005")
     fresh = run_pipeline(tmp_path, cfg)
     assert rule_ids(recheck(fresh, cfg, lambda d: d.sheet == "028"), "TAG-005")  # a copy on a decoded sheet: still found
+
+
+# --- TAG-009 -------------------------------------------------------------------
+
+
+def test_tag_009_one_tag_on_several_devices_of_a_sheet(tmp_path, cfg):
+    add_sheet(tmp_path, "PLC", "136", [(cell_rect(g), "S-TN136F4") for g in ("F4", "H4", "L4")])
+    [f] = by_rule(run_pipeline(tmp_path, cfg), "TAG-009")
+    assert f.subject_key == "S-TN136F4" and "3 places" in f.message
+
+
+def test_tag_009_mistyped_tag_repeated_is_caught_too(tmp_path, cfg):
+    add_sheet(tmp_path, "PLC", "136", [(cell_rect(g), "S-T1363F4") for g in ("F4", "H4")])
+    result = run_pipeline(tmp_path, cfg)
+    assert [f.subject_key for f in by_rule(result, "TAG-009")] == ["S-T1363F4"]
+    assert "S-T1363F4" in {f.subject_key for f in by_rule(result, "TAG-001")}
+
+
+def test_tag_009_quiet_for_one_place_and_for_relays(tmp_path, cfg):
+    add_sheet(tmp_path, "PLC", "136", [(cell_rect("F4"), "S-TN136F4"), (cell_rect("G4"), "S-TN136F4"),
+                                       (cell_rect("D2"), "K-TN136D2"), (cell_rect("M2"), "K-TN136D2")])
+    assert by_rule(run_pipeline(tmp_path, cfg), "TAG-009") == []
