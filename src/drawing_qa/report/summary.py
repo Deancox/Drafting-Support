@@ -22,10 +22,11 @@ class DocTypeSummary(BaseModel):
     placeholders: int = 0
 
 
-READ, DECODED, PARTIAL, NOT_READ = "Read", "Decoded", "Partially decoded", "Not read"
-READABILITY = [READ, DECODED, PARTIAL, NOT_READ]
+READ, READ_DWG, DECODED, PARTIAL, NOT_READ = "Read", "Read from DWG", "Decoded", "Partially decoded", "Not read"
+READABILITY = [READ, READ_DWG, DECODED, PARTIAL, NOT_READ]
 # Issues that leave a sheet unread, most telling first: its detail in the readability list.
-_NOT_READ = [IssueCode.PARSER_ERROR, IssueCode.SHX_NOT_DECODED, IssueCode.NO_SHX_TEXT, IssueCode.NEEDS_OCR, IssueCode.EMPTY_PAGE]
+_NOT_READ = [IssueCode.PARSER_ERROR, IssueCode.SHX_NOT_DECODED, IssueCode.DWG_NOT_USED, IssueCode.NO_SHX_TEXT,
+             IssueCode.NEEDS_OCR, IssueCode.EMPTY_PAGE]
 
 
 class SheetReadability(BaseModel):
@@ -97,7 +98,11 @@ def sheet_readability(result: RunResult) -> list[SheetReadability]:
     out = []
     for d in result.drawings:
         own = issues.get(d.id, {})
-        if d.decoded is not None and IssueCode.PARSER_ERROR not in own:
+        if d.text_source and IssueCode.PARSER_ERROR not in own:
+            status = READ_DWG
+            detail = "; ".join(x for x in (f"text read from {d.text_source}", own.get(IssueCode.DWG_NEWER, ""),
+                                           own.get(IssueCode.NO_GRID, "")) if x)
+        elif d.decoded is not None and IssueCode.PARSER_ERROR not in own:
             k = d.decoded
             status = DECODED if k.words_dropped == 0 and k.lone_shapes == 0 else PARTIAL
             detail = (f"decoded from line work (--ocr): {k.letters}/{k.shapes} letters, {k.words_kept} words used, "

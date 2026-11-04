@@ -187,6 +187,23 @@ class OcrConfig(BaseModel):
     patience: int = 3
 
 
+class DwgConfig(BaseModel):
+    """Reading the text of a sheet plotted without SHX notes from its own DWG, put beside the PDF with the same
+    name (401104-052.pdf + 401104-052.dwg). Needs the free ODA File Converter (opendesign.com)."""
+
+    enabled: bool = True
+    # ODAFileConverter.exe. Empty: the ODA_FILE_CONVERTER variable, PATH, Program Files\ODA or ~/Tools.
+    converter: str = ""
+    # Width of one letter as a fraction of the text height (SHX isocp / romans: about 0.72).
+    char_width: float = 0.72
+    # Share of the DWG's straight lines that must land on the PDF's for the DWG to be used.
+    min_line_match: float = 0.9
+    # Share of the DWG's texts that may have no ink under them on the PDF before the DWG is refused.
+    max_unplaced: float = 0.1
+    # A DWG saved more than this many hours after the PDF was plotted is used, but reported (DWG_NEWER).
+    newer_hours: float = 1.0
+
+
 class ReviewConfig(BaseModel):
     """Recording decisions in the register (Decision / comment columns, carried forward between runs
     in qa_review.sqlite, waivers, No Longer Raised). Off: the register is for printing and marking up
@@ -224,6 +241,7 @@ class Settings(BaseModel):
     cbd: CbdConfig = Field(default_factory=CbdConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
     ocr: OcrConfig = Field(default_factory=OcrConfig)
+    dwg: DwgConfig = Field(default_factory=DwgConfig)
     rules: dict[str, RuleSetting] = Field(default_factory=dict)  # from rules.toml beside the project config
     waivers: list[Waiver] = Field(default_factory=list)  # from waivers.toml beside the project config
     config_hash: str = ""

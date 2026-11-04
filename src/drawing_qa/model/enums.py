@@ -22,6 +22,7 @@ class ExtractionMethod(StrEnum):
     TEXT_LAYER = "TEXT_LAYER"
     SHX_ANNOTATION = "SHX_ANNOTATION"
     SHX_STROKES = "SHX_STROKES"  # decoded from the letter strokes of a sheet plotted without SHX notes
+    DWG_TEXT = "DWG_TEXT"  # read from the sheet's own DWG (beside the PDF), placed on the page by its line work
     TEMPLATE = "TEMPLATE"
     VECTOR = "VECTOR"
     OCR = "OCR"
@@ -86,6 +87,8 @@ class IssueCode(StrEnum):
     NO_SHX_TEXT = "NO_SHX_TEXT"  # drawn sheet whose text cannot be read: re-plot with PDFSHX=1
     SHX_NOT_DECODED = "SHX_NOT_DECODED"  # --ocr could not decode the sheet: nothing to learn from, or font not seen
     DECODED_TITLE_MISMATCH = "DECODED_TITLE_MISMATCH"  # decoded title block disagrees with the file name
+    DWG_NOT_USED = "DWG_NOT_USED"  # a DWG beside a sheet without SHX text could not be used (see the message)
+    DWG_NEWER = "DWG_NEWER"  # text read from a DWG saved after the PDF was plotted: it may differ from the PDF
     PANEL_MAPPING = "PANEL_MAPPING"  # a rack's assumed panel (<rack>-PLC) is shown on no drawing
     FFI_MAPPING = "FFI_MAPPING"  # the FFI -> drawing mapping disagrees with the sheets, or points outside the package
     PARSER_ERROR = "PARSER_ERROR"

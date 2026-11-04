@@ -81,6 +81,7 @@ class PageContent:
     words: list[Word]
     image_count: int = 0
     shx_word_count: int = 0  # words from AutoCAD SHX text notes
+    dwg_word_count: int = 0  # words read from the sheet's DWG (drawing_qa.dwg)
     drawn: bool = False  # substantial line work on the page
     _segment_loader: Callable[[], list[Segment]] | None = field(default=None, repr=False)
 
@@ -139,24 +140,30 @@ def _load_segments(page: pymupdf.Page) -> list[Segment]:
     return segments
 
 
-def _split_annotation(text: str, rect: pymupdf.Rect, block: int) -> list[Word]:
-    """Split one SHX annotation into words, giving each word a share of the box.
+def split_annotation(text: str, rect, block: int, method: ExtractionMethod = ExtractionMethod.SHX_ANNOTATION,
+                     vertical: bool | None = None) -> list[Word]:
+    """Split one string with a box (an SHX annotation, a DWG text) into words, giving each word a share of the box.
 
-    The annotation box covers the whole string. Word boxes are estimated by
-    character position along the longer side (vertical text runs bottom to top).
+    The box covers the whole string. Word boxes are estimated by character position along the
+    text's direction: the longer side unless `vertical` says (vertical text runs bottom to top).
     """
+    x0, y0, x1, y1 = (rect.x0, rect.y0, rect.x1, rect.y1) if hasattr(rect, "x0") else rect
+    width, height = x1 - x0, y1 - y0
     tokens = [(m.start(), m.end(), m.group()) for m in re.finditer(r"\S+", text)]
     n = max(len(text), 1)
-    horizontal = rect.width >= rect.height or len(tokens) <= 1
+    horizontal = (width >= height if vertical is None else not vertical) or len(tokens) <= 1
     words = []
     for start, end, token in tokens:
         a, b = start / n, end / n
         if horizontal:
-            bbox = (rect.x0 + a * rect.width, rect.y0, rect.x0 + b * rect.width, rect.y1)
+            bbox = (x0 + a * width, y0, x0 + b * width, y1)
         else:
-            bbox = (rect.x0, rect.y1 - b * rect.height, rect.x1, rect.y1 - a * rect.height)
-        words.append(Word(text=token, bbox=bbox, block=block, line=0, method=ExtractionMethod.SHX_ANNOTATION))
+            bbox = (x0, y1 - b * height, x1, y1 - a * height)
+        words.append(Word(text=token, bbox=bbox, block=block, line=0, method=method))
     return words
+
+
+_split_annotation = split_annotation
 
 
 def _shx_words(page: pymupdf.Page, titles: Sequence[str]) -> list[Word]:

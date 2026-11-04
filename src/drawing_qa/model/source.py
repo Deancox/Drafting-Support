@@ -93,6 +93,7 @@ class Drawing(BaseModel):
     ffi: str | None = None  # from the sheet's "WIRE NUMBER / FIRST FIELD IDENTIFIER" box, e.g. TN
     text_unreadable: bool = False  # drawn, but no readable text (NO_SHX_TEXT): in the package, nothing on it checked
     decoded: DecodeInfo | None = None  # read by decoding its letter strokes (--ocr): checked, but never fully read
+    text_source: str | None = None  # the DWG its text was read from (a PDF plotted without SHX notes); fully read
     title_doc_type: DocType | None = None  # document type implied by the descriptor
     title_block_method: ExtractionMethod = ExtractionMethod.FILENAME
     missing_title_fields: list[str] = Field(default_factory=list)

@@ -108,7 +108,7 @@ def test_summary_breaks_down_sheet_readability(tmp_path, cfg):
     result = run(package(tmp_path), cfg, ocr=False)
     summary = render_report(result, summarise(result)).split("## Findings by rule")[0]
     assert "### Sheets read" in summary
-    assert "| PLC | 2 | 1 | 0 | 0 | 1 |" in summary  # sheets, read, decoded, partially decoded, not read
+    assert "| PLC | 2 | 1 | 0 | 0 | 0 | 1 |" in summary  # sheets, read, read from DWG, decoded, partially decoded, not read
     row = next(line for line in summary.splitlines() if line.startswith("| 401103 sh 037"))
     assert "Not read" in row
 
@@ -116,7 +116,7 @@ def test_summary_breaks_down_sheet_readability(tmp_path, cfg):
 def test_register_summary_lists_sheets_to_check_harder(tmp_path, cfg):
     result = run(package(tmp_path), cfg, ocr=False)
     rows = list(build_register(result)["Summary"].iter_rows(values_only=True))
-    assert any(r[:6] == ("PLC", 2, 1, 0, 0, 1) for r in rows)
+    assert any(r[:7] == ("PLC", 2, 1, 0, 0, 0, 1) for r in rows)
     sheet = next(r for r in rows if r[0] == "401103 sh 037")
     assert sheet[1] == "PLC" and sheet[2] == "Not read"
 

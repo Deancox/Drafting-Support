@@ -7,6 +7,7 @@ report states plainly what was and was not checked.
 from __future__ import annotations
 
 import logging
+import tempfile
 import uuid
 from collections import Counter
 from datetime import UTC, datetime
@@ -14,6 +15,8 @@ from pathlib import Path
 
 from drawing_qa import __version__
 from drawing_qa.config import Settings
+from drawing_qa.dwg.convert import convert, find_converter
+from drawing_qa.dwg.text import DwgSheet, dwg_saved, pdf_created, place, read_dxf
 from drawing_qa.ingest.discovery import discover
 from drawing_qa.ingest.ffi import describe, resolve_ffis
 from drawing_qa.graph import build_graph
@@ -158,6 +161,8 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
     decode = settings.ocr.enabled
     pending: list[tuple] = []
     readable: list[tuple[Path, int]] = []
+    # Sheets plotted without SHX notes whose DWG sits beside them: their text is read from the DWG.
+    dwg_sheets = _read_dwgs(files, settings, result)
 
     for found in files:
         record = found.record
@@ -170,7 +175,14 @@ def _parse(files, settings: Settings, ocr: OcrEngine | None, result: RunResult) 
                 record.page_count = doc.page_count
                 for page in doc:
                     content = extract_page(page, min_words, ocr, settings.pdf.shx_annotation_titles, settings.pdf.min_drawing_bytes)
+                    dwg_used, dwg_issues = None, []
+                    if found.path in dwg_sheets:
+                        content, dwg_used, dwg_issues = _with_dwg_text(content, dwg_sheets[found.path], doc.metadata, settings)
                     drawing = drawing_for_page(record.path, record.doc_type, content, doc.page_count, settings)
+                    drawing.text_source = dwg_used
+                    for issue in dwg_issues:
+                        issue.file_path, issue.drawing_id = record.path, drawing.id
+                        result.issues.append(issue)
                     drawing.ffi = sheet_ffi(content)
                     result.drawings.append(drawing)
                     unreadable = _unreadable_text(content, drawing)
@@ -256,6 +268,92 @@ def _parse_page(parser, content: PageContent, drawing: Drawing, ctx: ParseContex
         return
     result.claims.extend(parsed.claims)
     result.issues.extend(parsed.issues)
+
+
+def _dwg_beside(pdf: Path) -> Path | None:
+    for suffix in (".dwg", ".DWG"):
+        if (dwg := pdf.with_suffix(suffix)).is_file():
+            return dwg
+    return None
+
+
+def _needs_text(pdf: Path, settings: Settings) -> bool:
+    """A one-sheet PDF with no SHX text notes and (almost) no text layer: plotted with PDFSHX = 0."""
+    wanted = {t.lower() for t in settings.pdf.shx_annotation_titles}
+    with open_pdf(pdf) as doc:
+        if doc.page_count != 1:
+            return False  # a DWG is one sheet: which page it belongs to is not known
+        page = doc[0]
+        if any((a.info or {}).get("title", "").lower() in wanted for a in page.annots() or []):
+            return False
+        return len(page.get_text("words")) < settings.pdf.min_words_for_vector
+
+
+def _read_dwgs(files, settings: Settings, result: RunResult) -> dict[Path, DwgSheet | str]:
+    """Text of the sheets plotted without SHX notes that have their DWG beside them: {pdf: sheet, or why not}."""
+    if not settings.dwg.enabled:
+        return {}
+    wanted: dict[Path, Path] = {}
+    for found in files:
+        if found.record.doc_type is DocType.EQUIP or not (dwg := _dwg_beside(found.path)):
+            continue
+        try:
+            if _needs_text(found.path, settings):
+                wanted[found.path] = dwg
+        except Exception:  # an unreadable PDF is reported by the parse itself
+            continue
+    if not wanted:
+        return {}
+    converter = find_converter(settings.dwg.converter)
+    if converter is None:
+        return {pdf: (f"{dwg.name} not read: the ODA File Converter was not found (install it from opendesign.com, "
+                      f"or set [dwg] converter in the config)") for pdf, dwg in wanted.items()}
+    out: dict[Path, DwgSheet | str] = {}
+    with tempfile.TemporaryDirectory(prefix="dxf_") as tmp:
+        dxfs = convert(list(wanted.values()), converter, Path(tmp))
+        for pdf, dwg in wanted.items():
+            if dwg not in dxfs:
+                out[pdf] = f"{dwg.name} not read: the ODA File Converter could not convert it"
+                continue
+            try:
+                sheet = read_dxf(dxfs[dwg], settings.dwg.char_width)
+                sheet.name, sheet.saved = dwg.name, dwg_saved(dwg)
+                out[pdf] = sheet
+            except Exception as exc:
+                out[pdf] = f"{dwg.name} not read: {type(exc).__name__}: {exc}"
+    used = sum(isinstance(v, DwgSheet) for v in out.values())
+    result.stages.append(StageResult(name="dwg", status=StageStatus.DONE,
+                                     note=f"{used} of {len(wanted)} sheet(s) without SHX text read from their DWG ({converter.name})"))
+    return out
+
+
+def _with_dwg_text(content: PageContent, sheet: DwgSheet | str, metadata, settings: Settings):
+    """The page with its DWG's text placed on it, the DWG's name when used, and any issues to report."""
+    if isinstance(sheet, str):
+        return content, None, [Issue(code=IssueCode.DWG_NOT_USED, message=sheet)]
+    cfg = settings.dwg
+    placed = place(sheet, content.segments, cfg.min_line_match)
+    if placed.reason:
+        return content, None, [Issue(code=IssueCode.DWG_NOT_USED, message=f"{sheet.name} not used: {placed.reason}")]
+    if not placed.texts:
+        return content, None, [Issue(code=IssueCode.DWG_NOT_USED, message=f"{sheet.name} not used: it has no text")]
+    if len(placed.unplaced) > cfg.max_unplaced * placed.texts:
+        sample = ", ".join(sorted(set(placed.unplaced))[:5])
+        return content, None, [Issue(code=IssueCode.DWG_NOT_USED, message=(
+            f"{sheet.name} not used: {len(placed.unplaced)} of its {placed.texts} texts are not drawn on the PDF "
+            f"(e.g. {sample}): it may not be the DWG this PDF was plotted from"))]
+    issues = []
+    plotted = pdf_created(metadata)
+    if sheet.saved and plotted and (sheet.saved - plotted).total_seconds() > cfg.newer_hours * 3600:
+        issues.append(Issue(code=IssueCode.DWG_NEWER, message=(
+            f"Text read from {sheet.name}, saved {sheet.saved.astimezone():%d.%m.%Y %H:%M}, after this PDF was plotted "
+            f"({plotted.astimezone():%d.%m.%Y %H:%M}): the DWG may have changed since; check findings on this sheet "
+            f"against the PDF")))
+    merged = PageContent(page_index=content.page_index, width=content.width, height=content.height, kind=PageKind.VECTOR,
+                         words=list(content.words) + placed.words, image_count=content.image_count,
+                         shx_word_count=content.shx_word_count, dwg_word_count=len(placed.words), drawn=content.drawn,
+                         _segment_loader=lambda segments=content.segments: segments)
+    return merged, sheet.name, issues
 
 
 def _overlaps(a, b) -> bool:
@@ -345,7 +443,8 @@ def _unreadable_text(content, drawing: Drawing) -> str:
     """
     if content.kind is PageKind.NO_TEXT:
         return "no text at all"
-    if content.drawn and content.shx_word_count == 0 and drawing.title_block_method is not ExtractionMethod.TEMPLATE:
+    if (content.drawn and content.shx_word_count == 0 and content.dwg_word_count == 0
+            and drawing.title_block_method is not ExtractionMethod.TEMPLATE):
         return f"only {len(content.words)} word(s) and no title block"
     return ""
 

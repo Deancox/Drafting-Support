@@ -5,4 +5,6 @@
 #   pydantic   settings and data records
 #   networkx   the engineering graph and signal traces
 #   openpyxl   writes QA_Register.xlsx
+#   ezdxf      reads a sheet's DWG (as DXF) when its PDF has no SHX text; the DWG -> DXF step needs
+#              the free ODA File Converter (opendesign.com), installed separately
 -e .[dev]

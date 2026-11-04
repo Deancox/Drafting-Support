@@ -39,7 +39,7 @@ All four inputs are reviewed by default. To leave one out (for example terminati
 ```
 `--exclude` takes `plc`, `cbd`, `term` or `equip` (or a folder name), repeated or comma-separated. A left-out type is still listed, but nothing is checked against it.
 
-Sheets plotted without SHX text notes (`PDFSHX = 0`, reported as `NO_SHX_TEXT`) have nothing to read. Re-plotting them with `PDFSHX = 1` is the fix; when that is not possible, add `--ocr`:
+Sheets plotted without SHX text notes (`PDFSHX = 0`, reported as `NO_SHX_TEXT`) have nothing to read. Re-plotting them with `PDFSHX = 1` is the fix. Next best is the sheet's DWG: put it beside the PDF with the same name (`PLC/401104-052.pdf` + `PLC/401104-052.dwg`) and its text is read from the DWG, exactly (it needs the free [ODA File Converter](https://www.opendesign.com/guestfiles/oda_file_converter); set its path under `[dwg]` in `config/project.toml`). The DWG is used only if its line work lines up with the PDF's and its text sits on the PDF's letters; otherwise the sheet is reported `DWG_NOT_USED`, and a DWG saved after the PDF was plotted is used but reported `DWG_NEWER`. Such sheets show as "Read from DWG" and are checked like readable ones. When neither is possible, add `--ocr`:
 ```bash
 .venv/Scripts/python -m drawing_qa run --input input/Main --ocr
 ```
@@ -72,6 +72,7 @@ src/drawing_qa/
   config.py             settings from config/project.toml
   ingest/               folder discovery and document typing
   pdf/                  page extraction (text layer, AutoCAD SHX annotations, OCR hook)
+  dwg/                  text from a sheet's DWG (ODA File Converter -> DXF -> ezdxf), placed on the PDF page
   common/               identifier grammar, placeholder detection
   parsers/              PLC (rack layout, slot sheets, wires) / CBD (routing from drawn lines) / TERM parsers
   model/                enums, source, claims, findings, run records

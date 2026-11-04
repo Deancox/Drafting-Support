@@ -88,6 +88,11 @@ def discover(root: Path, settings: Settings) -> DiscoveryResult:
             if not path.is_file() or _is_hidden(path):
                 continue
             rel = path.relative_to(root).as_posix()
+            if path.suffix.lower() == ".dwg" and accepted is _PDF_ONLY:
+                if not any(path.with_suffix(ext).is_file() for ext in (".pdf", ".PDF")):
+                    result.issues.append(Issue(code=IssueCode.IGNORED_FILE, file_path=rel,
+                                               message="DWG with no PDF of the same name: a DWG is only read for the text of its PDF"))
+                continue  # read with its PDF when the PDF has no SHX text (drawing_qa.dwg)
             if path.suffix.lower() not in accepted:
                 what = "Not a PDF" if accepted is _PDF_ONLY else f"Not one of {', '.join(sorted(accepted))}"
                 result.issues.append(Issue(code=IssueCode.IGNORED_FILE, message=what, file_path=rel))
