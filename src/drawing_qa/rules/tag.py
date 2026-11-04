@@ -119,6 +119,40 @@ class SheetValidation(Rule):
             )
 
 
+@rule
+class NotConfirmedOnDecodedSheet(Rule):
+    meta = RuleMeta(
+        rule_id="TAG-011",
+        title="Not Confirmed on Decoded Sheet",
+        category=Category.TAG,
+        default_severity=Severity.INFO,  # unconfirmed, not an error: many are labels that did not decode
+        description="A device tag is referenced, but its home sheet was decoded from its strokes (--ocr) and the tag was "
+                    "not read there. Either the tag is missing or wrong on one of the sheets, or its label did not decode: "
+                    "for the checker to look at. TAG-003 makes the same check on readable sheets.",
+        requires=_NEEDS_GRID,
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        all_devices = device_claims(ctx)
+        for tag, claims in sorted(all_devices.items()):
+            homes = home_sheets(ctx, claims[0].value["ffi"], int(claims[0].value["sheet"]))
+            home_ids = {d.id for d in homes}
+            if not homes or not home_ids & ctx.decoded_ids or any(c.source.drawing_id in home_ids for c in claims):
+                continue
+            near = _near_matches(tag, claims[0], all_devices, home_ids)
+            refs = sorted({make.where(c.source).split(" grid")[0] for c in claims})
+            hint = f"; sheet {homes[0].sheet} has {', '.join(near)}" if near else ""
+            yield make(
+                subject_type="DEVICE",
+                subject_key=tag,
+                message=f"{tag} is referenced on {', '.join(refs)} but was not read on its home sheet {homes[0].label}, "
+                        f"which was decoded from its line work: check the tag is drawn there{hint}",
+                evidence=claims,
+                recommendation=f"Compare with the home sheet; did you mean {near[0]}?" if near
+                else "Compare the tag with its home sheet",
+            )
+
+
 def _near_matches(tag: str, claim: Claim, devices: dict[str, list[Claim]], home_ids: set[str]) -> list[str]:
     """Tags on the home sheet with the same prefix, FFI and sheet whose grid is close."""
     v = claim.value

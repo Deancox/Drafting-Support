@@ -419,3 +419,21 @@ def test_tag_010_solenoid_with_another_prefix(tmp_path, cfg):
 def test_tag_010_quiet_without_type_prefixes(tmp_path, cfg):
     _solenoids(tmp_path)
     assert by_rule(run_pipeline(tmp_path, cfg), "TAG-010") == []
+
+
+# --- TAG-011 -------------------------------------------------------------------
+
+
+def test_tag_011_lists_a_tag_not_read_on_its_decoded_home_sheet(tmp_path, cfg):
+    """Like the cow catchers on CBD 401310-023: S-TL52T4 there, S-TL52T3 on 401104-052, which was decoded."""
+    from tests.test_shx_rules import recheck, rule_ids
+
+    add_sheet(tmp_path, "PLC", "052", [(cell_rect("T3"), "S-TN52T3")])
+    add_sheet(tmp_path, "CBD", "023", [(cell_rect("A0"), "S-TN52T4"), (cell_rect("C0"), "S-TN52T3")], drawing_no="401310")
+    result = run_pipeline(tmp_path, cfg)
+    assert [f.subject_key for f in by_rule(result, "TAG-003")] == ["S-TN52T4"]  # readable: TAG-003, not TAG-011
+    assert by_rule(result, "TAG-011") == []
+    decoded = recheck(result, cfg, lambda d: d.sheet == "052")
+    [f] = rule_ids(decoded, "TAG-011")
+    assert f.subject_key == "S-TN52T4" and not rule_ids(decoded, "TAG-003")
+    assert "S-TN52T3" in f.message  # the tag that did decode on 052 is offered
