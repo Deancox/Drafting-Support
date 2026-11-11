@@ -61,6 +61,10 @@ class IdentifierConfig(BaseModel):
     # {"SOLENOID": "Y"}: "... RELEASE SOLENOID SV3" must be Y-...; "SOLENOID DE-ENERGISED" (a switch) is not
     # a solenoid. Empty: no check.
     type_prefixes: dict[str, str] = Field(default_factory=dict)
+    # Device prefix -> the I/O direction its signal must have (DEV-004): "IN" (DI / AI / safety inputs) or
+    # "OUT" (DO / AO / safety outputs). {"S": "IN", "H": "OUT"}: a switch on a DO slot is reported for review.
+    # Prefixes used both ways (relays K) are left out. Empty: no check.
+    io_direction: dict[str, str] = Field(default_factory=dict)
     # FFI -> the drawing number whose sheets that FFI's tags and wires live on.
     # TN -> 401103: S-TN23N2 is drawn on 401103 sheet 023. Use "EXTERNAL" for an FFI from a
     # separate package that is not supplied (its references are listed, not checked).

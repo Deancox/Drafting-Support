@@ -9,7 +9,7 @@ from drawing_qa.rules.base import Rule
 _RULES: dict[str, type[Rule]] = {}
 
 # Category modules, imported for their @rule side effects.
-_MODULES = ("tag", "wire", "plc", "path", "term", "dev", "comp", "placeholder", "drw")
+_MODULES = ("tag", "wire", "plc", "path", "cable", "term", "dev", "comp", "placeholder", "drw")
 
 
 def rule(cls: type[Rule]) -> type[Rule]:

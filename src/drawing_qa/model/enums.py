@@ -41,6 +41,7 @@ class EntityType(StrEnum):
     PLC_MODULE = "PLC_MODULE"
     PLC_CHANNEL = "PLC_CHANNEL"
     ROUTE = "ROUTE"
+    CABLE = "CABLE"  # a cable by its number (C93812): termination drawings and cable block diagrams
     DRAWING = "DRAWING"
     TEXT = "TEXT"
 

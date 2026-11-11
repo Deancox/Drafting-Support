@@ -22,6 +22,11 @@ _NON_WIRE = {"SCR", "SPARE", "E", "PE"}
 SLOT_RE = re.compile(r"\b(?P<io>S?D[IO]|S?A[IO])\s+SLOT\s+0*(?P<slot>\d+)\b")
 CABLE_SPEC_RE = re.compile(r"^(?P<cores>\d+)C(?:\+E)?\b")
 SPARES_RE = re.compile(r"^(?P<n>\d+)\s+SPARES?$")
+# A cable's label stack on a termination sheet: spec over number over spare count
+#   "50C+E 1.5mm2 PVC" / "C93812" / "12 SPARE"   or   "INST 4PR 0.5mm2 IND SCR" / "C93815" / "2PR SPARE".
+CABLE_NO_RE = re.compile(r"^[CP][0-9X]{5,6}$")
+LABEL_SPEC_RE = re.compile(r"^(?:\d+\s*C(?:\+E)?\b|INST\b|CAT\s*\d|\d+\s*T?PR\b)(?!.*\b(?:SPARES?|COUPLER)\b)", re.I)
+LABEL_SPARES_RE = re.compile(r"^(?P<n>\d+)\s*(?P<unit>T?PR)?\s*SPARES?$", re.I)
 BRACKET_MAX_WIDTH = 0.5  # pt; brackets are drawn thin (0.36 pt on the client's sheets)
 
 
@@ -117,3 +122,33 @@ def designation(grammar: IdentifierGrammar, line: TextLine) -> ParsedIdentifier 
         if parsed is not None and parsed.kind in (EntityType.JUNCTION_BOX, EntityType.LOCATION, EntityType.PANEL):
             return parsed
     return None
+
+
+def cable_labels(page: PageContent) -> list[dict]:
+    """Every cable number on the sheet with the spec written just above it and the spare count just below."""
+    lines = page.lines
+    out = []
+    for ln in lines:
+        number = ln.text.strip().upper()
+        if not CABLE_NO_RE.match(number):
+            continue
+        cx = mid_x(ln.bbox)
+        above = [s for s in lines if LABEL_SPEC_RE.match(s.text.strip()) and abs(mid_x(s.bbox) - cx) <= 30
+                 and 0 < ln.bbox[1] - s.bbox[1] <= 12]
+        below = [s for s in lines if (m := LABEL_SPARES_RE.match(s.text.strip())) and abs(mid_x(s.bbox) - cx) <= 30
+                 and 0 < s.bbox[1] - ln.bbox[1] <= 12]
+        spec = min(above, key=lambda s: ln.bbox[1] - s.bbox[1]) if above else None
+        spares = min(below, key=lambda s: s.bbox[1] - ln.bbox[1]) if below else None
+        cores = CABLE_SPEC_RE.match(spec.text.strip().upper()) if spec else None
+        sm = LABEL_SPARES_RE.match(spares.text.strip()) if spares else None
+        parts = [b for b in (spec, ln, spares) if b is not None]
+        out.append({
+            "cable_no": number,
+            "text": spec.text.strip() if spec else None,
+            "cores": int(cores["cores"]) if cores else None,
+            "spares": int(sm["n"]) if sm else None,
+            "spare_unit": (sm["unit"] or "").upper() or None if sm else None,
+            "bbox": block_bbox(parts),
+            "raw_text": " / ".join(b.text.strip() for b in parts),
+        })
+    return out

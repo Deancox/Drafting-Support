@@ -9,12 +9,15 @@ Layout, left to right:
   field side               each device's cable, its terminals "1 TN15D5" and its tag
 
 Claims per JB terminal row: TERMINAL OCCURS; WIRE LANDS_ON TERMINAL; TERMINAL REFERS_TO_DEVICE;
-TERMINAL DESTINED_PANEL (+ DESTINED_FOR the PLC module from "DI SLOT 16"). Per JB: HAS_SPEC
-for the multicore to the panel (cores, spares, terminals). Per field device: WIRE CONNECTS DEVICE
-(the wire numbers at the device's own terminals).
+TERMINAL DESTINED_PANEL (+ DESTINED_FOR the PLC module from "DI SLOT 16", with the slot sheet
+from "(REF TERM. 218)"). Per JB: HAS_SPEC for the multicore to the panel (cores, spares, terminals,
+cable number). Per field device: WIRE CONNECTS DEVICE (the wire numbers at the device's own
+terminals) and DEVICE DESCRIBES (the function written beside it: "LONG TRAVEL WEST").
 """
 
 from __future__ import annotations
+
+import re
 
 from drawing_qa.common.identifiers import IdentifierGrammar, clean_token
 from drawing_qa.model.enums import EntityType, ExtractionMethod, Predicate
@@ -26,6 +29,7 @@ from drawing_qa.parsers.termination.common import (
     Row,
     block_bbox,
     brackets,
+    cable_labels,
     designation,
     label_block,
     mid_x,
@@ -37,6 +41,9 @@ from drawing_qa.pdf.extract import PageContent
 
 _STRIP_REACH = 45.0  # how far left / right of the JB designation its strip's numbers may sit (pt)
 _STRIP_COLUMN = 90.0  # strips sit in one column; a JB / LCS further right is a field enclosure (its device terminals)
+# "(REF TERM. 218)" / "(REF. TERM. SHT 0218)" under a destination label: the slot termination sheet.
+_REF_TERM = re.compile(r"REF\.?\s*TERM\.?\s*(?:SHT\.?\s*)?0*(?P<sheet>\d+)")
+_WORDY = re.compile(r"[A-Z]{2,}")
 
 
 def rack_for_panel(panel: str, settings) -> str | None:
@@ -118,7 +125,9 @@ class JbStripReader(TemplateReader):
                                                predicate=Predicate.REFERS_TO_DEVICE, object_type=EntityType.DEVICE, object_key=block[0]))
                 if dest is not None:
                     panel_terminals.setdefault(dest["panel"], []).append(r.terminal)
-                    dvalue = {k: dest[k] for k in ("panel_written", "io", "slot", "label") if dest.get(k) is not None}
+                    dvalue = {k: dest[k] for k in ("panel_written", "io", "slot", "label", "ref_sheet") if dest.get(k) is not None}
+                    if r.wire_id is not None:
+                        dvalue["wire"] = r.wire_id.key  # this row's wire: a terminal number drawn twice has two
                     result.claims.append(claim(bbox=dest["bbox"], raw_text=dest["label"], subject_type=EntityType.TERMINAL, subject_key=key,
                                                predicate=Predicate.DESTINED_PANEL, object_type=EntityType.PANEL,
                                                object_key=dest["panel"], value=dvalue))
@@ -133,7 +142,29 @@ class JbStripReader(TemplateReader):
                                                subject_key=jb_key, predicate=Predicate.HAS_SPEC,
                                                value={**{k: v for k, v in spec.items() if k != "bbox"}, "to": panel, "terminals": terminals}))
         result.claims.extend(self._field_side(page, ctx, claim, strips, strip_words))
+        if strips:
+            result.claims.extend(self._cables(page, ctx, claim, strips))
         return result
+
+    # --- every cable drawn on the sheet ---------------------------------------------------
+
+    def _cables(self, page, ctx, claim, strips):
+        """CABLE HAS_SPEC for each cable label stack on the sheet, with the enclosures and panels the sheet
+        names (its strips' JBs / LCSs and the destination panels), for the cable block diagram cross-checks."""
+        places = set()
+        for line in page.lines:
+            parsed = designation(ctx.grammar, line)
+            if parsed is not None and line.text.lstrip().startswith(("=", "+")):
+                places.add(str(parsed.parts.get("superseded_by") or parsed.key))
+        places.update(jb.key for jb, _, _ in strips)
+        strip_x0 = min(r.number.bbox[0] for _, _, rs in strips for r in rs)
+        out = []
+        for lab in cable_labels(page):
+            value = {k: lab[k] for k in ("cable_no", "text", "cores", "spares", "spare_unit")}
+            value.update({"side": "panel" if lab["bbox"][2] < strip_x0 else "field", "places": sorted(places)})
+            out.append(claim(bbox=lab["bbox"], raw_text=lab["raw_text"], subject_type=EntityType.CABLE,
+                             subject_key=lab["cable_no"], predicate=Predicate.HAS_SPEC, value=value))
+        return out
 
     # --- destinations (left labels with brackets) ---------------------------------------
 
@@ -164,9 +195,11 @@ class JbStripReader(TemplateReader):
             panel = str(parsed.parts.get("superseded_by") or parsed.key)
             rack = rack_for_panel(panel, ctx.settings)
             slot = int(m["slot"])
+            ref = _REF_TERM.search(text)
             out.append({
                 "panel": parsed.key, "panel_written": parsed.key, "resolved_panel": panel, "io": m["io"], "slot": slot,
                 "module": f"{rack}/S{slot}" if rack else None, "label": " / ".join(b.text for b in block),
+                "ref_sheet": ref["sheet"] if ref else None,
                 "bbox": bb, "x1": bb[2], "y0": y0, "y1": y1,
             })
         return out
@@ -231,13 +264,16 @@ class JbStripReader(TemplateReader):
             return []
         strip_x1 = max(r.wire.bbox[2] for _, _, rs in strips for r in rs)
         rows = [r for r in terminal_rows(page, ctx.grammar) if r.number.bbox[0] > strip_x1 + 60 and id(r.number) not in strip_words]
-        tags = []
+        strip_x0 = min(r.number.bbox[0] for _, _, rs in strips for r in rs)
+        all_tags = []
         for line in page.lines:
             for w in line.words:
-                p = ctx.grammar.parse(w.text)
-                if p is not None and p.kind is EntityType.DEVICE and w.bbox[0] > strip_x1 + 60:
-                    tags.append((w, p.key))
-        out = []
+                p = ctx.grammar.parse(clean_token(w.text))
+                if p is not None and p.kind is EntityType.DEVICE and w.bbox[0] > strip_x0 - 20:
+                    all_tags.append((w, p.key))
+        tags = [(w, key) for w, key in all_tags if w.bbox[0] > strip_x1 + 60]
+        # Devices boxed inside the JB / LCS beside its strip are described too (sheet 201: LTL-LCS1's switches).
+        out = self._descriptions(page, ctx, claim, all_tags)
         for r in rows:
             if r.wire_id is None:
                 continue
@@ -250,3 +286,32 @@ class JbStripReader(TemplateReader):
                              object_key=key, value={"terminal": r.terminal, "side": "device"}))
         return out
 
+    def _descriptions(self, page, ctx, claim, tags):
+        """The function written to the right of a field device's tag ('LONG TRAVEL' / 'MODE INDICATION LAMP'):
+        the nearest wordy line starting just right of the tag, and the lines stacked under it."""
+        lines = page.lines
+        tag_words = {id(w) for w, _ in tags}
+
+        def wordy(ln) -> bool:
+            text = ln.text.strip().upper()
+            if any(id(w) in tag_words for w in ln.words) or len(_WORDY.findall(text)) == 0 or len(text) < 4:
+                return False
+            return all(ctx.grammar.parse(w.text) is None for w in ln.words)
+
+        out, seen = [], set()
+        for w, key in tags:
+            near = [
+                ln for ln in lines
+                if 4 <= ln.bbox[0] - w.bbox[2] <= 45 and -3 <= ln.bbox[1] - w.bbox[1] <= 12 and wordy(ln)
+            ]
+            if not near:
+                continue
+            first = min(near, key=lambda ln: (ln.bbox[0] - w.bbox[2]) + abs(ln.bbox[1] - w.bbox[1]))
+            block = [b for b in label_block(lines, first, max_gap=10, max_lines=3) if wordy(b)]
+            text = " / ".join(b.text.strip() for b in block)
+            if (key, text) in seen:
+                continue
+            seen.add((key, text))
+            out.append(claim(bbox=block_bbox(block), raw_text=text, subject_type=EntityType.DEVICE, subject_key=key,
+                             predicate=Predicate.DESCRIBES, value={"text": text, "side": "field"}))
+        return out

@@ -21,7 +21,6 @@ class PlannedRule:
 
 
 PLANNED: tuple[PlannedRule, ...] = (
-    PlannedRule("PLC-002", "Description Match", "PLC description matches the device description (exact, then AI-assisted)", "AI description matching (M6)"),
     PlannedRule("DEV-001", "Device Presence", "Appears in every document type the document matrix expects", "equipment list (M8)"),
     PlannedRule("DEV-002", "Device Attribute Consistency", "Same type, description and signal across sources", "equipment list (M8)"),
 )

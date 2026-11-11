@@ -12,7 +12,8 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from drawing_qa.model.claims import Claim
-from drawing_qa.model.enums import DocType, Predicate, Severity
+from drawing_qa.common.descriptions import without_prefix
+from drawing_qa.model.enums import DocType, EntityType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -473,3 +474,89 @@ class SlotReferences(Rule):
                     discriminator=f"{c.source.drawing_id}|type|{v['slots_text']}",
                     recommendation="Check the module type in the note against the slot sheets",
                 )
+
+
+# --- descriptions: termination drawing vs schematic ----------------------------------------
+
+_DESC_WORD = re.compile(r"[A-Z]+|\d+")
+_STATE = re.compile(r"\([^)]*\)")
+# Words that say what kind of thing it is, not which signal: a termination drawing often shortens them.
+_GENERIC = frozenset({
+    "A", "AND", "OF", "TO", "FOR", "THE", "ON", "IN", "AT", "SWITCH", "PUSH", "BUTTON", "PB", "LAMP", "INDICATION",
+    "INDICATOR", "LIMIT", "SENSOR", "CONTACT", "HEALTHY", "LCS", "STATION", "LOCAL", "CONTROL", "STATUS", "SIGNAL",
+})
+
+
+def _words(text: str) -> list[str]:
+    return [w for w in _DESC_WORD.findall(text.upper()) if w not in _GENERIC]
+
+
+def _matches(word: str, others: set[str]) -> bool:
+    if word in others:
+        return True
+    return len(word) >= 5 and any(len(o) >= 5 and o[:5] == word[:5] for o in others)  # CORRECTION ~ CORRECT
+
+
+def description_difference(term: str, schematic: list[str]) -> list[str] | None:
+    """The termination description's distinctive words the schematic descriptions lack, when they say a
+    different signal: half or more of them missing (two at least), or a number the schematic does not have
+    while it has another ('LOAD CELL 1' / 'LOAD CELL 2'). None when they agree."""
+    plain = [_STATE.sub(" ", d) for d in schematic]
+    others = {w for d in schematic for w in _words(d)}
+    words = list(dict.fromkeys(_words(term)))
+    if not words or not others:
+        return None
+    missing = [w for w in words if not _matches(w, others)]
+    numbers = {w for d in plain for w in _words(d) if w.isdigit()}
+    wrong_number = [w for w in missing if w.isdigit() and numbers]
+    if wrong_number or (len(missing) >= 2 and len(missing) * 2 >= len(words)):
+        return missing
+    return None
+
+
+@rule
+class DescriptionMatch(Rule):
+    meta = RuleMeta(
+        rule_id="PLC-002",
+        title="Description Match",
+        category=Category.PLC,
+        default_severity=Severity.MINOR,
+        description=(
+            "The function a termination drawing writes beside a field device ('SOUTH RAIL CLAMP / LOCAL MODE INDICATION "
+            "LAMP') does not describe the signal of the device's schematic PLC channel ('... PAUSED FOR BOARDING LAMP'). "
+            "Case, spacing, word order and type words (SWITCH, LAMP, PUSH BUTTON) are ignored, and a shortened "
+            "description passes: reported when half or more of the distinctive words (two at least) are not in the "
+            "schematic description, or a number differs."
+        ),
+        requires=_NEEDS_TERM_GRAPH,
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        prefix = ctx.model.description_prefix
+        schematic: dict[str, list[tuple[str, str]]] = defaultdict(list)  # device -> [(channel, description)]
+        for e in ctx.edges_of("CHANNEL_DEVICE"):
+            ch = ctx.model.nodes.get(e.src)
+            if ch is not None and ch.attrs.get("description"):
+                schematic[ctx.model.nodes[e.dst].key].append((ch.key, without_prefix(ch.attrs["description"], prefix)))
+        seen = set()
+        for c in ctx.claims_of(Predicate.DESCRIBES, EntityType.DEVICE):
+            if c.parser is not DocType.TERM or c.subject_key not in schematic:
+                continue
+            text = c.value.get("text", "")
+            if (c.subject_key, text) in seen:
+                continue
+            seen.add((c.subject_key, text))
+            channels = schematic[c.subject_key]
+            missing = description_difference(text, [d for _, d in channels])
+            if missing is None:
+                continue
+            channel, desc = channels[0]
+            yield make(
+                subject_type="DEVICE",
+                subject_key=c.subject_key,
+                message=(f"{c.subject_key} is described '{text}' on the termination drawing ({make.where(c.source)}) but "
+                         f"'{desc}' on its schematic channel {channel} ({', '.join(missing)} not in the schematic)"),
+                evidence=[c],
+                discriminator=text,
+                recommendation=f"Make {c.subject_key}'s description on the termination drawing match the schematic",
+            )

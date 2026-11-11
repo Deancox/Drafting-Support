@@ -131,6 +131,13 @@ class CableRoutingReader(TemplateReader):
             claim = self._route(cable, enclosures, devices, page, ctx, common)
             if claim is not None:
                 result.claims.append(claim)
+        # Every cable number written on the sheet, routed or not: a number whose cable line was not
+        # traced is still on the diagram (CABLE-001 asks only whether it is shown).
+        for ln in page.lines:
+            text = ln.text.strip().upper()
+            if _CABLE_NO.match(text) and ln.bbox[1] < limit_y:
+                result.claims.append(ctx.claim(**common, bbox=ln.bbox, raw_text=text, subject_type=EntityType.CABLE,
+                                               subject_key=text, predicate=Predicate.OCCURS))
         return result
 
     # --- enclosures -------------------------------------------------------------
@@ -270,14 +277,19 @@ class CableRoutingReader(TemplateReader):
         return x
 
     def _labels(self, cable: Cable, page: PageContent) -> dict:
-        spec = number = None
+        # The nearest label of each kind: cables stacked ~17 pt apart each have a label box within reach of
+        # the next cable too (spec ~7 pt above its own cable, ~10 pt below the one above it).
+        best: dict[str, tuple[float, str]] = {}
         for ln in page.lines:
             cx, cy = _centre(ln.bbox)
             text = ln.text.strip()
+            kind = "cable_no" if _CABLE_NO.match(text.upper()) else "spec" if _SPEC.search(text) else None
+            if kind is None:
+                continue
             for r in cable.runs:
                 if r.horizontal and r.start - 5 <= cx <= r.end + 5 and abs(cy - r.pos) <= 14:
-                    if _CABLE_NO.match(text.upper()) and number is None:
-                        number = text.upper()
-                    elif _SPEC.search(text) and spec is None:
-                        spec = text
-        return {"spec": spec, "cable_no": number}
+                    d = abs(cy - r.pos)
+                    if kind not in best or d < best[kind][0]:
+                        best[kind] = (d, text.upper() if kind == "cable_no" else text)
+        return {"spec": best["spec"][1] if "spec" in best else None,
+                "cable_no": best["cable_no"][1] if "cable_no" in best else None}

@@ -32,6 +32,7 @@ class Category(StrEnum):
     WIRE = "Wire Validation"
     PLC = "PLC Validation"
     PATH = "Path Validation"
+    CABLE = "Cable Validation"
     TERM = "Termination Validation"
     DEV = "Device Validation"
     DRW = "Drawing Validation"
