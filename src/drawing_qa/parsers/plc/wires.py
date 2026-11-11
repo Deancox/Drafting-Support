@@ -91,12 +91,15 @@ def expand_wires(page: PageContent, drawing: Drawing, ctx: ParseContext, parser:
         return []
     this_sheet = f"{drawing.sheet_number:02d}"
     claims = []
+    # The title block starts below the grid's last row (Y6 / Y7 on a module's COM terminals sit in row Y,
+    # lower than a fixed 80 % of the page, 401103-020).
+    title_top = drawing.grid.body_bottom or page.height * 0.8
     for line in page.lines:
         if len(line.words) != 1:
             continue
         text = line.text.strip().upper()
         x0, y0, x1, y1 = line.bbox
-        if (x0 + x1) / 2 > page.width * 0.45 and (y0 + y1) / 2 > page.height * 0.8:
+        if (x0 + x1) / 2 > page.width * 0.45 and (y0 + y1) / 2 > title_top:
             continue  # title block
         if m := _SAME_SHEET.match(text):
             cell = drawing.grid.cell_at((x0 + x1) / 2, (y0 + y1) / 2)

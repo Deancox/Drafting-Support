@@ -208,7 +208,8 @@ class WireContinuity(Rule):
         default_severity=Severity.MAJOR,
         description=(
             "A wire number the schematic channel row shows for a device that its JB terminals on the termination "
-            "drawing do not have."
+            "drawing do not have. Panel devices (relays) and wires on the panel side of a wire the JB does carry "
+            "(module to relay board) are not expected at the JB."
         ),
         requires=frozenset({Requirement.CLAIMS, Requirement.GRAPH, Requirement.TRACES, Requirement.TERMINATIONS}),
     )
@@ -219,14 +220,28 @@ class WireContinuity(Rule):
         if DocType.TERM in ctx.decoded_types:
             return  # a decoded termination sheet (--ocr): its wire numbers may not have decoded
         # Schematic channel row vs JB terminals.
+        panel = {p.upper() for p in ctx.settings.identifiers.panel_device_prefixes}
+        at: dict[tuple[str, str], float] = {}  # (channel, wire / device) -> x of its label in the channel row
+        for c in ctx.claims_of(Predicate.WIRED_TO):
+            if c.object_key:
+                at[(c.subject_key, c.object_key)] = (c.source.bbox[0] + c.source.bbox[2]) / 2
         seen = set()
         for t in ctx.traces:
             hop = next((h for h in t.hops if h.hop == "JB_TERMINAL"), None)
             wires_hop = next((h for h in t.hops if h.hop == "WIRE"), None)
             if not t.device or hop is None or hop.status.value != "FOUND" or not wires_hop or not wires_hop.values:
                 continue
+            if t.device.split("-", 1)[0].upper() in panel:
+                continue  # a panel relay's own wires stay in the panel; its field wire is on another row
             landed = {ctx.model.nodes[w].key for v in hop.values for w in ctx.linked(f"TERMINAL:{v}", "WIRE_LANDS_ON")}
             missing = [w for w in wires_hop.values if w not in landed and not is_placeholder_wire(w)]
+            # A wire further from the device than one the JB does carry is on the panel side of something in
+            # between (TN51D3 from the module to a relay board; TN51D5 from the relay to the lamp is at the JB).
+            dev_x = at.get((t.channel or "", t.device))
+            reach = [abs(at[(t.channel, w)] - dev_x) for w in wires_hop.values
+                     if w in landed and dev_x is not None and (t.channel, w) in at]
+            if reach:
+                missing = [w for w in missing if (t.channel, w) not in at or abs(at[(t.channel, w)] - dev_x) <= max(reach) + 20]
             if not missing or (t.device, tuple(missing)) in seen:
                 continue
             seen.add((t.device, tuple(missing)))

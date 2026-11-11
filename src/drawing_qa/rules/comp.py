@@ -60,7 +60,8 @@ class IncompleteTrace(Rule):
         default_severity=Severity.MINOR,
         description=(
             "A channel's trace is missing a hop the supplied drawings should show: the device tag (MAJOR), "
-            "the field wire, or the JB / field location in the channel row."
+            "the field wire, or the JB / field location in the channel row. No JB is expected for a panel device "
+            "(panel_device_prefixes: a relay contact in the PLC cubicle) or a device drawn on another sheet ('REFER SHT 60')."
         ),
         requires=_NEEDS_TRACES,
     )
@@ -89,6 +90,8 @@ class IncompleteTrace(Rule):
                     recommendation=f"Tag the device{' (' + candidates[0] + '?)' if candidates else ''}",
                 )
             other = [g for g in t.gaps if g not in ("DEVICE", "JB_TERMINAL")]  # a missing JB terminal is DEV-003
+            if "JB" in other and t.device and _jb_not_expected(ctx, t):
+                other.remove("JB")
             if other:
                 what = " and ".join({"JB": "JB / field location", "WIRE": "field wire number"}.get(g, g) for g in other)
                 yield make(
@@ -99,6 +102,16 @@ class IncompleteTrace(Rule):
                     discriminator=",".join(other),
                     recommendation=f"Show the {what} for {t.device or 'this channel'}",
                 )
+
+
+def _jb_not_expected(ctx: RuleContext, t) -> bool:
+    """No JB in the channel row is right for a panel device (K-TN18F1: a relay contact in the PLC cubicle),
+    and for a device drawn on another sheet ('A-TN60H2 (REFER SHT 60)'): its field wiring is shown there."""
+    prefix = t.device.split("-", 1)[0].upper()
+    if prefix in {p.upper() for p in ctx.settings.identifiers.panel_device_prefixes}:
+        return True
+    home, here = _tag_sheet(t.device), _sheet_number(ctx, t)
+    return home is not None and here is not None and home != here
 
 
 def _tag_sheet(tag: str) -> int | None:

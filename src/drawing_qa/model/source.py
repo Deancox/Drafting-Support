@@ -52,6 +52,14 @@ class GridFrame(BaseModel):
     def row_labels(self) -> list[str]:
         return [r[0] for r in self.rows]
 
+    @property
+    def body_bottom(self) -> float | None:
+        """Bottom of the last row band (half a band below its label): the title block starts below it."""
+        if len(self.rows) < 2:
+            return None
+        ys = [y for _, y in self.rows]
+        return ys[-1] + (ys[-1] - ys[0]) / (len(ys) - 1) / 2
+
 
 class UnresolvedText(BaseModel):
     """A word on a decoded sheet missing a letter or two ('?' for each): shown to the checker, never used."""

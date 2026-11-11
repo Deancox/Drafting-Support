@@ -336,9 +336,13 @@ class CableNotTerminated(Rule):
         drawn = set(td_cables(ctx))
         named = set()  # CBD numbers CABLE-001 puts against a mistyped termination number
         unshown = unshown_cbd_cables(ctx)
+        numbers = cbd_numbers(ctx)
         for number, (jb, panel, _) in multicores.items():
-            if number not in cbd_numbers(ctx) and number not in cbd_routes(ctx):
+            if number not in numbers and number not in cbd_routes(ctx):
                 named |= {n for n, rs in unshown.items() if any(ends(ctx, r) == {jb, panel} for r in rs)}
+        for number in drawn:  # a mistyped termination number CABLE-001 puts against a near-identical CBD one
+            if number not in numbers and (near := closest(number, numbers)):
+                named.add(near)
         for number, rs in sorted(unshown.items()):
             if number in named or number in drawn:
                 continue

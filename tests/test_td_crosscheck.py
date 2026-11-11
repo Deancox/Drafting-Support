@@ -184,3 +184,36 @@ def test_term_006_jb_wire_not_on_the_slot_strip(tmp_path, cfg):
     slot_term_sheet(tmp_path, slot=13, rows=[("1", "TN36D7"), ("2", "TN15D5")], ref="0203")
     findings = by_rule(run_pipeline(tmp_path, cfg), "TERM-006")
     assert [f.subject_key for f in findings] == ["TN36D6"] and "has no TN36D6" in findings[0].message
+
+
+# --- false alarms found reviewing the 401103 Land Leg register (2026-11-11) ---------------------
+
+
+def test_grid_body_bottom_is_half_a_row_below_the_last_row():
+    from drawing_qa.model.source import GridFrame
+
+    grid = GridFrame(rows=[("A", 50.0), ("B", 80.0), ("C", 110.0)], cols=[("0", 40.0), ("1", 140.0)])
+    assert grid.body_bottom == 125.0  # Y6 / Y7 in the last row are drawing, not title block
+    assert GridFrame(rows=[("A", 50.0)], cols=[]).body_bottom is None
+
+
+def test_comp_001_no_jb_expected_for_a_panel_relay(tmp_path, cfg):
+    from tests.test_plc import channel_row, slot_sheet
+    from tests.test_rules import add_sheet
+
+    rows = [channel_row(113, "00", "IN-0", "K-TN36D4", "B4", "D6", None, ["MOTOR THERMISTOR RELAY"]),
+            channel_row(182, "01", "IN-1", "S-TN36F4", "E4", "F6", None, ["BRAKE SWITCH"])]
+    items, frame = slot_sheet(rows=rows)
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    devices = [f.message.split("(", 1)[1].split(",")[0] for f in by_rule(run_pipeline(tmp_path, cfg), "COMP-001")]
+    assert devices == ["S-TN36F4"]  # the field switch needs a JB in its row; the panel relay does not
+
+
+def test_cable_004_quiet_for_the_cbd_number_cable_001_names(tmp_path, cfg):
+    """C939890 on the terminations is CABLE-001 ('the cable block diagrams have C93890'), not also a CABLE-004."""
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13, spec=MULTICORE,
+             extra=[((420, 120, 450, 129), "C939890")])
+    cbd(tmp_path, [(160, "JB1", "50C+E 1.5mm² PVC", "C93812"), (200, "JB1", "4C+E 1.5mm² PVC", "C93890")])
+    result = run_pipeline(tmp_path, cfg)
+    assert [f.subject_key for f in by_rule(result, "CABLE-001")] == ["C939890"]
+    assert by_rule(result, "CABLE-004") == []
