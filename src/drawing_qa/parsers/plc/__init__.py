@@ -15,6 +15,7 @@ from drawing_qa.parsers.plc.rack_layout import RackLayoutReader
 from drawing_qa.parsers.plc.slot_refs import read_slot_refs
 from drawing_qa.parsers.plc.slot_sheet import SlotSheetReader
 from drawing_qa.parsers.plc.legend import read_legend
+from drawing_qa.parsers.pins import read_pins
 from drawing_qa.parsers.plc.wires import expand_wires
 from drawing_qa.pdf.extract import PageContent
 
@@ -26,7 +27,9 @@ class PlcParser(DrawingParser):
     report_unmatched = False
 
     def supplement(self, page: PageContent, drawing: Drawing, ctx: ParseContext, prior: list[Claim]) -> list[Claim]:
-        return expand_wires(page, drawing, ctx, self) + read_legend(page, drawing, ctx, self) + read_slot_refs(page, drawing, ctx, self)
+        wires = expand_wires(page, drawing, ctx, self)
+        pins = read_pins(page, drawing, ctx, self, prior + wires)
+        return wires + pins + read_legend(page, drawing, ctx, self) + read_slot_refs(page, drawing, ctx, self)
 
     @property
     def planned_content(self) -> str:

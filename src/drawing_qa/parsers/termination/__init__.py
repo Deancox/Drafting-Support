@@ -8,6 +8,7 @@
 
 from drawing_qa.model.enums import DocType
 from drawing_qa.parsers.base import DrawingParser
+from drawing_qa.parsers.pins import read_pins
 from drawing_qa.parsers.termination.jb_strip import JbStripReader
 from drawing_qa.parsers.termination.slot_strip import SlotStripReader
 
@@ -16,6 +17,9 @@ class TerminationParser(DrawingParser):
     doc_type = DocType.TERM
     version = "0.2.0"
     template_readers = (SlotStripReader, JbStripReader)
+
+    def supplement(self, page, drawing, ctx, prior):
+        return read_pins(page, drawing, ctx, self, prior)
 
     @property
     def planned_content(self) -> str:

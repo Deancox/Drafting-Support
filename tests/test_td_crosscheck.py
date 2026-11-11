@@ -1,5 +1,6 @@
 """Termination drawings against the cable block diagrams and the schematics: the cable label reader,
-CABLE-001..005, PLC-002 (descriptions), DEV-004 (I/O direction), TERM-005 / 006 (JB sheet vs slot sheet)."""
+CABLE-001..006, PLC-002 (descriptions), DEV-004 (I/O direction), TERM-005 / 006 (JB sheet vs slot sheet),
+TERM-007 (connector pins)."""
 
 from __future__ import annotations
 
@@ -217,3 +218,47 @@ def test_cable_004_quiet_for_the_cbd_number_cable_001_names(tmp_path, cfg):
     result = run_pipeline(tmp_path, cfg)
     assert [f.subject_key for f in by_rule(result, "CABLE-001")] == ["C939890"]
     assert by_rule(result, "CABLE-004") == []
+
+
+# --- missed issues found reviewing the 401103 Land Leg register (2026-11-11) --------------------
+
+
+def test_cable_006_spare_count_differs_between_jb_and_slot_sheets(tmp_path, cfg):
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13, spec=MULTICORE)  # 12 SPARE on 203
+    slot_term_sheet(tmp_path, slot=13, rows=[("1", "TN36D6"), ("2", "TN15D5")], cable=("C93812", "19 SPARE"))
+    result = run_pipeline(tmp_path, cfg)
+    slot = next(c for c in td_cables(result) if c.value["side"] == "slot")
+    assert (slot.subject_key, slot.value["spares"], slot.value["places"]) == ("C93812", 19, ["LTL-JB1"])
+    (f,) = by_rule(result, "CABLE-006")
+    assert f.subject_key == "C93812" and "12 SPARE on 401103 sh 203" in f.message and "19 SPARE on 401103 sh 211" in f.message
+    assert by_rule(result, "CABLE-001") == []  # the slot sheet's labels are only for the spare and spec checks
+
+
+def test_cable_006_quiet_when_the_counts_agree(tmp_path, cfg):
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13, spec=MULTICORE)
+    slot_term_sheet(tmp_path, slot=13, rows=[("1", "TN36D6"), ("2", "TN15D5")], cable=("C93812", "12 SPARES"))
+    assert by_rule(run_pipeline(tmp_path, cfg), "CABLE-006") == []
+
+
+def _pins(tmp_path, cfg, schematic_pin, td_pin):
+    from tests.test_plc import channel_row, slot_sheet
+    from tests.test_rules import add_sheet
+
+    row = channel_row(113, "00", "IN-0", "S-TN36D4", "B4", "D6", "LTL-JB1", ["BRAKE"]) + [((680, 116, 705, 125), f"PIN {schematic_pin}")]
+    items, frame = slot_sheet(rows=[row])
+    add_sheet(tmp_path, "PLC", "036", items, **frame)
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13,
+             extra=[((420, 120, 450, 129), "TN36D6"), ((460, 121, 485, 130), f"PIN {td_pin}")])
+    return run_pipeline(tmp_path, cfg)
+
+
+def test_term_007_connector_pin_differs(tmp_path, cfg):
+    result = _pins(tmp_path, cfg, "D", "A")
+    pins = {(c.parser.value, c.subject_key, c.value["pin"]) for c in result.claims if c.predicate is Predicate.AT_PIN}
+    assert pins == {("PLC", "TN36D6", "D"), ("TERM", "TN36D6", "A")}
+    (f,) = by_rule(result, "TERM-007")
+    assert "TN36D6 on PIN D" in f.message and "TN36D6 on PIN A" in f.message
+
+
+def test_term_007_quiet_when_the_pins_agree(tmp_path, cfg):
+    assert by_rule(_pins(tmp_path, cfg, "A", "A"), "TERM-007") == []

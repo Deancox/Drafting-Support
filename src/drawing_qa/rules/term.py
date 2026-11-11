@@ -338,3 +338,47 @@ class SlotSheetWire(Rule):
                 discriminator=str(slot),
                 recommendation=f"Make the JB and slot termination sheets agree on {c.subject_key}'s wire and slot",
             )
+
+
+@rule
+class FieldPinMatch(Rule):
+    meta = RuleMeta(
+        rule_id="TERM-007",
+        title="Connector Pin Match",
+        category=Category.TERM,
+        default_severity=Severity.MAJOR,
+        description=(
+            "A wire lands on one connector pin on the schematic and another on the termination drawing (load cell "
+            "U-TN56E1: TN56E1 on PIN D and TN56F1 on PIN A on schematic 056, the other way round on termination "
+            "sheet 202). Pins are read from 'PIN x' labels beside the wire numbers on both drawings."
+        ),
+        requires=NEEDS_TERMINATIONS,
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        pins: dict[DocType, dict[str, dict[str, Claim]]] = {DocType.PLC: defaultdict(dict), DocType.TERM: defaultdict(dict)}
+        for c in ctx.claims_of(Predicate.AT_PIN):
+            if c.parser in pins:
+                pins[c.parser][c.subject_key].setdefault(c.value["pin"], c)
+        device: dict[str, str] = {}
+        for c in strip_rows(ctx):
+            if c.value.get("wire_text") and c.value.get("block"):
+                device.setdefault(c.value["wire_text"], c.value["block"])
+        groups: dict[str, list[tuple[str, Claim, Claim]]] = defaultdict(list)
+        for wire, td in sorted(pins[DocType.TERM].items()):
+            sch = pins[DocType.PLC].get(wire)
+            if not sch or set(td) & set(sch):
+                continue
+            groups[device.get(wire, wire)].append((wire, next(iter(sch.values())), next(iter(td.values()))))
+        for key, rows in sorted(groups.items()):
+            sch_text = ", ".join(f"{w} on PIN {s.value['pin']}" for w, s, _ in rows)
+            td_text = ", ".join(f"{w} on PIN {t.value['pin']}" for w, _, t in rows)
+            yield make(
+                subject_type="DEVICE" if key not in {w for w, _, _ in rows} else "WIRE",
+                subject_key=key,
+                message=(f"{key}: the schematic ({make.where(rows[0][1].source)}) has {sch_text}; the termination drawing "
+                         f"({make.where(rows[0][2].source)}) has {td_text}"),
+                evidence=[s for _, s, _ in rows],
+                evidence_b=[t for _, _, t in rows],
+                recommendation=f"Make the schematic and termination drawing agree on {key}'s connector pins",
+            )

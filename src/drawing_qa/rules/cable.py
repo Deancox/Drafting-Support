@@ -10,6 +10,7 @@ number joins the two, so these rules compare:
   CABLE-003  it joins the same JB / enclosure and panel on both
   CABLE-004  a CBD cable to an enclosure whose terminations are supplied is drawn on them
   CABLE-005  one cable number is not given to two different cables on the cable block diagrams
+  CABLE-006  every termination sheet (JB and PLC slot) that labels a cable gives it the same spare count
 
 Placeholder numbers (CXXXXX) are PLACEHOLDER-002's business and are skipped here.
 """
@@ -75,10 +76,13 @@ def spec_difference(a: str | None, b: str | None) -> tuple[str, Severity] | None
     return None
 
 
-def td_cables(ctx: RuleContext) -> dict[str, list[Claim]]:
-    """Cable number -> its label stacks on the termination sheets (real numbers only)."""
+def td_cables(ctx: RuleContext, slot_sheets: bool = False) -> dict[str, list[Claim]]:
+    """Cable number -> its label stacks on the JB termination sheets (real numbers only); with slot_sheets,
+    also the labels beside the brackets of the PLC slot termination sheets."""
     out: dict[str, list[Claim]] = defaultdict(list)
     for c in ctx.claims_of(Predicate.HAS_SPEC, EntityType.CABLE):
+        if c.value.get("side") == "slot" and not slot_sheets:
+            continue
         if c.parser is DocType.TERM and not is_placeholder(c.subject_key):
             out[c.subject_key].append(c)
     return out
@@ -216,7 +220,7 @@ class CableSpecMatch(Rule):
         default_severity=Severity.MAJOR,
         description=(
             "One cable number with different specs: on a termination sheet and the cable block diagram, or on two "
-            "termination sheets. Core count, earth conductor or conductor size differing is MAJOR (10C+E 1.5mm2 on the "
+            "termination sheets (JB or PLC slot sheets). Core count, earth conductor or conductor size differing is MAJOR (10C+E 1.5mm2 on the "
             "terminations, 10C+E 2.5mm2 on the CBD); only the insulation / screen words differing is MINOR."
         ),
         requires=_NEEDS,
@@ -224,11 +228,11 @@ class CableSpecMatch(Rule):
 
     def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
         routes = cbd_routes(ctx)
-        for number, cs in sorted(td_cables(ctx).items()):
-            specs = [c for c in cs if c.value.get("text")]
+        for number, cs in sorted(td_cables(ctx, slot_sheets=True).items()):
+            specs = sorted((c for c in cs if c.value.get("text")), key=lambda c: c.value.get("side") == "slot")
             if not specs:
                 continue
-            td = specs[0]
+            td = specs[0]  # a JB sheet's label first: the slot sheets are compared with it
             for other in specs[1:]:  # the same cable on two termination sheets (a strip continued)
                 diff = spec_difference(td.value["text"], other.value["text"])
                 if diff:
@@ -244,7 +248,7 @@ class CableSpecMatch(Rule):
                         recommendation=f"Give cable {number} one spec on all termination sheets",
                     )
                     break
-            for route in routes.get(number, [])[:1]:
+            for route in routes.get(number, [])[:1] if td.value.get("side") != "slot" else []:
                 diff = spec_difference(td.value["text"], route.value.get("spec"))
                 if diff:
                     yield make(
@@ -384,4 +388,41 @@ class DuplicateCableNumber(Rule):
                 evidence=[first],
                 evidence_b=others,
                 recommendation="Give each cable its own number",
+            )
+
+
+@rule
+class CableSparesMatch(Rule):
+    meta = RuleMeta(
+        rule_id="CABLE-006",
+        title="Cable Spares Match",
+        category=Category.CABLE,
+        default_severity=Severity.MINOR,
+        description=(
+            "One cable number labelled with different spare counts on different termination sheets: JB sheets, "
+            "or a JB sheet and the PLC slot termination sheet the cable lands on (C93812 '12 SPARE' on 201, "
+            "'20 SPARE' on 202, '19 SPARE' on 211)."
+        ),
+        requires=frozenset({Requirement.CLAIMS, Requirement.TERMINATIONS}),
+    )
+
+    def evaluate(self, ctx: RuleContext, make: FindingBuilder) -> Iterable[Finding]:
+        for number, cs in sorted(td_cables(ctx, slot_sheets=True).items()):
+            counts: dict[int, dict[str, Claim]] = defaultdict(dict)  # "2 SPARE" and "2PR SPARE" are one count
+            for c in cs:
+                if c.value.get("spares") is not None:
+                    counts[c.value["spares"]].setdefault(ctx.sheet_of(c).label, c)
+            if len(counts) < 2:
+                continue
+            unit = next((f" {c.value['spare_unit']}" for c in cs if c.value.get("spare_unit")), "")
+            ordered = sorted(counts.items(), key=lambda kv: (-len(kv[1]), min(kv[1])))
+            listed = "; ".join(f"{n}{unit} SPARE on {', '.join(sorted(sheets))}" for n, sheets in ordered)
+            first, *others = [next(iter(sheets.values())) for _, sheets in ordered]
+            yield make(
+                subject_type="CABLE",
+                subject_key=number,
+                message=f"Cable {number} has different spare counts: {listed}",
+                evidence=[first],
+                evidence_b=others,
+                recommendation=f"Count cable {number}'s spare cores and give the same number on every termination sheet",
             )

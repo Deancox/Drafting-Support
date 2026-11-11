@@ -51,7 +51,7 @@ def jb_sheet(root, sheet="203", *, jb="=K07.11+LTL-JB1", blocks=(), destinations
     build_pdf(root / "Terminations" / f"401103-{sheet}.pdf", [[]], lines=[lines], shx=[frame + items + list(extra)])
 
 
-def slot_term_sheet(root, sheet="211", *, slot=13, rows=(), target="=K07.11+LTL-JB1", ref="0203", first=1, last=2):
+def slot_term_sheet(root, sheet="211", *, slot=13, rows=(), target="=K07.11+LTL-JB1", ref="0203", first=1, last=2, cable=None):
     """A PLC slot termination sheet: 'SAFETY / INPUTS SLOT n' strip and one EXTERNAL WIRING group."""
     items = [((183, 45, 207, 56), "SAFETY"), ((178, 51, 213, 63), f"INPUTS SLOT {slot}")]
     ys = {}
@@ -64,6 +64,8 @@ def slot_term_sheet(root, sheet="211", *, slot=13, rows=(), target="=K07.11+LTL-
         items.append(((272, ys[str(t)], 278, ys[str(t)] + 8), str(i + 1)))
     items += [((287, y0, 336, y0 + 9), "EXTERNAL WIRING TO"), ((287, y0 + 5, 327, y0 + 16), target),
               ((287, y0 + 7, 338, y0 + 24), f"(REF. TERM. SHT {ref})")]
+    if cable:  # ("C93812", "19 SPARE") beside the group's label, as on 401103-211
+        items += [((352, y0 + 2, 382, y0 + 11), cable[0]), ((350, y0 + 9, 384, y0 + 18), cable[1])]
     frame = sheet_frame("401103", sheet, title="LAND LEG REMOTE I/O PANEL", descriptor=f"PLC SLOT - {slot} TERMINATION DIAGRAM")
     build_pdf(root / "Terminations" / f"401103-{sheet}.pdf", [[]], lines=[[(284, y0, 284, y1, BRACKET)]], shx=[frame + items])
 

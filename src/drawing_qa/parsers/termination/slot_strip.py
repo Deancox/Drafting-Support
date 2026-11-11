@@ -6,7 +6,8 @@ labelled "EXTERNAL WIRING TO / =K07.11+LTL-JB4 / (REF. TERM. SHT 0202)", with th
 number beside each row.
 
 Claims: WIRE LANDS_ON PLC_MODULE (value: terminal) and PLC_MODULE DESTINED_FOR the JB / location
-(value: terminal, wire, core, referenced sheet). The module key is "S<slot>"; the linker resolves
+(value: terminal, wire, core, referenced sheet). The cable label beside each bracket ("C93812 /
+19 SPARE") gives a CABLE HAS_SPEC (side "slot", places: the JB it goes to), for CABLE-006. The module key is "S<slot>"; the linker resolves
 it to the rack's module when only one rack has that slot.
 """
 
@@ -20,6 +21,7 @@ from drawing_qa.parsers.termination.common import (
     Row,
     block_bbox,
     brackets,
+    cable_labels,
     designation,
     label_block,
     mid_x,
@@ -73,7 +75,20 @@ class SlotStripReader(TemplateReader):
                                            object_type=group["kind"], object_key=group["key"],
                                            value={"slot": slot, "terminal": r.terminal, "wire": r.wire_id.key,
                                                   "core": core[0] if core else None, "ref_sheet": group["ref_sheet"]}))
+        result.claims.extend(self._cables(page, claim, groups))
         return result
+
+    def _cables(self, page, claim, groups):
+        out = []
+        for lab in cable_labels(page):
+            cx, cy = mid_x(lab["bbox"]), mid_y(lab["bbox"])
+            near = [g for g in groups if g["bbox"][1] - 12 <= cy <= g["bbox"][3] + 12 and 0 <= cx - g["bbox"][0] <= 160]
+            places = sorted({min(near, key=lambda g: abs(mid_y(g["bbox"]) - cy))["key"]}) if near else []
+            value = {k: lab[k] for k in ("cable_no", "text", "cores", "spares", "spare_unit")}
+            value.update({"side": "slot", "places": places})
+            out.append(claim(bbox=lab["bbox"], raw_text=lab["raw_text"], subject_type=EntityType.CABLE,
+                             subject_key=lab["cable_no"], predicate=Predicate.HAS_SPEC, value=value))
+        return out
 
     def _strip(self, page, header, rows: list[Row], y_end: float) -> list[Row]:
         """The slot's rows, down to the next text in the column (e.g. a "24V DC SUPPLIES" block)."""
