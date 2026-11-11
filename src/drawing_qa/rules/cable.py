@@ -173,7 +173,8 @@ class CableOnCbd(Rule):
         description=(
             "A cable number drawn on a termination sheet is not on any supplied cable block diagram, although the "
             "JB / enclosure it serves is. Where the CBD shows a cable between the same JB and panel under another "
-            "number, or a near-identical number, the finding names it (C92807 on the terminations, C93807 on the CBD)."
+            "number, or a near-identical number, the finding names it (C92807 on the terminations, C93807 on the CBD) and gives "
+            "where the CBD draws it as a second location."
         ),
         requires=_NEEDS,
     )
@@ -192,14 +193,16 @@ class CableOnCbd(Rule):
             places = {p for c in cs for p in c.value.get("places", [])}
             if not places & shown:
                 continue  # the sheet's enclosures are on no supplied CBD: its CBD is not in the package
-            hint = ""
+            hint, there = "", []  # there: where the CBD draws the cable it is taken for
             if number in multicores:
                 jb, panel, _ = multicores[number]
                 other = sorted(n for n, rs in unshown.items() if any(ends(ctx, r) == {jb, panel} for r in rs))
                 if other:
                     hint = f"; the cable block diagram shows {', '.join(other)} between {jb} and {panel}"
+                    there = [r for n in other for r in unshown[n] if ends(ctx, r) == {jb, panel}]
             if not hint and (near := closest(number, numbers)):
                 hint = f"; the cable block diagrams have {near}"
+                there = routes.get(near) or numbers[near][:1]
             sheets = ", ".join(sorted({ctx.sheet_of(c).label for c in cs}))
             spec = next((c.value.get("text") for c in cs if c.value.get("text")), None)
             yield make(
@@ -207,6 +210,7 @@ class CableOnCbd(Rule):
                 subject_key=number,
                 message=f"Cable {number}{f' ({spec})' if spec else ''} on {sheets} is not on the cable block diagrams{hint}",
                 evidence=cs[:1],
+                evidence_b=there,
                 recommendation="Correct the cable number on the termination drawing or the cable block diagram",
             )
 

@@ -96,6 +96,8 @@ def test_cable_001_names_the_cbd_cable_between_the_same_jb_and_panel(tmp_path, c
     (f,) = by_rule(result, "CABLE-001")
     assert "C92807" in f.message and "shows C93807 between LTL-JB1 and LTL-PLC" in f.message
     assert not by_rule(result, "CABLE-004")
+    roles = {e.role: e.source.drawing_id.split("/")[0] for e in f.evidence}
+    assert roles == {"A": "Terminations", "B": "CableBlocks"}  # both places: the C92807 label and the CBD's C93807
 
 
 def test_cable_003_multicore_to_another_jb_on_the_cbd(tmp_path, cfg):
@@ -216,7 +218,9 @@ def test_cable_004_quiet_for_the_cbd_number_cable_001_names(tmp_path, cfg):
              extra=[((420, 120, 450, 129), "C939890")])
     cbd(tmp_path, [(160, "JB1", "50C+E 1.5mm² PVC", "C93812"), (200, "JB1", "4C+E 1.5mm² PVC", "C93890")])
     result = run_pipeline(tmp_path, cfg)
-    assert [f.subject_key for f in by_rule(result, "CABLE-001")] == ["C939890"]
+    (f,) = by_rule(result, "CABLE-001")
+    assert f.subject_key == "C939890"
+    assert [e.source.drawing_id.split("/")[0] for e in f.evidence if e.role == "B"] == ["CableBlocks"]
     assert by_rule(result, "CABLE-004") == []
 
 
