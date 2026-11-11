@@ -55,6 +55,9 @@ def rack_for_panel(panel: str, settings) -> str | None:
     return area if kind.upper().startswith("PLC") else None
 
 
+_CORE_MARK = re.compile(r"^\d*(?:WH|BK|BU|BR|RD|GN|YE|GY|OG|VT|PK|GNYE|G/Y)$")
+
+
 class JbStripReader(TemplateReader):
     name = "JB termination diagram"
 
@@ -214,6 +217,7 @@ class JbStripReader(TemplateReader):
             ln for ln in page.lines
             if header.bbox[3] <= ln.bbox[1] and x0 <= mid_x(ln.bbox) <= x1
             and not any(id(w) in strip_words for w in ln.words) and not ln.text.strip().isdigit()
+            and not _CORE_MARK.match(ln.text.strip().upper())  # "1WH" / "1BK" beside a close-set strip (401103-206)
         ]
         out = {}
         for r in strip:

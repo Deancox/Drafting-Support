@@ -266,3 +266,23 @@ def test_term_007_connector_pin_differs(tmp_path, cfg):
 
 def test_term_007_quiet_when_the_pins_agree(tmp_path, cfg):
     assert by_rule(_pins(tmp_path, cfg, "A", "A"), "TERM-007") == []
+
+
+# --- second pass over the 401103 Land Leg register (2026-11-11) ---------------------------------
+
+
+def test_wire_004_keeps_a_device_terminal_just_outside_its_destination_bracket(tmp_path, cfg):
+    """401103-207: the DI SLOT 14 bracket stops one row short; LTL-JB3:4 (TN37F6) is still the device's."""
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=[("LTL-AUT1", "DI SLOT 13", "5", "5")])
+    schematic(tmp_path)
+    result = run_pipeline(tmp_path, cfg)
+    t = next(t for t in result.traces if t.key == "LTL/S13/CH00")
+    assert next(h for h in t.hops if h.hop == "JB_TERMINAL").values == ["LTL-JB1:5", "LTL-JB1:6"]
+    assert by_rule(result, "WIRE-004") == []
+
+
+def test_core_marks_are_not_block_headers():
+    from drawing_qa.parsers.termination.jb_strip import _CORE_MARK
+
+    assert all(_CORE_MARK.match(t) for t in ("1WH", "1BK", "12BU", "BR", "GNYE"))
+    assert not any(_CORE_MARK.match(t) for t in ("R-TH158V4", "SCR", "S-TN36D4", "WHEEL"))

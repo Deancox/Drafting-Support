@@ -193,9 +193,11 @@ class TraceBuilder:
             return TraceHop(seq=3, hop="JB_TERMINAL", status=HopStatus.NOT_SOURCED, note="termination drawings left out of the review")
         terminals = self._terminals_for(devices)
         if row["module"] and terminals:
-            # A device with several channels lands on several terminal pairs; keep the ones for this slot.
-            for_slot = [t for t in terminals if row["module"] in neighbours(self.g, t, "DESTINED_FOR")]
-            terminals = for_slot or terminals
+            # A device with several channels lands on several terminal pairs; drop the ones sent to another slot.
+            # A terminal with no destination read (just outside its bracket, 401103-207 LTL-JB3:4) stays.
+            dest = {t: neighbours(self.g, t, "DESTINED_FOR") for t in terminals}
+            if any(row["module"] in d for d in dest.values()):
+                terminals = [t for t in terminals if not dest[t] or row["module"] in dest[t]]
         if terminals:
             return TraceHop(seq=3, hop="JB_TERMINAL", values=_keys(self.model, terminals), status=HopStatus.FOUND)
         drawn = [j for j in row["jbs"] if neighbours(self.g, j, "TERMINAL_IN")]

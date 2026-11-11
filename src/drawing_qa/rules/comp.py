@@ -11,7 +11,7 @@ from collections.abc import Iterable
 
 from drawing_qa.common.tags import near_tags
 from drawing_qa.model.engineering import HopStatus, SignalTrace, TraceStatus
-from drawing_qa.model.enums import DocType, Severity
+from drawing_qa.model.enums import DocType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -33,6 +33,17 @@ def _on_home_sheet(ctx: RuleContext, device: str) -> bool:
         return False
     status, _, homes = ctx.home(node.attrs["ffi"], int(node.attrs["sheet"]))
     return status == "package" and bool(homes) and any(h.label in node.sheets for h in homes)
+
+
+def _home_has_channels(ctx: RuleContext, device: str) -> bool:
+    """Whether the device's home schematic sheet is an I/O slot sheet (has PLC channel rows). A device drawn on
+    a network or power sheet (Ethernet encoders on 401103-061) is not expected on a PLC channel."""
+    node = ctx.model.nodes.get(f"DEVICE:{device}")
+    if node is None or "ffi" not in node.attrs or "sheet" not in node.attrs:
+        return True
+    _, _, homes = ctx.home(node.attrs["ffi"], int(node.attrs["sheet"]))
+    with_channels = {c.source.drawing_id for c in ctx.claims_of(Predicate.HAS_CHANNEL)}
+    return any(h.id in with_channels for h in homes) or not homes
 
 
 def _occurrences(ctx: RuleContext, device: str):
@@ -133,7 +144,8 @@ class OrphanDevice(Rule):
         default_severity=Severity.MAJOR,
         description=(
             "A device on a cable block diagram, drawn on its home sheet, that no PLC channel trace reaches. "
-            "Devices not on their home sheet are reported by TAG-003 instead."
+            "Devices not on their home sheet are reported by TAG-003 instead; devices whose home sheet has no PLC "
+            "channel rows (a network or power sheet: Ethernet encoders) are not expected on a channel."
         ),
         requires=_NEEDS_TRACES,
     )
@@ -144,6 +156,8 @@ class OrphanDevice(Rule):
                 continue
             if any(c.source.drawing_id in ctx.decoded_ids for c in _occurrences(ctx, t.device)):
                 continue  # on a decoded sheet (--ocr): its channel row may not have decoded
+            if not _home_has_channels(ctx, t.device):
+                continue  # drawn on a network / power sheet, not an I/O slot sheet
             yield make(
                 subject_type="DEVICE",
                 subject_key=t.device,

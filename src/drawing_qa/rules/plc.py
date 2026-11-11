@@ -186,10 +186,14 @@ class ModuleTypeMatch(Rule):
             if any(k == key and n in decoded_plc for k, n in listed):
                 continue  # its slot sheet was decoded (--ocr): the slot header may not have decoded
             if key not in modules(ctx, "slot_sheet") and ctx.sheet_numbers:
+                unread = sorted(d.label for d in ctx.drawings if d.doc_type is DocType.PLC and d.text_unreadable
+                                and (key, d.sheet_number) in listed)
+                why = (f"; its slot sheet {', '.join(unread)} has no readable text (plotted without SHX text: try --ocr)"
+                       if unread else "")
                 yield make(
                     subject_type="PLC_MODULE",
                     subject_key=key,
-                    message=f"{key} ({lcs[0].value['part']}) is on the rack layout but no slot sheet in the package describes it",
+                    message=f"{key} ({lcs[0].value['part']}) is on the rack layout but no slot sheet in the package describes it{why}",
                     evidence=lcs[:1],
                     severity=Severity.MINOR,
                     discriminator="no-sheet",
