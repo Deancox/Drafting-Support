@@ -286,3 +286,26 @@ def test_core_marks_are_not_block_headers():
 
     assert all(_CORE_MARK.match(t) for t in ("1WH", "1BK", "12BU", "BR", "GNYE"))
     assert not any(_CORE_MARK.match(t) for t in ("R-TH158V4", "SCR", "S-TN36D4", "WHEEL"))
+
+
+# --- system map: the termination drawings ------------------------------------------------------
+
+
+def test_system_map_shows_terminals_cables_and_the_termination_jb(tmp_path, cfg):
+    from drawing_qa.report.system_map import build_map
+
+    jb_sheet(tmp_path, blocks=BRAKE, destinations=TO_SLOT_13, spec=("50C+E 1.5mm2 PVC", "C92812", "12 SPARE"))
+    schematic(tmp_path, jb="LTL-JB2")  # the schematic sends S-TN36D4 through LTL-JB2; the terminations land it in LTL-JB1
+    cbd(tmp_path, [(160, "JB1", "50C+E 1.5mm² PVC", "C93812")])
+    m = build_map(run_pipeline(tmp_path, cfg))
+    node = {n["key"]: n for n in m["nodes"]}
+    assert node["LTL-JB1"]["column"] == 2 and node["LTL-JB1"]["on_term"] is True  # shown though only the terminations name it
+    assert node["LTL-JB1"]["strip_sheets"] == ["401103 sh 203"]
+    cables = {c["number"]: c["on"] for c in node["LTL-JB1"]["cables"]}
+    assert cables == {"C92812": ["termination"], "C93812": ["CBD"]}
+    [ch] = node["S-TN36D4"]["channels"]
+    assert ch["terminals"] == ["LTL-JB1:5", "LTL-JB1:6"] and ch["td_jbs"] == ["LTL-JB1"] and ch["jbs"] == ["LTL-JB2"]
+    assert node["S-TN36D4"]["on_term"] is True
+    ids = {n["id"]: n["key"] for n in m["nodes"]}
+    states = {(ids[l["src"]], ids[l["dst"]]): l["state"] for l in m["links"]}
+    assert states[("LTL-JB1", "S-TN36D4")] == "conflict"  # COMP-003: the drawings disagree on its JB

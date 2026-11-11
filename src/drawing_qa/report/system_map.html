@@ -159,11 +159,14 @@
             note: "Should be on a CBD: the schematic wires each out through a field JB, but no cable block diagram shows it."},
     noplc: {label: "On CBD, not on PLC", test: n => n.column === 3 && n.on_cbd && (n.orphan || !n.on_plc),
             note: "Shown on a cable block diagram, but no schematic channel wires it."},
+    noterm: {label: "On PLC, not on terminations", test: n => n.missing_from_term,
+             note: "Its JB's terminal strip is on a termination sheet, but no terminal there serves it."},
   };
   // Lists that can only be compared (no overview box): the devices each drawing type shows.
   const LISTS = {
     plcdev: {label: "PLC: devices wired through a field JB", test: n => n.column === 3 && n.via_field_jb},
     cbddev: {label: "CBD: devices shown", test: n => n.column === 3 && n.on_cbd},
+    termdev: {label: "Terminations: devices shown", test: n => n.column === 3 && n.on_term},
     ...CATEGORIES,
   };
   const listOf = name => data.nodes.filter(LISTS[name].test);
@@ -241,7 +244,8 @@
       const x1 = COL_X[a.column] + COL_W[a.column], y1 = y[a.id] + BOX_H / 2;
       const x2 = COL_X[b.column], y2 = y[b.id] + BOX_H / 2, mx = (x1 + x2) / 2;
       const p = el("path", {d: `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, class: "link " + l.state}, gLinks);
-      el("title", {}, p).textContent = `${a.key} → ${b.key}` + (l.channels.length ? "\n" + l.channels.join(", ") : "");
+      el("title", {}, p).textContent = `${a.key} → ${b.key}` + (l.channels.length ? "\n" + l.channels.join(", ") : "")
+        + (l.cables && l.cables.length ? "\nCable " + l.cables.map(cableText).join("; ") : "");
       l._el = p; l._mid = [mx, (y1 + y2) / 2];
     }
     for (const n of nodes) {
@@ -298,14 +302,35 @@
       ${f.recommendation ? `<div class="rec">→ ${esc(f.recommendation)}</div>` : ""}</div>`;
   }
 
+  function cableText(c) {
+    const specs = [...new Set(Object.values(c.spec || {}))];
+    return `${c.number}${specs.length ? " " + specs.join(" / ") : ""} (${c.on.join(", ")})`;
+  }
+
+  function cableHtml(c) {
+    const specs = Object.entries(c.spec || {});
+    const same = new Set(specs.map(([, v]) => v.replace("²", "2"))).size <= 1;
+    const missing = ["termination", "CBD"].filter(o => !c.on.includes(o));
+    return `<div class="chan"><b>${esc(c.number)}</b>
+      <div class="muted">${specs.length ? (same ? esc(specs[0][1]) : specs.map(([o, v]) => `${esc(v)} on the ${esc(o)}`).join(" · ")) : "no spec"}</div>
+      ${missing.length ? `<div class="muted">Not on the ${esc(missing.join(" or "))}</div>` : ""}</div>`;
+  }
+
+  function onHtml(n) {
+    const mark = (ok, name) => `<span class="${ok ? "" : "muted"}">${ok ? "✓" : "✗"} ${name}</span>`;
+    return `<div class="sub">${[mark(n.on_plc, "Schematic"), mark(n.on_cbd, "CBD"), mark(n.on_term, "Termination")].join(" · ")}</div>`;
+  }
+
   function channelHtml(c) {
-    const via = (c.cbd_via || []).join(", "), jbs = (c.jbs || []).join(", ");
+    const via = (c.cbd_via || []).join(", "), jbs = (c.jbs || []).join(", "), td = (c.td_jbs || []).join(", ");
     const differs = via && via !== jbs;
     const label = {ok: "traced as far as the drawings go", gap: "a hop is missing", conflict: "drawings disagree"}[c.state];
     return `<div class="chan"><span class="state ${c.state}" title="${label}"></span><b>${esc(c.channel)}</b>
       <span class="muted">· ${label}</span><div>${esc(c.description)}</div>
       <div class="muted">Wires: ${esc((c.wires || []).join(", ") || "—")} · Schematic via: ${esc(jbs || "—")}</div>
-      ${differs ? `<div class="muted">CBD routes via: ${esc(via)}</div>` : ""}</div>`;
+      ${differs ? `<div class="muted">CBD routes via: ${esc(via)}</div>` : ""}
+      ${c.terminals && c.terminals.length ? `<div class="muted">JB terminals: ${esc(c.terminals.join(", "))}</div>` : ""}
+      ${(c.td_jbs || []).some(j => !(c.jbs || []).includes(j)) ? `<div class="muted">Terminations land it in: ${esc(td)}</div>` : ""}</div>`;
   }
 
   function summary() {
@@ -322,7 +347,10 @@
       Each line is a connection; hover it for its channels.</p>
       <p><b style="color:var(--ok)">Green</b>: traced as far as the supplied drawings go.
       <b style="color:var(--gap)">Amber</b>: a hop the drawings should show is missing.
-      <b style="color:var(--conflict)">Red</b>: two drawings disagree (e.g. the CBD routes through a JB the schematic leaves out).</p>
+      <b style="color:var(--conflict)">Red</b>: two drawings disagree (e.g. the CBD routes through a JB the schematic leaves out,
+      or the termination drawing lands a wire, pin or cable differently).</p>
+      <p>Hover a line from a PLC module to a JB for the JB's multicore to the panel; click the JB to compare its
+      number and spec on the termination drawing and the CBD.</p>
       <p>A <b>dashed</b> device is wired out through a field JB on the schematic but shown on no cable block diagram.
       A red number is how many findings name the item.</p>
       <p>Click an item to highlight its channels and see its sheets, channels and findings. Click empty space to clear.</p>
@@ -396,9 +424,13 @@
     side.innerHTML = `<button class="back" data-back>${esc(back)}</button>
       <h2>${esc(n.key)}</h2><div class="sub">${esc(kind)}</div>
       ${n.column === 3 && n.sub ? `<div class="sub">${esc(n.sub)}</div>` : ""}
+      ${n.column ? onHtml(n) : ""}
       ${n.missing_from_cbd ? `<div class="warn">Wired out through a field JB on the schematic, but not on any cable block diagram.</div>` : ""}
+      ${n.missing_from_term ? `<div class="warn">Its JB's terminal strip is on a termination sheet, but no terminal there serves it.</div>` : ""}
       ${n.orphan ? `<div class="warn">Drawn on the CBD or its home sheet, but no PLC channel reaches it.</div>` : ""}
       <h3>Findings (${n.findings.length})</h3>${n.findings.map(findingHtml).join("") || `<div class="muted">None.</div>`}
+      ${n.column === 2 ? `<h3>Cables to the panel (${n.cables.length})</h3>${n.cables.map(cableHtml).join("") || `<div class="muted">None read.</div>`}
+        ${n.strip_sheets.length ? `<div class="muted">Terminal strip on ${esc(n.strip_sheets.join(", "))}</div>` : ""}` : ""}
       ${n.column ? `<h3>Channels (${n.channels.length})</h3>${n.channels.map(channelHtml).join("") || `<div class="muted">None.</div>`}` : ""}
       <h3>Drawn on</h3>${n.locations.length ? `<ul class="locs">${n.locations.map(l => `<li>${esc(l)}</li>`).join("")}</ul>` : `<div class="muted">—</div>`}`;
     side.querySelector("[data-back]").addEventListener("click", () => from ? showCategory(from) : summary());
