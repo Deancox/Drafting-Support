@@ -12,6 +12,14 @@ Automated QA of controls drawing packages: PLC drawings, cable block diagrams an
 Termination drawings are read as JB terminal strips (terminal, wire, device, destination panel and slot, multicore) and PLC slot terminal strips, and cross-checked against the schematics and CBDs.
 
 ## Setup
+**The easy way: two double-click programs.**
+
+- **`Set Up.cmd`** (Mac / Linux: `./setup`): run once on a new computer, and again after the tool is updated. It installs Python 3.12 if no Python 3.11+ is found (winget on Windows; Homebrew or apt elsewhere), creates `.venv` and downloads the requirements, then a box says it worked or what went wrong. When everything is already installed and unchanged it says so and installs nothing.
+- **`Steve.cmd`** (Mac / Linux: `./steve`): reviews the drawings in `input/Main` and saves the results in `reports/Main`, then a box gives the number of findings (and any warnings, e.g. the register was open in Excel) and the results folder opens. If the tool is not set up, or `input/Main` has no PDFs, the box says what to do.
+
+Both share `steve.py`, which also passes other commands to the tool once set up (`python steve.py run --input input/LL_Main`). Set `STEVE_NO_BOX=1` to print the messages instead of showing boxes.
+
+**By hand:**
 ```bash
 python -m venv .venv
 ```
