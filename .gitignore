@@ -4,15 +4,21 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 
-# Client drawings and anything made from them stay out of the repository
-input/
+# Client drawings and anything made from them stay out of the repository. Only the empty folder layout
+# (input/Main/PLC, CableBlocks, Terminations, EquipmentList; reports/) is kept, by its placeholder files.
+input/**
+!input/**/
+!input/**/.gitkeep
+!input/README.md
 Terms/
 extracted/
 /*.pdf
 *.dwg
 
 # Run outputs: reports, the QA register and the review database (the checker's decisions)
-reports/
+reports/**
+!reports/**/
+!reports/README.md
 *.sqlite
 QA_Register*.xlsx
 
