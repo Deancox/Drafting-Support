@@ -1,9 +1,9 @@
 """The two double-click programs' shared code: "Set Up" and "Steve".
 
-    Set Up.cmd  ->  python steve.py setup    creates .venv, installs the requirements, then a box says it worked or why not
-    Steve.cmd   ->  python steve.py review   reviews input/Main, saves the outputs in reports/Main, then a box says how it went
+    Set Up  ->  python steve.py setup    creates .venv, installs the requirements, then a box says it worked or why not
+    Steve   ->  python steve.py review   reviews input/Main, saves the outputs in reports/Main, then a box says how it went
 
-Both are started by their .cmd file (Windows) or shell script (Mac / Linux), which find Python first; Set Up
+Both are started by their launcher in Windows/ (.cmd) or Mac/ (.command), which find Python first; Set Up
 installs Python if there is none. Any other arguments go straight to the tool:
     python steve.py run --input input/LL_Main      is   python -m drawing_qa run --input input/LL_Main
 
@@ -114,7 +114,11 @@ def setup(force: bool = False) -> str:
     if still:
         raise Failed(f"These did not install properly: {', '.join(still)}. Run Set Up again; the details are in the black window.")
     STAMP.write_text(fingerprint() + "\n", encoding="utf-8")
-    return "Set up is complete. Put the drawings in input\\Main and double-click Steve to run the review."
+    tk = subprocess.run([str(VPY), "-c", "import tkinter"], capture_output=True).returncode == 0
+    note = "" if tk else ("\n\nNote: this Python has no tkinter, so the Drawing QA window will not open (Steve still works). "
+                          "On a Mac with Homebrew: brew install python-tk@3.12, then run Set Up again.")
+    return (f"Set up is complete. Put the drawings in {Path('input', 'Main')} and double-click Steve to run the review, "
+            "or Drawing QA to choose the folders and options." + note)
 
 
 def oda_note() -> str:

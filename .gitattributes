@@ -1,0 +1,4 @@
+# The double-click launchers need their own system's line endings, whatever computer checks them out.
+*.cmd      text eol=crlf
+*.command  text eol=lf
+*.sh       text eol=lf

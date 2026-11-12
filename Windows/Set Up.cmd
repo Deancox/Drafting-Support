@@ -1,9 +1,9 @@
 @echo off
 rem Set Up: installs everything the Drawing QA tool needs on this computer, then shows a box saying it worked
 rem (or what went wrong). Double-click it once on a new computer, and again whenever the tool is updated.
-rem Installs Python 3.12 if no Python 3.11+ is found, then the requirements into .venv in this folder.
+rem Installs Python 3.12 if no Python 3.11+ is found, then the requirements into .venv in the project folder.
 setlocal
-cd /d "%~dp0"
+cd /d "%~dp0.."
 title Drawing QA - Set Up
 
 set "PY="
@@ -22,7 +22,7 @@ if not defined PY (
     if not defined PY goto :reopen
 )
 
-%PY% "%~dp0steve.py" setup %*
+%PY% "%CD%\steve.py" setup %*
 exit /b %ERRORLEVEL%
 
 :nopython
