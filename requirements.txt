@@ -1,10 +1,10 @@
 # Installs the Drawing QA tool and everything it needs: pip install -r requirements.txt
-# The dependency list itself is in pyproject.toml ([project] dependencies; [dev] adds pytest and
-# ipykernel for the tests and commands.ipynb), so it is kept in one place:
+# The dependency list itself is in pyproject.toml ([project] dependencies), so it is kept in one place.
+# For the tests and notebooks (kept locally, not on GitHub) add pytest and ipykernel: pip install -e .[dev]
 #   pymupdf    reads the PDFs (text, SHX notes, line work)
 #   pydantic   settings and data records
 #   networkx   the engineering graph and signal traces
 #   openpyxl   writes QA_Register.xlsx
 #   ezdxf      reads a sheet's DWG (as DXF) when its PDF has no SHX text; the DWG -> DXF step needs
 #              the free ODA File Converter (opendesign.com), installed separately
--e .[dev]
+-e .

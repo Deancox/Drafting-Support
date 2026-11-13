@@ -29,9 +29,7 @@ python -m venv .venv
 ```bash
 .venv/Scripts/python -m pip install -r requirements.txt
 ```
-`requirements.txt` installs the tool with its dependencies (listed in `pyproject.toml`), plus pytest and ipykernel.
-
-**`commands.ipynb`** has the main commands one cell each: install, survey, run (with `--exclude` / `--ocr` variations), open the outputs, run the tests, help. Pick the `.venv` as its kernel.
+`requirements.txt` installs the tool with its dependencies (listed in `pyproject.toml`).
 
 ## Run
 Put one package in a folder with three subfolders:
@@ -68,13 +66,9 @@ The outputs are written to `reports/Main/` (change this with `--output`):
 - `QA_Register.xlsx`: the findings register to print and mark up
 - `system_map.html`: the package as an interactive map (panel → PLC module → JB → field device); opens in any browser, offline
 
-Configuration is in `config/project.toml`, in three parts: the project (FFI drawings, renamed designations, rack panels, areas), the client's drafting standard (tag grammar, CBD line weights, placeholders) and run preferences. Per-rule settings are in `config/rules.toml`, accepted exceptions in `config/waivers.toml`.
+Configuration is in `config/project.toml`, in three parts: the project (FFI drawings, renamed designations, rack panels, areas), the client's drafting standard (tag grammar, CBD line weights, placeholders) and run preferences. Two optional files beside it, kept per project and not on GitHub: `config/rules.toml` (turn a rule off or change its severity: `[rules."TAG-002"]` `enabled = false`) and `config/waivers.toml` (accepted exceptions, `[[waiver]]` with `id`, `rule`, `subject`, `reason`). Every rule is on with its default severity when they are absent.
 
-## Test
-```bash
-.venv/Scripts/python -m pytest
-```
-The tests generate their own PDFs, including AutoCAD-style SHX text annotations, so they don't need client drawings.
+The automatic tests and the notebooks are kept locally, not on GitHub.
 
 ## Layout
 ```
@@ -90,5 +84,7 @@ src/drawing_qa/
   rules/                rule engine + TAG, WIRE, PLC, PATH, COMP, PLACEHOLDER, DRW rules
   linker/ graph/ traces/  claims -> engineering model -> networkx graph -> signal traces
   report/               review.json, findings.json, report.md, QA_Register.xlsx, system_map.html
-tests/                  pytest suite with synthetic PDF fixtures
+  gui.py                the Drawing QA window
+Windows/, Mac/          Set Up, Steve and Drawing QA launchers
+steve.py                what Set Up and Steve run
 ```

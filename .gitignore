@@ -31,3 +31,9 @@ QA_Register*.xlsx
 
 # Local tool settings (preview server)
 .claude/
+
+# Kept locally, not on GitHub: the tests, the notebooks and the per-project rule switches and waivers
+tests/
+*.ipynb
+config/rules.toml
+config/waivers.toml
