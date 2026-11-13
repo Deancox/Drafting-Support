@@ -126,7 +126,8 @@ def oda_note() -> str:
     if run([VPY, "-c", code], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
         return ""
     return ("\n\nOptional: the ODA File Converter is not installed. It is only needed to read a sheet's DWG when its PDF "
-            "has no text (free from opendesign.com).")
+            "has no text. It is free: double-click 'Get the ODA File Converter' in this folder to download it, install it, "
+            "and the tool finds it by itself.")
 
 
 # --- review -----------------------------------------------------------------------------------------

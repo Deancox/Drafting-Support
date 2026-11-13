@@ -147,7 +147,8 @@ enabled = false
 # (PLC/401104-052.pdf + PLC/401104-052.dwg) have their text read from the DWG: exact, no decoding.
 # The DWG is used only if its line work lines up with the PDF's; otherwise the sheet is reported (DWG_NOT_USED).
 enabled = true
-# ODA File Converter (free, opendesign.com). Empty: found on PATH, in Program Files\ODA or in ~/Tools.
+# ODA File Converter (free; "Get the ODA File Converter" in Windows/ or Mac/ opens its download page).
+# Empty: found on PATH, in Program Files\ODA, in ~/Tools or as /Applications/ODAFileConverter.app; otherwise its full path.
 converter = ""
 
 # [ocr]

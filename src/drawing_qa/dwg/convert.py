@@ -16,7 +16,8 @@ _EXE = "ODAFileConverter.exe" if os.name == "nt" else "ODAFileConverter"
 
 def find_converter(configured: str = "") -> Path | None:
     """The converter: the configured path, the ODA_FILE_CONVERTER variable, on PATH, or a usual install folder."""
-    candidates = [configured, os.environ.get("ODA_FILE_CONVERTER", ""), shutil.which(_EXE) or ""]
+    candidates = [configured, os.environ.get("ODA_FILE_CONVERTER", ""), shutil.which(_EXE) or "",
+                  "/Applications/ODAFileConverter.app/Contents/MacOS/ODAFileConverter"]  # its usual place on a Mac
     for root in (Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "ODA", Path.home() / "Tools"):
         if root.is_dir():
             candidates += [str(p) for p in sorted(root.glob(f"*/{_EXE}"), reverse=True)]  # newest version first
