@@ -28,6 +28,7 @@ QA_Register*.xlsx
 /DATA_MODEL.md
 /Drawing QA Handbook.html
 /Drawing QA User Guide.html
+/steve.py
 
 # Local tool settings (preview server)
 .claude/
