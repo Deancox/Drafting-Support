@@ -28,7 +28,6 @@ QA_Register*.xlsx
 /DATA_MODEL.md
 /Drawing QA Handbook.html
 /Drawing QA User Guide.html
-/steve.py
 /COMMANDS.md
 /src/drawing_qa/api.py
 /src/drawing_qa/server.py
