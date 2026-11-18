@@ -1,13 +1,16 @@
-"""The two double-click programs' shared code: "Set Up" and "Steve".
+"""The double-click programs' shared code: "Set Up" and "Steve" (Windows/*.cmd and Mac/*.command run it).
 
-    Set Up  ->  python steve.py setup    creates .venv, installs the requirements, then a box says it worked or why not
-    Steve   ->  python steve.py review   reviews input/Main, saves the outputs in reports/Main, then a box says how it went
+    Set Up  ->  python Windows/launcher.py setup    creates .venv, installs the requirements, offers to install
+                                                    the ODA File Converter, then a box says it worked or why not
+    Steve   ->  python Windows/launcher.py review   reviews input/Main, saves the outputs in reports/Main, then a
+                                                    box says how it went
 
-Both are started by their launcher in Windows/ (.cmd) or Mac/ (.command), which find Python first; Set Up
+Standard library only, so Set Up can run it before anything is installed. The launchers find Python first; Set Up
 installs Python if there is none. Any other arguments go straight to the tool:
-    python steve.py run --input input/LL_Main      is   python -m drawing_qa run --input input/LL_Main
+    python Windows/launcher.py run --input input/LL_Main    is    python -m drawing_qa run --input input/LL_Main
 
-The drawings are only read, never changed. Setup only installs Python packages into .venv in this folder.
+The drawings are only read, never changed. Setup installs Python packages into .venv in the project folder and,
+if the person says yes, the ODA File Converter (its own installer, with its own licence to accept).
 """
 
 from __future__ import annotations
@@ -15,12 +18,15 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import subprocess
 import sys
+import tempfile
+import urllib.request
 import venv
 from pathlib import Path
 
-HERE = Path(__file__).resolve().parent
+HERE = Path(__file__).resolve().parent.parent  # the project folder (this file is in its Windows folder)
 VENV = HERE / ".venv"
 STAMP = VENV / "steve-installed.txt"
 WINDOWS = os.name == "nt"
@@ -58,6 +64,26 @@ def box(title: str, text: str, error: bool = False) -> None:
             subprocess.run(["zenity", "--error" if error else "--info", f"--title={title}", f"--text={text}"], check=False)
     except Exception:  # no GUI (a server, a remote session): the console message above is enough
         pass
+
+
+def ask(title: str, text: str) -> bool:
+    """A Yes / No question box; False when boxes are off (STEVE_NO_BOX) or there is no GUI."""
+    print(f"\n{title}: {text}\n", flush=True)
+    if os.environ.get("STEVE_NO_BOX"):
+        return False
+    try:
+        if WINDOWS:
+            import ctypes
+
+            return ctypes.windll.user32.MessageBoxW(0, text, title, 0x4 | 0x20 | 0x40000) == 6  # Yes / No, question, on top
+        if sys.platform == "darwin":
+            safe = text.replace('"', "'")
+            out = subprocess.run(["osascript", "-e", f'display dialog "{safe}" with title "{title}" '
+                                  'buttons {"No", "Yes"} default button "Yes"'], capture_output=True, text=True)
+            return "Yes" in out.stdout
+        return subprocess.run(["zenity", "--question", f"--title={title}", f"--text={text}"]).returncode == 0
+    except Exception:
+        return False
 
 
 def run(cmd: list, **kw) -> int:
@@ -121,13 +147,71 @@ def setup(force: bool = False) -> str:
             "or Drawing QA to choose the folders and options." + note)
 
 
-def oda_note() -> str:
+# --- the ODA File Converter (optional: reads a sheet's DWG when its PDF has no text) --------------------
+
+ODA_PAGE = "https://www.opendesign.com/guestfiles/oda_file_converter"
+ODA_GET = "https://www.opendesign.com/guestfiles/get?filename="  # ODA's own links, always the current version
+
+
+def oda_installed() -> bool:
     code = "from drawing_qa.dwg.convert import find_converter; import sys; sys.exit(0 if find_converter() else 1)"
-    if run([VPY, "-c", code], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0:
+    return run([VPY, "-c", code], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) == 0
+
+
+def oda_file() -> str | None:
+    """ODA's installer for this computer: Windows .msi, Mac .dmg (Apple chip or Intel), Linux AppImage."""
+    machine = platform.machine().lower()
+    if WINDOWS:
+        return "ODAFileConverter_QT6_vc16_amd64dll.msi" if machine in ("amd64", "x86_64", "arm64") else None
+    if sys.platform == "darwin":
+        return f"ODAFileConverter_QT6_macOsX_{'arm64' if machine == 'arm64' else 'x64'}_15.0dll.dmg"
+    return "ODAFileConverter_QT6_lnxX64_11dll.AppImage" if machine in ("x86_64", "amd64") else None
+
+
+def download(name: str, to: Path) -> Path:
+    say(f"Downloading the ODA File Converter ({name}) ...")
+    req = urllib.request.Request(ODA_GET + name, headers={"User-Agent": "Mozilla/5.0 (Drawing QA set up)"})
+    path = to / name
+    with urllib.request.urlopen(req, timeout=120) as r, open(path, "wb") as f:  # follows ODA's redirect to its download
+        while chunk := r.read(1 << 20):
+            f.write(chunk)
+    if path.stat().st_size < 1_000_000:
+        raise OSError("the download is too small to be the installer")
+    return path
+
+
+def install_oda() -> str:
+    """Offer to install the converter; returns a line for the Set Up box ('' when it is installed)."""
+    if oda_installed():
         return ""
-    return ("\n\nOptional: the ODA File Converter is not installed. It is only needed to read a sheet's DWG when its PDF "
-            "has no text. It is free: double-click 'Get the ODA File Converter' in this folder to download it, install it, "
-            "and the tool finds it by itself.")
+    link = ("double-click 'Get the ODA File Converter' in the Windows (or Mac) folder, install it, and run Set Up again; "
+            "the tool finds it by itself.")
+    name = oda_file()
+    if name is None or not ask("Set Up: ODA File Converter (optional)",
+                               "The ODA File Converter is not installed. It is only needed to read a sheet's DWG when its "
+                               "PDF was plotted without text.\n\nDownload and install it now? It is free; its installer "
+                               "will ask you to accept ODA's licence."):
+        return f"\n\nOptional: the ODA File Converter is not installed. To add it later, {link}"
+    try:
+        folder = Path(tempfile.mkdtemp(prefix="oda-"))
+        path = download(name, folder)
+        if WINDOWS:
+            say("Opening the installer: follow its steps (it may ask for administrator permission) ...")
+            run(["msiexec", "/i", path])  # ODA's own installer and licence; waits until it closes
+        elif sys.platform == "darwin":
+            run(["open", path])
+            return ("\n\nThe ODA File Converter installer has opened: drag ODAFileConverter into Applications, then run "
+                    "Set Up again to check it is found.")
+        else:
+            target = Path.home() / "Tools" / "ODAFileConverter" / "ODAFileConverter"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            path.replace(target)
+            target.chmod(0o755)
+    except Exception as exc:
+        return f"\n\nThe ODA File Converter could not be downloaded ({exc}). To add it, {link}"
+    if oda_installed():
+        return "\n\nThe ODA File Converter is installed and found."
+    return f"\n\nThe ODA File Converter was not found after its installer closed. To try again, {link}"
 
 
 # --- review -----------------------------------------------------------------------------------------
@@ -173,7 +257,7 @@ def main(argv: list[str]) -> int:
     try:
         if action == "setup":
             message = setup(force="--force" in argv)
-            box("Set Up: success", message + oda_note())
+            box("Set Up: success", message + install_oda())
             return 0
         if action == "review":
             box("Steve: review finished", review())

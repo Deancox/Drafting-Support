@@ -22,7 +22,7 @@ if not defined PY (
     if not defined PY goto :reopen
 )
 
-%PY% "%CD%\steve.py" setup %*
+%PY% "%CD%\Windows\launcher.py" setup %*
 exit /b %ERRORLEVEL%
 
 :nopython

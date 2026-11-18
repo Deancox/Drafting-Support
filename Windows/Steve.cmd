@@ -9,5 +9,5 @@ if not exist "%CD%\.venv\Scripts\python.exe" (
     powershell -NoProfile -Command "Add-Type -AssemblyName PresentationFramework; [void][System.Windows.MessageBox]::Show('The tool is not set up on this computer yet. Double-click Set Up first.', 'Steve: error', 'OK', 'Error')"
     exit /b 1
 )
-"%CD%\.venv\Scripts\python.exe" "%CD%\steve.py" review
+"%CD%\.venv\Scripts\python.exe" "%CD%\Windows\launcher.py" review
 exit /b %ERRORLEVEL%
