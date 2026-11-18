@@ -28,4 +28,4 @@ if [ -z "$PY" ] || ! "$PY" -c "import sys; sys.exit(sys.version_info < (3, 11))"
     exit 1
 fi
 
-exec "$PY" "$(pwd)/steve.py" setup "$@"
+exec "$PY" "$(pwd)/Windows/launcher.py" setup "$@"

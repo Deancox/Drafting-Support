@@ -14,13 +14,13 @@ Termination drawings are read as JB terminal strips (terminal, wire, device, des
 ## Setup
 **The easy way: double-click programs**, in the **`Windows`** folder (`.cmd`) and the **`Mac`** folder (`.command`). The same three on each:
 
-- **Set Up**: run once on a new computer, and again after the tool is updated. It installs Python 3.12 if no Python 3.11+ is found (winget on Windows, Homebrew on a Mac), creates `.venv` in the project folder and downloads the requirements, then a box says it worked or what went wrong. When everything is already installed and unchanged it says so and installs nothing.
+- **Set Up**: run once on a new computer, and again after the tool is updated. It installs Python 3.12 if no Python 3.11+ is found (winget on Windows, Homebrew on a Mac), creates `.venv` in the project folder and downloads the requirements. If the ODA File Converter (needed only to read a sheet's DWG when its PDF has no text) is not installed, it asks whether to install it: on Yes it downloads ODA's current installer and opens it (Windows: you accept ODA's licence and click through; Mac: drag the app into Applications). Then a box says it worked or what went wrong. When everything is already installed and unchanged it says so and installs nothing.
 - **Steve**: reviews the drawings in `input/Main` and saves the results in `reports/Main`, then a box gives the number of findings (and any warnings, e.g. the register was open in Excel) and the results folder opens (Windows). If the tool is not set up, or `input/Main` has no PDFs, the box says what to do.
 - **Drawing QA**: a window to choose everything yourself: browse for the input (package) folder, the output folder and the project settings file; tick or untick the drawing types to check (PLC, CBD, terminations, equipment list; unticked = `--exclude`) and the extras (OCR for sheets with no SHX text, a detailed log). Survey or Run review, watch the progress, then open the QA register, system map, report or output folder from its buttons. It remembers the last choices. Also `python -m drawing_qa.gui`.
 
 On a Mac, the first time macOS may say a `.command` file "cannot be opened": right-click it, choose Open, then Open again. A Mac with Homebrew Python also needs `brew install python-tk@3.12` for the window (Set Up installs it with Python, and says if it is missing).
 
-Set Up and Steve share `steve.py`, which also passes other commands to the tool once set up (`python steve.py run --input input/LL_Main`). Set `STEVE_NO_BOX=1` to print the messages instead of showing boxes.
+Set Up and Steve (Windows and Mac) share `Windows/launcher.py`, which also passes other commands to the tool once set up (`python Windows/launcher.py run --input input/LL_Main`). Set `STEVE_NO_BOX=1` to print the messages instead of showing boxes.
 
 **By hand:**
 ```bash
@@ -86,5 +86,5 @@ src/drawing_qa/
   report/               review.json, findings.json, report.md, QA_Register.xlsx, system_map.html
   gui.py                the Drawing QA window
 Windows/, Mac/          Set Up, Steve and Drawing QA launchers
-steve.py                what Set Up and Steve run
+Windows/launcher.py     what Set Up and Steve run (Windows and Mac)
 ```
