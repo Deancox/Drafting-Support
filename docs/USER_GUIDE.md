@@ -123,7 +123,7 @@ The window remembers your last choices. You can also start it with `python -m dr
 | `--ocr` | Decode the letter strokes of sheets with no SHX text (section 6). |
 | `-v`, `--verbose` | Show the detailed log. |
 
-`steve.py` also passes any command through to the tool: `python steve.py run --input input/LL_Main` is the same
+`Windows/launcher.py` also passes any command through to the tool: `python Windows/launcher.py run --input input/LL_Main` is the same
 as `python -m drawing_qa run --input input/LL_Main`.
 
 `commands.ipynb` has these commands one per cell, if you prefer working in a notebook. Choose `.venv` as the
