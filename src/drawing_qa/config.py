@@ -7,7 +7,7 @@ import tomllib
 from datetime import date
 from pathlib import Path
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from drawing_qa.model.enums import DocType
 
@@ -216,6 +216,42 @@ class ReviewConfig(BaseModel):
     enabled: bool = False
 
 
+class CasesConfig(BaseModel):
+    """The Copilot review cases: one JSON file per finding, a crop of each evidence spot and a manifest, made at the
+    end of a run from findings.json and review.json and written to `folder`. Off unless enabled = true or run --cases."""
+
+    enabled: bool = False
+    # The job name the review list rows are keyed by, as the review list writes it: letters, digits and hyphens,
+    # e.g. "900001-Main". A plain number such as 900001 works too. Empty: the most common drawing number on the
+    # PLC schematics (from the title blocks); with no PLC schematics, the most common drawing number on any sheet.
+    job: str = ""
+    # Where the cases are saved: a full path, or a name for a folder inside the output folder. Write a Windows path
+    # in single quotes, e.g. 'C:\Users\you\OneDrive - Company\QA Cases', because backslashes in double quotes break
+    # the config file. A missing folder is created when the folder above it exists. Empty: the output folder's
+    # cases folder, e.g. reports\<package>\cases.
+    folder: str = ""
+
+    @field_validator("enabled", mode="before")
+    @classmethod
+    def as_switch(cls, value: object) -> bool:
+        """true, yes, on or 1 (any case; as text or a number) is on. Anything else is off, so a bad switch never stops a QA run."""
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int):
+            return value == 1
+        return isinstance(value, str) and value.strip().lower() in {"true", "yes", "on", "1"}
+
+    @field_validator("job", "folder", mode="before")
+    @classmethod
+    def as_text(cls, value: object) -> object:
+        """A job or folder written as a number is read as its text; anything else that is not text becomes empty."""
+        if isinstance(value, bool):
+            return ""
+        if isinstance(value, (int, float)):
+            return str(value)
+        return value if isinstance(value, str) else ""
+
+
 class ProjectInfo(BaseModel):
     code: str = ""  # labels for whoever reads the file; checks take drawing numbers from the sheets
     name: str = ""
@@ -244,6 +280,7 @@ class Settings(BaseModel):
     spelling: SpellingConfig = Field(default_factory=SpellingConfig)
     cbd: CbdConfig = Field(default_factory=CbdConfig)
     review: ReviewConfig = Field(default_factory=ReviewConfig)
+    cases: CasesConfig = Field(default_factory=CasesConfig)
     ocr: OcrConfig = Field(default_factory=OcrConfig)
     dwg: DwgConfig = Field(default_factory=DwgConfig)
     rules: dict[str, RuleSetting] = Field(default_factory=dict)  # from rules.toml beside the project config

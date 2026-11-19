@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import sys
+import tomllib
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from drawing_qa import __version__
+from drawing_qa.cases import make_cases
 from drawing_qa.config import DEFAULT_FOLDERS, Settings
 from drawing_qa.ingest.ffi import describe
 from drawing_qa.model.enums import DocType, IssueCode
@@ -18,6 +23,7 @@ from drawing_qa.survey import render as render_survey
 from drawing_qa.survey import survey
 
 DEFAULT_CONFIG = Path("config/project.toml")
+PROJECT = Path(__file__).resolve().parents[2]  # the folder with config/, input/, reports/
 _INPUT_TYPES = (DocType.PLC, DocType.CBD, DocType.TERM, DocType.EQUIP)
 
 
@@ -60,12 +66,105 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Read sheets plotted without SHX text (NO_SHX_TEXT) by decoding their letter strokes, "
              "learned from the readable sheets",
     )
+    run.add_argument(
+        "--cases", action=argparse.BooleanOptionalAction, default=None,
+        help="Make the Copilot review cases for this run (--no-cases leaves them out). Without either flag, "
+             "[cases] enabled in the config decides",
+    )
+    run.add_argument("--job", help="Job name the review cases are keyed by (letters, digits and hyphens); replaces [cases] job for this run. "
+                     "Empty (--job=): the most common drawing number on the PLC schematics")
+    run.add_argument("--cases-folder", help="Where the review cases are saved: a full path, or a name for a folder inside the output folder; "
+                     "replaces [cases] folder for this run. Empty (--cases-folder=): the default, the output folder's cases folder")
     run.add_argument("-v", "--verbose", action="store_true")
     sv = sub.add_parser("survey", help="Count which PDFs can be read from their SHX text and which need decoding (--ocr); checks nothing")
     sv.add_argument("--input", required=True, type=Path, help="Folder to survey: every PDF under it, any layout")
     sv.add_argument("--config", type=Path, help=f"Project config TOML (default: {DEFAULT_CONFIG} if present)")
     sv.add_argument("-v", "--verbose", action="store_true")
+    cs = sub.add_parser("cases", help="Make the Copilot review cases from a finished review's output folder, with no pipeline run")
+    cs.add_argument("--report", required=True, type=Path, help="Output folder of a finished review (holds findings.json and review.json)")
+    cs.add_argument("--input", type=Path, help="Drawing package folder that review was made from (default: the one review.json records)")
+    cs.add_argument("--config", type=Path, help=f"Project config TOML (default: {DEFAULT_CONFIG} if present)")
+    cs.add_argument("--job", help="Job name the review cases are keyed by (letters, digits and hyphens); replaces [cases] job. "
+                    "Empty (--job=): the most common drawing number on the PLC schematics")
+    cs.add_argument("--cases-folder", help="Where the review cases are saved: a full path, or a name for a folder inside the report folder; "
+                    "replaces [cases] folder. Empty (--cases-folder=): the default, the report folder's cases folder")
+    cs.add_argument("-v", "--verbose", action="store_true")
     return p
+
+
+def _recorded_input_root(review: object) -> str | None:
+    """The drawing folder review.json records (run.input_root), or None when it is not there."""
+    run = review.get("run") if isinstance(review, dict) else None
+    root = run.get("input_root") if isinstance(run, dict) else None
+    return root if isinstance(root, str) and root.strip() else None
+
+
+def _load_settings(config_path: Path | None) -> Settings | None:
+    """The project settings a run uses, or None after one line says why the config cannot be read or checked."""
+    try:
+        return Settings.load(config_path)
+    except ValidationError as exc:
+        first = exc.errors()[0]
+        where = ".".join(str(part) for part in first["loc"]) or "config"
+        print(f"Could not read the project settings {config_path}: {where}: {first['msg']}", file=sys.stderr)
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
+        print(f"Could not read the project settings {config_path}: {exc}", file=sys.stderr)
+    return None
+
+
+def _candidate_folders(recorded: str) -> list[Path]:
+    """Where a recorded drawing folder may be: as written when absolute, else from the current folder, then the project folder."""
+    path = Path(recorded)
+    if path.is_absolute():
+        return [path]
+    return [(Path.cwd() / path).resolve(), (PROJECT / path).resolve()]
+
+
+def _cases(args: argparse.Namespace, config_path: Path | None) -> int:
+    """Make the review cases from a finished review's output folder, with no pipeline run. Errors print one line."""
+    report = args.report
+    if report.is_file():
+        print(f"{report} is a file; give the review's output folder.", file=sys.stderr)
+        return 1
+    if not report.is_dir():
+        print(f"Report folder not found: {report}. It should be the output folder of a finished review.", file=sys.stderr)
+        return 1
+    missing = [name for name in ("findings.json", "review.json") if not (report / name).is_file()]
+    if missing:
+        print(f"No {' or '.join(missing)} in {report}. It should be the output folder of a finished review.", file=sys.stderr)
+        return 1
+    review_path = report / "review.json"
+    try:
+        review = json.loads(review_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        print(f"Could not read {review_path}: {exc}", file=sys.stderr)
+        return 1
+    if args.input is None:
+        recorded = _recorded_input_root(review)
+        if recorded is None:
+            print("This report doesn't say which drawing folder it was made from. Give it with --input <folder>.", file=sys.stderr)
+            return 1
+        input_root = next((folder for folder in _candidate_folders(recorded) if folder.is_dir()), None)
+        if input_root is None:
+            print(f"The drawing folder this report was made from, {_candidate_folders(recorded)[0]}, is not there. "
+                  "Give it with --input <folder>.", file=sys.stderr)
+            return 1
+    else:
+        input_root = args.input
+        if not input_root.is_dir():
+            print(f"Input folder not found: {input_root}", file=sys.stderr)
+            return 1
+    settings = _load_settings(config_path)
+    if settings is None:
+        return 2
+    if args.job is not None:
+        settings.cases.job = args.job
+    if args.cases_folder is not None:
+        settings.cases.folder = args.cases_folder  # empty: the default folder, whatever the config says
+    outcome = make_cases(report, input_root, settings)
+    for line in outcome.lines:
+        print(line)
+    return 0 if outcome.made else 1
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -76,11 +175,15 @@ def main(argv: list[str] | None = None) -> int:
     if args.config and not args.config.is_file():
         print(f"Config not found: {args.config}", file=sys.stderr)
         return 2
+    if args.command == "cases":
+        return _cases(args, config_path)
     if not args.input.is_dir():
         print(f"Input folder not found: {args.input}", file=sys.stderr)
         return 2
 
-    settings = Settings.load(config_path)
+    settings = _load_settings(config_path)
+    if settings is None:
+        return 2
     if args.command == "survey":
         print(render_survey(survey(args.input, settings), args.input))
         return 0
@@ -96,6 +199,12 @@ def main(argv: list[str] | None = None) -> int:
     unchecked = [t for t in settings.ingest.unchecked_types if t not in included]
     settings.ingest.unchecked_types = unchecked + [t for t in excluded if t not in unchecked]
     settings.ocr.enabled = settings.ocr.enabled or args.ocr
+    if args.cases is not None:
+        settings.cases.enabled = args.cases  # the flag decides; without it [cases] enabled in the config does
+    if args.job is not None:
+        settings.cases.job = args.job
+    if args.cases_folder is not None:
+        settings.cases.folder = args.cases_folder  # empty: the default folder, whatever the config says
     result = run_pipeline(args.input, settings)
     out_dir = args.output or Path("reports") / args.input.resolve().name
     review = carry_forward(result, out_dir, settings) if settings.review.enabled else None
@@ -123,4 +232,7 @@ def main(argv: list[str] | None = None) -> int:
               f"{review.new_findings} new finding(s), {len(review.no_longer_raised)} no longer raised")
     for path in paths:
         print(f"  wrote {path}")
+    if settings.cases.enabled:
+        for line in make_cases(out_dir, args.input, settings).lines:
+            print(line)
     return 0

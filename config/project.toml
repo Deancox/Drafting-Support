@@ -142,6 +142,20 @@ unchecked_types = []
 # and carry them forward between runs.
 enabled = false
 
+[cases]
+# false: the run makes no Copilot review cases. true: after each run, one case file per finding, a crop of each
+# evidence spot and a manifest are written to the folder below. --cases does this for one run only.
+enabled = false
+# The job name, as the review list names it: letters, digits and hyphens, e.g. "900001-Main".
+# A plain number such as 900001 works too. Empty: the most common drawing number on the PLC schematics
+# (from the title blocks); with no PLC schematics, the most common drawing number on any sheet.
+job = ""
+# Where the cases are saved: a full path, or a name for a folder inside the output folder. Write a Windows path
+# in single quotes, e.g. folder = 'C:\Users\you\OneDrive - Company\QA Cases', because backslashes in double quotes
+# break this file. A missing folder is created when the folder above it exists.
+# Empty: the output folder's cases folder, e.g. reports\<package>\cases.
+folder = ""
+
 [dwg]
 # Sheets plotted without SHX text (NO_SHX_TEXT) whose DWG is put beside the PDF with the same name
 # (PLC/401104-052.pdf + PLC/401104-052.dwg) have their text read from the DWG: exact, no decoding.
