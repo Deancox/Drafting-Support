@@ -11,7 +11,7 @@ from collections.abc import Iterable
 
 from drawing_qa.common.tags import near_tags
 from drawing_qa.model.engineering import HopStatus, SignalTrace, TraceStatus
-from drawing_qa.model.enums import DocType, Predicate, Severity
+from drawing_qa.model.enums import DocType, EntityType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
@@ -90,15 +90,31 @@ class IncompleteTrace(Rule):
             if "DEVICE" in t.gaps:
                 sheet = _sheet_number(ctx, t)
                 candidates = sorted(o.device for o in orphans if o.device and sheet is not None and _tag_sheet(o.device) == sheet)
-                hint = f"; the cable block diagrams show {', '.join(candidates)} for sheet {sheet:03d}, which is not tagged there" if candidates else ""
+                malformed = _malformed_tag_in_row(ctx, claim) if claim else None
+                in_row, exact = _in_channel_row(claim, candidates, malformed.source.raw_text if malformed else "")
+                if in_row:
+                    hint = f"; the cable block diagrams show {', '.join(in_row)} {'for' if exact else 'near'} this row"
+                elif candidates:
+                    hint = f"; the cable block diagrams show {', '.join(candidates)} for sheet {sheet:03d}, which is not tagged there"
+                else:
+                    hint = ""
+                guess = (in_row or candidates)[:1]
+                if malformed is not None:
+                    raw = malformed.source.raw_text
+                    message = f"{t.channel} ({heading}) at {where}: the tag in its row, '{raw}', does not fit the tag format{hint}"
+                    recommendation = f"Correct the tag '{raw}'{' (' + guess[0] + '?)' if guess else ''}"
+                else:
+                    message = f"{t.channel} ({heading}) at {where} has no device tag in its row{hint}"
+                    recommendation = f"Tag the device{' (' + guess[0] + '?)' if guess else ''}"
                 yield make(
                     subject_type="PLC_CHANNEL",
                     subject_key=t.channel,
-                    message=f"{t.channel} ({heading}) at {where} has no device tag in its row{hint}",
+                    message=message,
                     evidence=[claim] if claim else [],
+                    evidence_b=[malformed] if malformed is not None else [],
                     severity=Severity.MAJOR,
                     discriminator="DEVICE",
-                    recommendation=f"Tag the device{' (' + candidates[0] + '?)' if candidates else ''}",
+                    recommendation=recommendation,
                 )
             other = [g for g in t.gaps if g not in ("DEVICE", "JB_TERMINAL")]  # a missing JB terminal is DEV-003
             if "JB" in other and t.device and _jb_not_expected(ctx, t):
@@ -113,6 +129,63 @@ class IncompleteTrace(Rule):
                     discriminator=",".join(other),
                     recommendation=f"Show the {what} for {t.device or 'this channel'}",
                 )
+
+
+def _grid_row(cell: str | None) -> str:
+    return cell[0] if cell else ""
+
+
+_GRID_ROWS = "ABCDEFGHJKLMNPQRSTUVWXYZ"  # drawing grid rows: no I or O
+
+
+def _in_channel_row(claim, candidates: list[str], written: str = "") -> tuple[list[str], bool]:
+    """The candidate tags for the channel's row, and whether they are for this row (True) or only near it.
+
+    For this row: the candidate whose grid is the one written in the row's malformed tag (S-T138W4: W4), when that
+    is this row or the next; else the candidates whose grid row is the channel's row (S-TL136F4 for row F). Near
+    it: the next row up or down (an address can sit a grid row off its device: '02' at H7, S-TL136J4), which may
+    be a neighbouring channel's device, so it is only offered as near. ([], False) when none of these.
+    """
+    row = _grid_row(claim.source.grid_cell) if claim else ""
+    if not row or row not in _GRID_ROWS:
+        return [], False
+    i = _GRID_ROWS.index(row)
+    near = {_GRID_ROWS[j] for j in (i - 1, i + 1) if 0 <= j < len(_GRID_ROWS)}
+    grid = written[-2:].upper() if len(written) >= 2 else ""
+    if grid[:1] in near | {row} and grid[1:].isdigit():
+        found = [c for c in candidates if c.upper().endswith(grid)]
+        if found:
+            return found, True
+    exact = [c for c in candidates if len(c) >= 2 and c[-2] == row]
+    if exact:
+        return exact, True
+    return [c for c in candidates if len(c) >= 2 and c[-2] in near], False
+
+
+def _malformed_tag_in_row(ctx: RuleContext, claim):
+    """Tag-like text in the channel's row that does not fit the tag format (S-T1363F4), or None.
+
+    The slot sheet reader leaves such text out of the row, so the channel looks untagged. Labels are drawn above
+    their symbol, so the row reaches from about one row spacing above the channel address to a quarter below it,
+    on the device side (left) of the address. The row spacing is the median gap between the sheet's addresses
+    (70 points when the sheet has one).
+    """
+    drawing_id = claim.source.drawing_id
+    anchors = sorted(_cy(c.source.bbox) for c in ctx.claims_of(Predicate.HAS_CHANNEL) if c.source.drawing_id == drawing_id)
+    gaps = [b - a for a, b in zip(anchors, anchors[1:]) if b - a > 1]
+    gap = sorted(gaps)[len(gaps) // 2] if gaps else 70.0  # one channel on the sheet: the slot sheet reader's default
+    y = _cy(claim.source.bbox)
+    x = claim.source.bbox[0]
+    found = [
+        c for c in ctx.claims
+        if c.predicate is Predicate.OCCURS and c.subject_type is EntityType.DEVICE and not c.value.get("format_valid", True)
+        and c.source.drawing_id == drawing_id and c.source.bbox[2] <= x and y - gap <= _cy(c.source.bbox) <= y + gap / 4
+    ]
+    return min(found, key=lambda c: abs(_cy(c.source.bbox) - (y - gap / 2)), default=None)
+
+
+def _cy(bbox) -> float:
+    return (bbox[1] + bbox[3]) / 2
 
 
 def _jb_not_expected(ctx: RuleContext, t) -> bool:

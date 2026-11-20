@@ -116,3 +116,31 @@ def load_cases_with_problems(run_dir: Path) -> tuple[list[Case], list[str]]:
 def load_cases(run_dir: Path) -> list[Case]:
     """Every case in the run folder, sorted by Ref."""
     return load_cases_with_problems(run_dir)[0]
+
+
+MIN_RELATED_TEXT = 4  # shorter texts (channel addresses "01", grid cells) are shared by unrelated cases
+
+
+def _keys(case: Case) -> set[str]:
+    texts = [case.data.get("subject_key") or ""]
+    texts += [str(side.get("raw_text") or "") for side in (case.data.get("sides") or {}).values() if isinstance(side, dict)]
+    return {t.strip().upper() for t in texts if len(t.strip()) >= MIN_RELATED_TEXT}
+
+
+def related_index(cases: list[Case]) -> dict[str, list[str]]:
+    """For each case, the other cases that share its tag or the text at one of its spots, in list order.
+
+    S-T1363F4 written on every row of a sheet gives one COMP-001 case per channel and one TAG-001 case per
+    occurrence: all of them name the same text, so they show up as related and can be decided together.
+    """
+    by_key: dict[str, list[str]] = {}
+    keys = {c.fingerprint: _keys(c) for c in cases}
+    for c in cases:
+        for k in keys[c.fingerprint]:
+            by_key.setdefault(k, []).append(c.fingerprint)
+    order = {c.fingerprint: i for i, c in enumerate(cases)}
+    related = {}
+    for c in cases:
+        others = {fp for k in keys[c.fingerprint] for fp in by_key[k]} - {c.fingerprint}
+        related[c.fingerprint] = sorted(others, key=order.__getitem__)
+    return related

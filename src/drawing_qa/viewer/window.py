@@ -17,7 +17,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 
 from drawing_qa.cases.crops import CropError, render_crop
 from drawing_qa.gui import PREFS, open_path
-from drawing_qa.viewer.cases import VERDICTS, Case, load_cases_with_problems
+from drawing_qa.viewer.cases import VERDICTS, Case, load_cases_with_problems, related_index
 from drawing_qa.viewer.filters import CaseFilter, copilot_entry, filter_cases, plan_accept_copilot, plan_bulk
 from drawing_qa.viewer.register_writer import Entry, NoDecisionColumns, has_decision_columns, is_locked
 from drawing_qa.viewer.review_switch import enable_review
@@ -49,6 +49,8 @@ class ReviewApp(ttk.Frame):
         self.cases: list[Case] = []
         self.shown: list[Case] = []
         self.current: Case | None = None
+        self.related: dict[str, list[str]] = {}
+        self.only: frozenset[str] | None = None  # Show related: just these cases
         self._images: list[tk.PhotoImage] = []  # kept so tkinter does not drop them
         self._retry: str | None = None
         self.bar = tk.StringVar()
@@ -165,6 +167,9 @@ class ReviewApp(ttk.Frame):
         ttk.Button(actions, text="Wider view (W)", command=self.wider_view).pack(side="left")
         self.accept_btn = ttk.Button(actions, text="Accept Copilot (Enter)", command=self.accept_copilot)
         self.accept_btn.pack(side="left", padx=6)
+        self.related_btn = ttk.Button(actions, text="Show related (R)", command=self.show_related)
+        self.related_btn.pack(side="left")
+        self.all_btn = ttk.Button(actions, text="Show all", command=self.show_all)
         decide = ttk.Frame(right)
         decide.grid(row=3, column=0, sticky="ew", pady=(6, 0))
         for key, value, label in DECISIONS:
@@ -230,6 +235,9 @@ class ReviewApp(ttk.Frame):
             self.find_btn.pack(side="right", padx=6)
             return
         self.cases, problems = load_cases_with_problems(loc.run_dir)
+        self.related = related_index(self.cases)
+        self.only = None
+        self.all_btn.pack_forget()
         notes = problems[:3]
         if not loc.register.is_file():
             notes.insert(0, f"There is no {loc.register.name} in {loc.output_dir}, so decisions can't be saved.")
@@ -284,7 +292,7 @@ class ReviewApp(ttk.Frame):
         return CaseFilter(
             rule=None if self.rule.get() == ALL else self.rule.get(),
             severity=None if self.severity.get() == ALL else self.severity.get(),
-            status=self.status.get(), copilot=self.copilot.get(), text=self.search.get(),
+            status=self.status.get(), copilot=self.copilot.get(), text=self.search.get(), only=self.only,
         )
 
     def _decisions(self) -> dict[str, Entry]:
@@ -353,6 +361,13 @@ class ReviewApp(ttk.Frame):
             by = f" by {decided.reviewer}" if decided.reviewer else ""
             text.insert("end", "\nDecided: ", "label")
             text.insert("end", f"{decided.decision}{by} {decided.date}  {decided.comment}\n")
+        related = self.related.get(case.fingerprint, [])
+        if related:
+            by_fp = {c.fingerprint: c for c in self.cases}
+            names = ", ".join(f"{by_fp[fp].ref} {by_fp[fp].rule_id}" for fp in related[:6])
+            more = f" and {len(related) - 6} more" if len(related) > 6 else ""
+            text.insert("end", "\nRelated cases: ", "label")
+            text.insert("end", f"{names}{more} (same tag or text; R lists them together)\n")
         text.insert("end", "\nCopilot: ", "label")
         if case.verdict is not None:
             v = case.verdict
@@ -384,6 +399,7 @@ class ReviewApp(ttk.Frame):
         text.configure(state="disabled")
         usable = case.verdict is not None and not case.verdict.stale
         self.accept_btn.configure(state="normal" if usable and self.saver else "disabled")
+        self.related_btn.configure(state="normal" if related else "disabled")
 
     def _put_crop(self, label: ttk.Label, case: Case, side: dict) -> None:
         path = case.cases_dir / str(side.get("crop") or "")
@@ -555,6 +571,25 @@ class ReviewApp(ttk.Frame):
                 parent=self.root)
         return True
 
+    # --- related cases --------------------------------------------------------------------------
+
+    def show_related(self) -> None:
+        """List this case and the cases related to it, whatever their status, ready to decide together."""
+        case = self.current
+        if case is None or not self.related.get(case.fingerprint):
+            return
+        self.only = frozenset([case.fingerprint, *self.related[case.fingerprint]])
+        self.all_btn.pack(side="left", padx=6)
+        if self.status.get() != "ANY":
+            self.status.set("ANY")  # refreshes
+        else:
+            self.refresh(keep=case.fingerprint)
+
+    def show_all(self) -> None:
+        self.only = None
+        self.all_btn.pack_forget()
+        self.refresh()
+
     # --- wider view -----------------------------------------------------------------------------
 
     def wider_view(self) -> None:
@@ -589,6 +624,8 @@ class ReviewApp(ttk.Frame):
             self.search_entry.focus_set()
         elif event.char in ("w", "W"):
             self.wider_view()
+        elif event.char in ("r", "R"):
+            self.show_related()
 
 
 class WiderView(tk.Toplevel):

@@ -22,6 +22,7 @@ class CaseFilter:
     status: str = "UNDECIDED"  # UNDECIDED, ANY, DECIDED, or a decision
     copilot: str = "ANY"  # ANY, NONE, HIGH, DISAGREES, or a verdict
     text: str = ""
+    only: frozenset[str] | None = None  # just these fingerprints (Show related)
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,8 @@ def _text_of(case: Case) -> str:
 
 
 def _matches(case: Case, decisions: dict[str, Entry], f: CaseFilter) -> bool:
+    if f.only is not None and case.fingerprint not in f.only:
+        return False
     if f.rule and case.rule_id != f.rule:
         return False
     if f.severity and case.severity != f.severity:
