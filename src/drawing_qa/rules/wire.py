@@ -12,6 +12,7 @@ from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.common import col_offset, row_offset
 from drawing_qa.rules.context import RuleContext
+from drawing_qa.rules.evidence import row_box, terminal_claims as _terminal_claims, trace_row
 from drawing_qa.rules.findings import FindingBuilder
 from drawing_qa.rules.registry import rule
 from drawing_qa.rules.tag import home_sheets
@@ -251,7 +252,9 @@ class WireContinuity(Rule):
                 subject_key=t.device,
                 message=(f"{t.device} ({t.channel}): the schematic shows {', '.join(missing)}, its JB terminals "
                          f"{', '.join(hop.values)} have {', '.join(sorted(landed)) or 'no wires'}"),
-                evidence=[claim] if claim else [],
+                # A: the wire numbers in the schematic channel row; B: the JB terminals that do not carry them.
+                evidence=trace_row(ctx, t, missing) or [c for c in [row_box(claim)] if c],
+                evidence_b=_terminal_claims(ctx, hop.values),
                 discriminator="schematic|" + ",".join(missing),
                 recommendation="Make the schematic wire numbers and the termination drawing agree",
             )

@@ -12,9 +12,11 @@ from collections.abc import Iterable
 from drawing_qa.common.tags import near_tags
 from drawing_qa.model.engineering import HopStatus, SignalTrace, TraceStatus
 from drawing_qa.model.enums import DocType, EntityType, Predicate, Severity
+from drawing_qa.model.claims import Claim
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
+from drawing_qa.rules.evidence import channel_row, drawn_on, row_box, trace_row
 from drawing_qa.rules.findings import FindingBuilder
 from drawing_qa.rules.registry import rule
 from drawing_qa.common.descriptions import without_prefix
@@ -110,8 +112,8 @@ class IncompleteTrace(Rule):
                     subject_type="PLC_CHANNEL",
                     subject_key=t.channel,
                     message=message,
-                    evidence=[claim] if claim else [],
-                    evidence_b=[malformed] if malformed is not None else [],
+                    # The red box: the malformed tag when there is one, else the row it is missing from.
+                    evidence=[malformed] if malformed is not None else [c for c in [row_box(claim)] if c],
                     severity=Severity.MAJOR,
                     discriminator="DEVICE",
                     recommendation=recommendation,
@@ -125,7 +127,7 @@ class IncompleteTrace(Rule):
                     subject_type="PLC_CHANNEL",
                     subject_key=t.channel,
                     message=f"{t.channel} ({t.device or 'no device'}, {heading}) at {where}: no {what} shown in the channel row",
-                    evidence=[claim] if claim else [],
+                    evidence=[c for c in [row_box(claim)] if c],
                     discriminator=",".join(other),
                     recommendation=f"Show the {what} for {t.device or 'this channel'}",
                 )
@@ -281,7 +283,7 @@ class NotOnCableBlockDiagram(Rule):
                 subject_type="DEVICE",
                 subject_key=t.device,
                 message=message,
-                evidence=[c for c in [_claim(ctx, t)] if c] + _occurrences(ctx, t.device)[:1],
+                evidence=trace_row(ctx, t, t.device) or _occurrences(ctx, t.device)[:1],
                 discriminator="not-on-cbd",
                 recommendation=recommendation,
             )
@@ -320,12 +322,20 @@ class ConflictedTrace(Rule):
                     subject_key=t.device or t.key,
                     message=(f"{t.device} ({t.channel}): the schematics give {what} {', '.join(c.schematic)}, "
                              f"{where} {', '.join(c.other)}"),
-                    evidence=[claim] if claim else [],
-                    evidence_b=_occurrences(ctx, t.device)[:3] if t.device else [],
+                    evidence=(trace_row(ctx, t, t.device) if t.device else []) or [c for c in [channel_row(ctx, t)] if c],
+                    evidence_b=_other_side(ctx, t, c.other_source),
                     discriminator=f"{c.hop}|{','.join(c.schematic)}|{','.join(c.other)}",
                     recommendation=(f"Make the schematic and the {'cable block diagram' if c.other_source == 'CBD' else 'termination drawing'} "
                                     f"agree on the {what}"),
                 )
+
+
+def _other_side(ctx: RuleContext, t: SignalTrace, source: str) -> list[Claim]:
+    """Where the other drawing shows the device: on the cable block diagrams, or the termination drawings."""
+    if not t.device:
+        return []
+    doc = DocType.CBD if source == "CBD" else DocType.TERM
+    return drawn_on(ctx, EntityType.DEVICE, t.device, doc)[:2] or _occurrences(ctx, t.device)[:1]
 
 
 def _field_devices(ctx: RuleContext, devices: list[str]) -> list[str]:
@@ -383,7 +393,7 @@ class Branching(Rule):
                 subject_type="DEVICE",
                 subject_key=device,
                 message=f"{device} is on channels with different descriptions: {listed}",
-                evidence=[c for c in (_claim(ctx, t) for t in ts) if c],
+                evidence=[c for t in ts for c in (trace_row(ctx, t, device) or [channel_row(ctx, t)]) if c],
                 discriminator="device-on-channels|" + ",".join(sorted(t.channel for t in ts)),
                 recommendation="Check " + "; ".join(hints) + " (a copied tag?)",
             )
@@ -398,7 +408,7 @@ class Branching(Rule):
                 subject_key=t.channel,
                 message=(f"{t.channel} ({description_heading(t.description, ctx.model.description_prefix).title()}, {', '.join(t.sheets)}) has "
                          f"{len(field)} field devices in its row: {', '.join(field)}"),
-                evidence=[claim] if claim else [],
+                evidence=trace_row(ctx, t, field) or [c for c in [row_box(claim)] if c],
                 severity=Severity.MINOR,
                 discriminator="devices-in-row|" + ",".join(field),
                 recommendation="Confirm one is an interposing device (isolator, barrier, amplifier), or give each device its own channel",

@@ -6,10 +6,11 @@ from collections import defaultdict
 from collections.abc import Iterable
 
 from drawing_qa.model.engineering import TraceStatus
-from drawing_qa.model.enums import DocType, Severity
+from drawing_qa.model.enums import DocType, EntityType, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
+from drawing_qa.rules.evidence import PLACES, channel_row, drawn_on, trace_row
 from drawing_qa.rules.findings import FindingBuilder
 from drawing_qa.rules.registry import rule
 
@@ -49,7 +50,7 @@ class RouteExists(Rule):
                 subject_type="DEVICE",
                 subject_key=t.device,
                 message=f"{t.device} ({t.channel}) is on the cable block diagrams but no cable route from it to {panel} was found",
-                evidence=[claim] if claim else [],
+                evidence=drawn_on(ctx, EntityType.DEVICE, t.device, DocType.CBD)[:1] or [c for c in [channel_row(ctx, t)] if c],
                 recommendation=f"Check the cabling from {t.device} to {panel} on the CBD",
             )
 
@@ -94,7 +95,9 @@ class JbConsistency(Rule):
                     f"{t.device} ({t.channel}): the schematic shows it via {', '.join(schematic)}, "
                     f"the cable block diagram routes it via {', '.join(t.cbd_via)}{gap}{agree}"
                 ),
-                evidence=[claim] if claim else [],
+                # A: the JB / location the schematic row shows; B: the ones the cable block diagram routes through.
+                evidence=trace_row(ctx, t, schematic) or [c for c in [channel_row(ctx, t)] if c],
+                evidence_b=[c for j in t.cbd_via for c in drawn_on(ctx, PLACES, j, DocType.CBD)[:1]],
                 discriminator=",".join(sorted(schematic)) + "|" + ",".join(sorted(t.cbd_via)),
                 recommendation="Make the schematic and the cable block diagram agree on the JB",
             )

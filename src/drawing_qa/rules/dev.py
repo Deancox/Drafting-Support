@@ -8,6 +8,7 @@ from drawing_qa.model.enums import DocType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
+from drawing_qa.rules.evidence import PLACES, drawn_on, row_box, trace_row
 from drawing_qa.rules.findings import FindingBuilder
 from drawing_qa.rules.registry import rule
 
@@ -52,7 +53,9 @@ class DeviceTerminated(Rule):
                 subject_key=t.device,
                 message=(f"{t.device} ({t.channel or 'on the CBD'}) goes through {', '.join(drawn)}, but no terminal on "
                          f"{', '.join(drawn)} ({', '.join(sheets)}) serves it"),
-                evidence=[claim] if claim else [],
+                # A: the device in its channel row; B: the JB's termination drawing it is missing from.
+                evidence=trace_row(ctx, t, t.device) or [c for c in [row_box(claim)] if c],
+                evidence_b=[c for k in drawn for c in drawn_on(ctx, PLACES, k, DocType.TERM)[:1]],
                 discriminator=",".join(drawn),
                 recommendation=f"Show {t.device}'s terminals on the termination drawing for {', '.join(drawn)}",
             )

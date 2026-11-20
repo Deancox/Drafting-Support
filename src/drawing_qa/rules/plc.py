@@ -17,6 +17,7 @@ from drawing_qa.model.enums import DocType, EntityType, Predicate, Severity
 from drawing_qa.model.findings import Finding
 from drawing_qa.rules.base import Category, Requirement, Rule, RuleMeta
 from drawing_qa.rules.context import RuleContext
+from drawing_qa.rules.evidence import in_row, row_box, terminal_claims as _terminal_claims, trace_row
 from drawing_qa.rules.findings import FindingBuilder
 from drawing_qa.rules.registry import rule
 
@@ -85,7 +86,7 @@ class DuplicateChannelAllocation(Rule):
                     subject_type="PLC_CHANNEL",
                     subject_key=key,
                     message=f"Channel {key} is drawn on {', '.join(sheets)}",
-                    evidence=cs,
+                    evidence=[x for x in (row_box(c) for c in cs) if x],
                     recommendation="Keep the channel on one sheet",
                 )
 
@@ -102,7 +103,7 @@ class DuplicateChannelAllocation(Rule):
                 subject_type="DEVICE",
                 subject_key=device,
                 message=f"{device} is wired to {len(keys)} channels: {', '.join(keys)}",
-                evidence=cs,
+                evidence=[x for c in cs for x in (in_row(ctx, c.subject_key, device, c.source.drawing_id) or [row_box(c)]) if x],
                 recommendation="Check the channel allocation; a standard input device should use one channel",
             )
 
@@ -321,7 +322,9 @@ class ChannelMatch(Rule):
                     subject_key=t.device or t.key,
                     message=(f"{t.device} is on {t.channel} on the schematics, but its JB terminals {', '.join(terminals)} "
                              f"go to {', '.join(c.other)} on the termination drawings"),
-                    evidence=[claim] if claim else [],
+                    # A: the device in its schematic channel row; B: its JB terminals on the termination drawing.
+                    evidence=(trace_row(ctx, t, t.device) if t.device else []) or [x for x in [row_box(claim)] if x],
+                    evidence_b=_terminal_claims(ctx, terminals),
                     discriminator=f"device|{t.channel}|{','.join(c.other)}",
                     recommendation="Make the schematic channel and the termination drawing's destination slot agree",
                 )

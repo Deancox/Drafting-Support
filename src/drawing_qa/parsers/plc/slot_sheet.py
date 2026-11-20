@@ -92,8 +92,10 @@ class SlotSheetReader(TemplateReader):
             return next((i for i, (lo, hi) in enumerate(bands) if lo <= y < hi), None)
 
         rows: list[dict] = [
-            {"channel": int(a.text.strip()), "anchor": a, "terminals": [], "description": [], "items": []} for a in anchors
+            {"channel": int(a.text.strip()), "anchor": a, "band": band, "terminals": [], "description": [], "items": []}
+            for a, band in zip(anchors, bands)
         ]
+        row_left = max(0.0, header.bbox[0] - page.width / 2)  # an empty row: about the device side of the sheet
 
         for ln in body:
             text = ln.text.strip()
@@ -150,6 +152,7 @@ class SlotSheetReader(TemplateReader):
         last = v["points_last"] if v["points_last"] is not None else (v["channels"] or 99) - 1
         for row in rows:
             if first <= row["channel"] <= last:
+                row["left"] = min((c.source.bbox[0] for c in row["items"]), default=row_left)
                 result.claims.extend(self._channel_claims(row, module, ctx, common))
         return result
 
@@ -275,6 +278,9 @@ class SlotSheetReader(TemplateReader):
                     "jbs": sorted({c.subject_key for c in items if c.subject_type is EntityType.JUNCTION_BOX}),
                     "locations": sorted({c.subject_key for c in items if c.subject_type is EntityType.LOCATION}),
                     "wires": sorted({c.subject_key for c in items if c.subject_type is EntityType.WIRE}),
+                    # The whole row, from its leftmost item to the address, over the row's band: what a finding
+                    # about something missing from the row outlines.
+                    "row_bbox": [row["left"], row["band"][0], anchor.bbox[2], row["band"][1]],
                 },
             )
         ]
