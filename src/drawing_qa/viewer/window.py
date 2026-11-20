@@ -7,6 +7,7 @@ nearby text, drawing warnings, Copilot's verdict) and the decision buttons. Keys
 
 from __future__ import annotations
 
+import base64
 import json
 import sys
 import tempfile
@@ -18,6 +19,7 @@ from tkinter import filedialog, messagebox, simpledialog, ttk
 from drawing_qa.cases.crops import CropError, render_crop
 from drawing_qa.gui import PREFS, open_path
 from drawing_qa.viewer.cases import VERDICTS, Case, load_cases_with_problems, related_index
+from drawing_qa.viewer.pictures import PictureError, render_fit
 from drawing_qa.viewer.filters import CaseFilter, copilot_entry, filter_cases, plan_accept_copilot, plan_bulk
 from drawing_qa.viewer.register_writer import Entry, NoDecisionColumns, has_decision_columns, is_locked
 from drawing_qa.viewer.review_switch import enable_review
@@ -30,7 +32,8 @@ STATUSES = ["UNDECIDED", "ANY", "DECIDED", "CONFIRMED", "FALSE_POSITIVE", "FIXED
 COPILOT = ["ANY", "NONE", "HIGH", "DISAGREES", *VERDICTS]
 ALL = "(all)"
 RETRY_MS = 5000
-CROP_BOX = (600, 460)  # the most a crop is shown at in the case panel, in pixels
+CROP_BOX = (600, 460)  # the most a crop is shown at in the case panel, in pixels (two sides)
+WIDE_CROP_W = 900  # one side: it has the whole width of the panel
 ZOOMS = (1.5, 2.0, 3.0, 4.0)
 WIDE_MARGIN = 400.0
 MUTED = "#6b6b66"
@@ -402,6 +405,12 @@ class ReviewApp(ttk.Frame):
         self.related_btn.configure(state="normal" if related else "disabled")
 
     def _put_crop(self, label: ttk.Label, case: Case, side: dict) -> None:
+        one_sided = not (case.data.get("sides") or {}).get("B")
+        image = self._crop_from_pdf(side, (WIDE_CROP_W, CROP_BOX[1]) if one_sided else CROP_BOX)
+        if image is not None:
+            self._images.append(image)
+            label.configure(image=image, text="")
+            return
         path = case.cases_dir / str(side.get("crop") or "")
         if side.get("crop_problem") or not path.is_file():
             label.configure(text=side.get("crop_problem") or "No picture for this side")
@@ -416,6 +425,16 @@ class ReviewApp(ttk.Frame):
             image = image.subsample(step)
         self._images.append(image)
         label.configure(image=image, text="")
+
+    def _crop_from_pdf(self, side: dict, size: tuple[int, int]) -> tk.PhotoImage | None:
+        """The crop drawn from the PDF at the panel's size, sharp; None when the drawings are not to hand."""
+        if self.loc is None or self.loc.input_root is None or not side.get("source_pdf") or not side.get("bbox"):
+            return None
+        try:
+            png = render_fit(self.loc.input_root / side["source_pdf"], int(side.get("page_index") or 0), side["bbox"], *size)
+            return tk.PhotoImage(data=base64.b64encode(png).decode("ascii"))
+        except (PictureError, tk.TclError):
+            return None  # the case's own PNG is shown instead
 
     def open_crop(self, role: str) -> None:
         if self.current is None:

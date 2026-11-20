@@ -101,10 +101,22 @@ class IncompleteTrace(Rule):
                 else:
                     hint = ""
                 guess = (in_row or candidates)[:1]
+                misplaced = _tag_drawn_in_row(ctx, claim, valid=True) if claim and malformed is None else None
                 if malformed is not None:
                     raw = malformed.source.raw_text
                     message = f"{t.channel} ({heading}) at {where}: the tag in its row, '{raw}', does not fit the tag format{hint}"
                     recommendation = f"Correct the tag '{raw}'{' (' + guess[0] + '?)' if guess else ''}"
+                elif misplaced is not None:
+                    raw = misplaced.subject_key
+                    copy = _same_tag_elsewhere(ctx, misplaced)
+                    said = (f"is also drawn at grid {copy.source.grid_cell}: a copied tag?" if copy
+                            else f"names grid {misplaced.value.get('grid')}, another row")
+                    wire, suggestion = _tag_from_wire(misplaced, _row_wires(t))
+                    from_wire = f" Its wire {wire} suggests {suggestion}." if suggestion else ""
+                    message = f"{t.channel} ({heading}) at {where}: the tag drawn in its row, '{raw}', {said}{from_wire}{hint}"
+                    better = suggestion or (guess[0] if guess else "")
+                    recommendation = f"Correct the tag '{raw}'{' (' + better + '?)' if better else ''}"
+                    malformed = misplaced  # the red box goes on it
                 else:
                     message = f"{t.channel} ({heading}) at {where} has no device tag in its row{hint}"
                     recommendation = f"Tag the device{' (' + guess[0] + '?)' if guess else ''}"
@@ -165,9 +177,40 @@ def _in_channel_row(claim, candidates: list[str], written: str = "") -> tuple[li
 
 
 def _malformed_tag_in_row(ctx: RuleContext, claim):
-    """Tag-like text in the channel's row that does not fit the tag format (S-T1363F4), or None.
+    """Tag-like text in the channel's row that does not fit the tag format (S-T1363F4), or None."""
+    return _tag_drawn_in_row(ctx, claim, valid=False)
 
-    The slot sheet reader leaves such text out of the row, so the channel looks untagged. Labels are drawn above
+
+def _same_tag_elsewhere(ctx: RuleContext, tag):
+    """Another place the same tag is written on the same sheet (the original of a copied tag), or None."""
+    return next((c for c in _occurrences(ctx, tag.subject_key)
+                 if c.source.drawing_id == tag.source.drawing_id and c.source.bbox != tag.source.bbox), None)
+
+
+def _row_wires(t: SignalTrace) -> list[str]:
+    return next((h.values for h in t.hops if h.hop == "WIRE"), [])
+
+
+def _tag_from_wire(tag, wires: list[str]) -> tuple[str, str]:
+    """(wire, the tag it suggests): a wire numbered from the same sheet (TL161L6) gives the row its device is on,
+    so U-TL161J3 drawn on that row suggests U-TL161L3 (row L, the tag's own column). ("", "") when none does."""
+    v = tag.value
+    stem = f"{v.get('ffi', '')}{v.get('sheet', '')}"
+    grid = v.get("grid") or ""
+    for w in wires:
+        if stem and w.startswith(stem) and len(w) > len(stem) and len(grid) >= 2:
+            suggestion = f"{v.get('prefix')}-{stem}{w[len(stem)]}{grid[1:]}"
+            if suggestion != tag.subject_key:
+                return w, suggestion
+    return "", ""
+
+
+def _tag_drawn_in_row(ctx: RuleContext, claim, valid: bool):
+    """A device tag drawn in the channel's row that the slot sheet reader did not put in it, or None.
+
+    valid=False: text that does not fit the tag format (S-T1363F4), which the reader leaves out. valid=True: a
+    proper tag whose name puts it on another row (U-TL161J3 drawn on the row of wire L6), as a copied tag does;
+    the reader places tags by the row they name, so the channel looks untagged. Labels are drawn above
     their symbol, so the row reaches from about one row spacing above the channel address to a quarter below it,
     on the device side (left) of the address. The row spacing is the median gap between the sheet's addresses
     (70 points when the sheet has one).
@@ -180,7 +223,8 @@ def _malformed_tag_in_row(ctx: RuleContext, claim):
     x = claim.source.bbox[0]
     found = [
         c for c in ctx.claims
-        if c.predicate is Predicate.OCCURS and c.subject_type is EntityType.DEVICE and not c.value.get("format_valid", True)
+        if c.predicate is Predicate.OCCURS and c.subject_type is EntityType.DEVICE
+        and bool(c.value.get("format_valid", True)) is valid and (not valid or c.value.get("grid"))
         and c.source.drawing_id == drawing_id and c.source.bbox[2] <= x and y - gap <= _cy(c.source.bbox) <= y + gap / 4
     ]
     return min(found, key=lambda c: abs(_cy(c.source.bbox) - (y - gap / 2)), default=None)
