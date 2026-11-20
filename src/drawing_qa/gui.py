@@ -335,10 +335,11 @@ class App(ttk.Frame):
         return cmd
 
     def viewer_command(self) -> list[str]:
-        """The command that opens the Case Review window on the output folder (and this config, when one is set)."""
+        """The command that opens the Case Review window on the output folder, with this config and cases folder."""
         cmd = [sys.executable, "-m", "drawing_qa.viewer", "--output", self.output.get().strip()]
         if self.config_path.get().strip():
             cmd += ["--config", self.config_path.get().strip()]
+        cmd += ["--cases-folder", self.cases_folder.get().strip()]  # the runs from this window use it too
         return cmd
 
     def review_cases(self) -> None:

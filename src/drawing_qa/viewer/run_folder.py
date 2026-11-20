@@ -39,8 +39,11 @@ def _read(path: Path) -> dict:
     return data
 
 
-def _cases_folder(output_dir: Path, config_path: Path | None) -> Path:
-    text = _clean(Settings.load(config_path).cases.folder) if config_path else ""
+def _cases_folder(output_dir: Path, config_path: Path | None, cases_folder: str | None) -> Path:
+    if cases_folder is not None:  # given by the Drawing QA window, which passes it to its runs too
+        text = _clean(cases_folder)
+    else:
+        text = _clean(Settings.load(config_path).cases.folder) if config_path else ""
     if not text:
         return output_dir / "cases"
     folder = Path(text)
@@ -56,13 +59,17 @@ def _input_root(output_dir: Path) -> Path | None:
     return path if path is not None and path.is_dir() else None
 
 
-def find_run(output_dir: Path, config_path: Path | None) -> RunLocation:
-    """The run in output_dir: its id from findings.json, its cases from the config's cases folder."""
+def find_run(output_dir: Path, config_path: Path | None, cases_folder: str | None = None) -> RunLocation:
+    """The run in output_dir: its id from findings.json, its cases from the cases folder.
+
+    cases_folder, when given, is the Drawing QA window's Cases folder field (it overrides the config for the
+    window's runs, as --cases-folder does): empty means the default folder. Otherwise the config's is used.
+    """
     output_dir = Path(output_dir)
     run_id = _read(output_dir / "findings.json").get("run_id")
     if not isinstance(run_id, str) or not run_id:
         raise RunNotFound(f"findings.json in {output_dir} has no run id")
-    runs = _cases_folder(output_dir, config_path) / "Runs"
+    runs = _cases_folder(output_dir, config_path, cases_folder) / "Runs"
     found = sorted(p for p in runs.glob(f"*/{run_id}") if (p / "cases").is_dir()) if runs.is_dir() else []
     return RunLocation(
         output_dir=output_dir,

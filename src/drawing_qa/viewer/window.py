@@ -19,7 +19,7 @@ from drawing_qa.cases.crops import CropError, render_crop
 from drawing_qa.gui import PREFS, open_path
 from drawing_qa.viewer.cases import VERDICTS, Case, load_cases_with_problems
 from drawing_qa.viewer.filters import CaseFilter, copilot_entry, filter_cases, plan_accept_copilot, plan_bulk
-from drawing_qa.viewer.register_writer import Entry, NoDecisionColumns, has_decision_columns
+from drawing_qa.viewer.register_writer import Entry, NoDecisionColumns, has_decision_columns, is_locked
 from drawing_qa.viewer.review_switch import enable_review
 from drawing_qa.viewer.run_folder import RunLocation, RunNotFound, find_run, with_run_dir
 from drawing_qa.viewer.saver import DecisionSaver, SaveResult
@@ -37,11 +37,13 @@ MUTED = "#6b6b66"
 
 
 class ReviewApp(ttk.Frame):
-    def __init__(self, root: tk.Tk, output_dir: Path | None, config_path: Path | None) -> None:
+    def __init__(self, root: tk.Tk, output_dir: Path | None, config_path: Path | None,
+                 cases_folder: str | None = None) -> None:
         super().__init__(root, padding=10)
         self.root = root
         self.prefs_path = PREFS
         self.config_path = config_path
+        self.cases_folder = cases_folder
         self.loc: RunLocation | None = None
         self.saver: DecisionSaver | None = None
         self.cases: list[Case] = []
@@ -171,6 +173,9 @@ class ReviewApp(ttk.Frame):
         ttk.Label(decide, text="Comment").pack(side="left", padx=(10, 4))
         self.comment_entry = ttk.Entry(decide, textvariable=self.comment)
         self.comment_entry.pack(side="left", fill="x", expand=True)
+        for entry in (self.comment_entry, self.search_entry):  # Enter or Esc: back to the list, ready for a key
+            entry.bind("<Return>", self._back_to_list)
+            entry.bind("<Escape>", self._back_to_list)
 
         self.root.bind("<Key>", self._on_key)
 
@@ -204,7 +209,10 @@ class ReviewApp(ttk.Frame):
         output_dir = Path(output_dir)
         self._remember(viewer_output=str(output_dir))
         try:
-            loc = find_run(output_dir, self.config_path)
+            cases_folder = self.cases_folder
+            if cases_folder is None:  # started on its own: the Drawing QA window's Cases folder, as its runs used
+                cases_folder = self._prefs().get("cases_folder")
+            loc = find_run(output_dir, self.config_path, cases_folder if isinstance(cases_folder, str) else None)
         except Exception as exc:  # RunNotFound, or a config that can't be read
             self._clear(str(exc))
             return
@@ -302,6 +310,7 @@ class ReviewApp(ttk.Frame):
         index = max(0, min(index, len(self.shown) - 1))
         iid = str(index)
         self.list.selection_set(iid)
+        self.list.focus(iid)  # the list's arrow keys move from its focus item
         self.list.see(iid)
         self._show(self.shown[index])
 
@@ -463,22 +472,44 @@ class ReviewApp(ttk.Frame):
         try:
             result = self.saver.decide(changes)
         except Exception as exc:  # the register vanished or can't be read
-            messagebox.showerror("Case Review", f"The decision could not be saved: {exc}", parent=self.root)
-            return
+            if not self.saver.waiting:
+                messagebox.showerror("Case Review", f"The decision could not be saved: {exc}", parent=self.root)
+                return
+            result = None
+            self._held_after_error(exc)
         self.comment.set("")
-        self._show_result(result)
+        if result is not None:
+            self._show_result(result)
         decisions = self.saver.decisions
         # Move on: the first case shown after this one, or this position if it dropped out of the list.
         remaining = filter_cases(self.cases, decisions, self._filter())
         later = [c for c in remaining if c.ref > (self.shown[after].ref if self.shown else "")]
         keep = (later[0] if later else (remaining[-1] if remaining else None))
         self.refresh(keep=keep.fingerprint if keep else None)
+        self.list.focus_set()
+
+    def _back_to_list(self, _event=None) -> str:
+        self.list.focus_set()
+        return "break"
+
+    def _schedule_retry(self) -> None:
+        if self._retry is not None:
+            self.after_cancel(self._retry)
+        self._retry = self.after(RETRY_MS, self._flush)
+
+    def _held_after_error(self, exc: Exception) -> None:
+        self.bar.set(f"{self.saver.waiting} decision(s) held, not saved yet ({exc}). Trying again in a few seconds.")
+        self._schedule_retry()
 
     def _show_result(self, result: SaveResult) -> None:
         notes = []
         if result.waiting:
-            notes.append(f"{result.waiting} decision(s) waiting — close {self.loc.register.name} in Excel and they will "
-                         "be saved.")
+            name = self.loc.register.name
+            note = f"{result.waiting} decision(s) waiting — close {name} in Excel and they will be saved."
+            if is_locked(self.loc.register):
+                note += (f" (If Excel isn't open, a crash may have left the file ~${name} behind in "
+                         f"{self.loc.output_dir}; delete it.)")
+            notes.append(note)
         if result.gone:
             notes.append(f"{len(result.gone)} decision(s) dropped: no longer on the register ({', '.join(result.gone[:5])}).")
         if result.saved and not notes:
@@ -495,25 +526,28 @@ class ReviewApp(ttk.Frame):
             self._show_result(self.saver.resolve(conflict.fingerprint, "mine" if keep_mine else "theirs"))
             return
         if result.waiting and self._retry is None:
-            self._retry = self.after(RETRY_MS, self._flush)
+            self._schedule_retry()
 
     def _flush(self) -> None:
+        if self._retry is not None:
+            self.after_cancel(self._retry)
         self._retry = None
         if self.saver is None:
             return
         try:
             result = self.saver.flush()
         except Exception as exc:
-            self.bar.set(f"Saving failed: {exc}")
+            self._held_after_error(exc)
             return
         self._show_result(result)
-        self.refresh()
+        if result.saved or result.gone or result.conflicts:  # a quiet retry leaves the list and case as they are
+            self.refresh()
 
     def closing(self) -> bool:
         """Save what is waiting; True when the window may close."""
         if self.saver is None or not self.saver.waiting:
             return True
-        self._flush()
+        self._flush()  # cancels the scheduled retry first, so declining to close doesn't start a second one
         if self.saver.waiting:
             return messagebox.askyesno(
                 "Case Review", f"{self.saver.waiting} decision(s) are still waiting for {self.loc.register.name} to be "
@@ -641,7 +675,7 @@ def _ask_decision(root: tk.Tk, count: int) -> tuple[str, str] | None:
     return answer[0] if answer else None
 
 
-def main(output_dir: Path | None, config_path: Path | None) -> None:
+def main(output_dir: Path | None, config_path: Path | None, cases_folder: str | None = None) -> None:
     root = tk.Tk()
     root.title("Case Review")
     root.geometry("1280x860")
@@ -650,7 +684,7 @@ def main(output_dir: Path | None, config_path: Path | None) -> None:
         ttk.Style().theme_use("vista" if sys.platform == "win32" else "clam")
     except tk.TclError:
         pass
-    app = ReviewApp(root, output_dir, config_path)
+    app = ReviewApp(root, output_dir, config_path, cases_folder)
     if output_dir is None:
         last = app._prefs().get("viewer_output")
         if last and Path(last).is_dir():

@@ -269,7 +269,7 @@ can use it on its own, or after the Copilot review to check Copilot's verdicts.
 
 **Opening it:** double-click **Case Review**, or press **Review cases...** in the Drawing QA window, and pick the
 output folder (the one with `QA_Register.xlsx`). The window finds that run's cases in the cases folder set in
-`config/project.toml`. If they are somewhere else, use **Find the run folder...** and pick the folder named after
+`config/project.toml` (or, when opened from the Drawing QA window, its *Cases folder*). If they are somewhere else, use **Find the run folder...** and pick the folder named after
 the run (e.g. `Runs/401104/20261119-053804-0b4a05`). The first time, it asks for your name or initials for the
 *Reviewed by* column.
 
@@ -281,11 +281,11 @@ the run (e.g. `Runs/401104/20261119-053804-0b4a05`). The first time, it asks for
 | 1 – 5 | Confirmed, False positive, Fixed, Waived, Deferred (then moves to the next case) |
 | 0 | Clears the decision back to OPEN |
 | Enter | Accepts Copilot's verdict for this case |
-| / | Search (Esc to leave the search box) |
+| / | Search (Enter or Esc goes back to the list) |
 | W | Wider view: a bigger area of the sheet, drawn from the PDF, with zoom |
 
-Type in the *Comment* box before pressing the key and the comment goes in with the decision. Double-click a
-picture to open it full size.
+To add a comment, click the *Comment* box, type it, press **Enter** to go back to the list, then press the
+decision key: the comment goes in with the decision. Double-click a picture to open it full size.
 
 **Working through a run quickly:** the list shows undecided cases by default. Filter by rule, severity, status or
 Copilot verdict, or search, then use **Decide all shown...** to give every case in the list the same decision
@@ -295,7 +295,9 @@ many cases they will set, and how many already have a different decision, before
 **When the register is open in Excel:** your decisions are kept in `QA_Register.pending.json` next to the
 register, a bar says how many are waiting, and they are saved as soon as you close the register in Excel (also
 after closing and reopening Case Review). If a row was changed in Excel in the meantime, the window shows both
-versions and asks which to keep, so nothing is overwritten without you seeing it.
+versions and asks which to keep, so nothing is overwritten without you seeing it. If the bar keeps saying decisions
+are waiting when Excel is not open, Excel probably crashed and left a hidden `~$QA_Register.xlsx` file in the
+output folder; delete it.
 
 A case that is not on the register (cases from an older run than the register) is shown but can't be decided.
 
