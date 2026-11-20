@@ -192,6 +192,7 @@ class App(ttk.Frame):
         bottom.pack(fill="x", pady=(6, 0))
         self.cases_btn = ttk.Button(bottom, text="Make cases from a finished report...", command=self.make_cases_from_report)
         self.cases_btn.pack(side="right")
+        ttk.Button(bottom, text="Review cases...", command=self.review_cases).pack(side="right", padx=(0, 6))
         ttk.Label(bottom, text="Tick to make cases after each run. Job: empty uses the title-block drawing number. "
                   "Cases folder: empty or a name = inside the output folder, or Browse. Button: cases from a finished review.",
                   foreground="#6b6b66", wraplength=520).pack(side="left", fill="x")
@@ -332,6 +333,20 @@ class App(ttk.Frame):
         if self.verbose.get():
             cmd.append("--verbose")
         return cmd
+
+    def viewer_command(self) -> list[str]:
+        """The command that opens the Case Review window on the output folder (and this config, when one is set)."""
+        cmd = [sys.executable, "-m", "drawing_qa.viewer", "--output", self.output.get().strip()]
+        if self.config_path.get().strip():
+            cmd += ["--config", self.config_path.get().strip()]
+        return cmd
+
+    def review_cases(self) -> None:
+        if not (Path(self.output.get().strip()) / "findings.json").is_file():
+            messagebox.showinfo("Not there yet", "The output folder has no review yet. Run the review first.", parent=self.root)
+            return
+        self._save_prefs()
+        subprocess.Popen(self.viewer_command())
 
     def run_review(self) -> None:
         if self._check(survey=False):
@@ -558,6 +573,7 @@ class App(ttk.Frame):
                  "excluded": [c for c, v in self.include.items() if not v.get()], "ocr": self.ocr.get(),
                  "verbose": self.verbose.get(), "cases": self.cases_on.get(), "job": self.job.get(),
                  "cases_folder": self.cases_folder.get()}
+        prefs = {**self._load_prefs(), **prefs}  # keep what the Case Review window saved (reviewer, its last folder)
         try:
             PREFS.write_text(json.dumps(prefs, indent=2), encoding="utf-8")
         except OSError:
