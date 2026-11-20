@@ -93,6 +93,9 @@ Double-click **Drawing QA**. In the window you can:
 
 The window remembers your last choices. You can also start it with `python -m drawing_qa.gui`.
 
+When a review has finished, **Review cases...** (in the review cases box) opens the Case Review window on the
+output folder, to go through the findings one by one (section 8).
+
 ### C. Command line
 
 ```bash
@@ -166,7 +169,7 @@ The **Findings** tab has one row per finding:
 |---|---|
 | Ref | Row reference for marking up. |
 | Severity | **MAJOR**: a wiring or identity error. **MINOR**: incomplete or inconsistent drafting. **INFO**: a note, e.g. a reference to a separate package. |
-| Rule / Category | Which check raised it (see section 9). |
+| Rule / Category | Which check raised it (see section 10). |
 | Tag / item | The tag, wire, cable, channel or text concerned. |
 | PLC channel | The PLC channel involved, if any. |
 | Conflict / issue | What is wrong. |
@@ -250,7 +253,81 @@ Close the register in Excel before running again.
 
 ---
 
-## 8. Setting the tool up for a project
+## 8. Going through the findings in the Case Review window
+
+The Case Review window shows one finding at a time: the picture of each spot on the drawings with the evidence
+outlined in red, what the tool thinks is wrong, what the rule checks, and the fix. You decide it with one key,
+and your decision is written into the register's yellow columns, exactly as if you had typed it in Excel. You
+can use it on its own, or after the Copilot review to check Copilot's verdicts.
+
+**Before you start:**
+
+- Review must be on (section 7), so the register has the decision columns. If it isn't, the window still shows
+  the cases but can't save, and offers to switch review on for you. Then run the review again.
+- The run needs its review cases (tick *Make review cases* in the Drawing QA window, or use *Make cases from a
+  finished report...*).
+
+**Opening it:** double-click **Case Review**, or press **Review cases...** in the Drawing QA window, and pick the
+output folder (the one with `QA_Register.xlsx`). The window finds that run's cases in the cases folder set in
+`config/project.toml`. If they are somewhere else, use **Find the run folder...** and pick the folder named after
+the run (e.g. `Runs/401104/20261119-053804-0b4a05`). The first time, it asks for your name or initials for the
+*Reviewed by* column.
+
+**Keys:**
+
+| Key | Does |
+|---|---|
+| ↑ / ↓ | Previous / next case |
+| 1 – 5 | Confirmed, False positive, Fixed, Waived, Deferred (then moves to the next case) |
+| 0 | Clears the decision back to OPEN |
+| Enter | Accepts Copilot's verdict for this case |
+| / | Search (Esc to leave the search box) |
+| W | Wider view: a bigger area of the sheet, drawn from the PDF, with zoom |
+
+Type in the *Comment* box before pressing the key and the comment goes in with the decision. Double-click a
+picture to open it full size.
+
+**Working through a run quickly:** the list shows undecided cases by default. Filter by rule, severity, status or
+Copilot verdict, or search, then use **Decide all shown...** to give every case in the list the same decision
+(for example, all PLACEHOLDER-002 on a preliminary package), or **Accept Copilot for all shown...**. Both say how
+many cases they will set, and how many already have a different decision, before anything changes.
+
+**When the register is open in Excel:** your decisions are kept in `QA_Register.pending.json` next to the
+register, a bar says how many are waiting, and they are saved as soon as you close the register in Excel (also
+after closing and reopening Case Review). If a row was changed in Excel in the meantime, the window shows both
+versions and asks which to keep, so nothing is overwritten without you seeing it.
+
+A case that is not on the register (cases from an older run than the register) is shown but can't be decided.
+
+### Copilot verdict files
+
+To show Copilot's view next to each case, the Copilot flow writes one file per case into the run folder, in a
+`verdicts` folder beside `cases`: `Runs/<job>/<run>/verdicts/<fingerprint>.json`.
+
+```json
+{
+  "fingerprint": "0d2ea3105bb1-2",
+  "message_hash": "02f88b821b97",
+  "verdict": "CONFIRMED",
+  "confidence": "HIGH",
+  "reasoning": "TLXXXXX is a placeholder; the sheet is PRELIMINARY ...",
+  "reviewed_at": "2026-11-20T09:14:00Z"
+}
+```
+
+- `fingerprint` and `message_hash` are copied from the case file.
+- `verdict` is CONFIRMED, FALSE_POSITIVE or DEFERRED (FIXED and WAIVED are only yours to give).
+- `confidence` is HIGH, MEDIUM or LOW.
+- A verdict whose `message_hash` no longer matches the case was made on an older version of the finding. It is
+  shown, marked as such, and left out of *Accept Copilot for all shown*.
+- A verdict file that can't be read is reported on its case. The case can still be decided.
+
+Copilot's verdict is never written to the register by itself: it only gets there when you accept it.
+
+---
+
+## 9. Setting the tool up for a project
+
 
 All settings are plain text files in `config/`, read at the start of every run.
 
@@ -326,7 +403,7 @@ finding's Decision to WAIVED in the register instead of adding a waiver.
 
 ---
 
-## 9. What gets checked
+## 10. What gets checked
 
 The tool reads every sheet's title block and grid. It reads the PLC rack layout, modules and channels from the
 schematics, the cables and enclosures from the CBD line work, and the JB and PLC slot terminal strips from the
@@ -353,7 +430,7 @@ DEV-002 (equipment list checks) are planned but not built yet.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 | Symptom | Likely cause / fix |
 |---|---|
