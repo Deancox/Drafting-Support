@@ -135,13 +135,24 @@ class IncompleteTrace(Rule):
                 other.remove("JB")
             if other:
                 what = " and ".join({"JB": "JB / field location", "WIRE": "field wire number"}.get(g, g) for g in other)
+                message = f"{t.channel} ({t.device or 'no device'}, {heading}) at {where}: no {what} shown in the channel row"
+                recommendation = f"Show the {what} for {t.device or 'this channel'}"
+                if "JB" in other and t.device and _drawn_nowhere_else(ctx, t.device):
+                    # Nothing else shows how it is cabled: a direct cable to the panel would be fine on the
+                    # schematic, but the CBD must show it. That is the gap to fix, not the row.
+                    panel = next((h.values[0] for h in t.hops if h.hop == "PANEL" and h.values), "its panel")
+                    wire = " or field wire number" if "WIRE" in other else ""
+                    message = (f"{t.device} ({t.channel}, {heading}) at {where} is not on any cable block diagram or "
+                               f"termination drawing, so how it is cabled to {panel} is not shown (the schematic row has "
+                               f"no JB / field location{wire} either)")
+                    recommendation = f"Add {t.device} and its cable to the cable block diagram"
                 yield make(
                     subject_type="PLC_CHANNEL",
                     subject_key=t.channel,
-                    message=f"{t.channel} ({t.device or 'no device'}, {heading}) at {where}: no {what} shown in the channel row",
+                    message=message,
                     evidence=[c for c in [row_box(claim)] if c],
                     discriminator=",".join(other),
-                    recommendation=f"Show the {what} for {t.device or 'this channel'}",
+                    recommendation=recommendation,
                 )
 
 
@@ -232,6 +243,11 @@ def _tag_drawn_in_row(ctx: RuleContext, claim, valid: bool):
 
 def _cy(bbox) -> float:
     return (bbox[1] + bbox[3]) / 2
+
+
+def _drawn_nowhere_else(ctx: RuleContext, device: str) -> bool:
+    """The device is on no cable block diagram and no termination drawing."""
+    return not any(drawn_on(ctx, EntityType.DEVICE, device, doc) for doc in (DocType.CBD, DocType.TERM))
 
 
 def _jb_not_expected(ctx: RuleContext, t) -> bool:
