@@ -96,6 +96,7 @@ class IssueCode(StrEnum):
     PARSER_ERROR = "PARSER_ERROR"
     NO_TEMPLATE = "NO_TEMPLATE"
     DUPLICATE_SHEET = "DUPLICATE_SHEET"
+    ADDRESS_MISMATCH = "ADDRESS_MISMATCH"  # a slot sheet's address column disagrees with its module terminals
     NO_TITLE_BLOCK = "NO_TITLE_BLOCK"
     NO_GRID = "NO_GRID"
     REGISTER_UNREADABLE = "REGISTER_UNREADABLE"  # QA register could not be read; its decisions were not carried

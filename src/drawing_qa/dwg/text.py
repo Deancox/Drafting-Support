@@ -1,7 +1,7 @@
 """Read a sheet's text from its DXF and place it on the PDF page.
 
 Only what plots is read: text on layers that are off, frozen or set not to plot, and invisible attributes,
-are left out, because they are not on the PDF. Text inside blocks (title block, symbols) is read through
+are left out, because they are not on the PDF. An attribute definition left loose in model space plots its tag. Text inside blocks (title block, symbols) is read through
 the block, with attribute values (tags are often attributes). Positions are in drawing units (mm).
 
 The DWG is lined up with the PDF by its line work: the extents of the long lines give the scale and offset,
@@ -95,6 +95,10 @@ def read_dxf(path: Path, char_width: float = 0.72) -> DwgSheet:
                         continue
             elif kind in ("TEXT", "ATTRIB"):
                 texts.extend(_single_line(e, char_width))
+            elif kind == "ATTDEF" and depth == 0 and not e.dxf.get("flags", 0) & 1:
+                # Left loose in model space (an exploded block), an attribute definition plots its tag:
+                # the channel addresses 24..31 on 401104-151. Inside a block it is a template and does not.
+                texts.extend(_single_line(e, char_width, e.dxf.get("tag", "")))
             elif kind == "MTEXT":
                 texts.extend(_mtext(e, char_width))
             elif kind == "LINE":
@@ -119,9 +123,9 @@ def _vertical(rot: float) -> bool:
     return 45 < rot % 180 < 135
 
 
-def _single_line(e, char_width: float) -> list[DwgText]:
-    """TEXT / ATTRIB: one line, placed by its alignment."""
-    text = decode_autocad_text(e.dxf.get("text", "")).strip()
+def _single_line(e, char_width: float, text: str | None = None) -> list[DwgText]:
+    """TEXT / ATTRIB (or a loose ATTDEF, with its tag as the text): one line, placed by its alignment."""
+    text = decode_autocad_text(e.dxf.get("text", "") if text is None else text).strip()
     h = float(e.dxf.get("height", 0) or 0)
     if not text or h <= 0:
         return []

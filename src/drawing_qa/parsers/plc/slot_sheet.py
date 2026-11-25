@@ -21,8 +21,8 @@ import re
 from statistics import median
 
 from drawing_qa.model.claims import Claim
-from drawing_qa.model.enums import EntityType, Predicate
-from drawing_qa.model.source import BBox, Drawing
+from drawing_qa.model.enums import EntityType, IssueCode, Predicate
+from drawing_qa.model.source import BBox, Drawing, Issue
 from drawing_qa.parsers.base import DrawingParser, ParseContext, ParseResult, TemplateReader
 from drawing_qa.pdf.extract import PageContent, TextLine
 
@@ -37,6 +37,12 @@ _TITLE_SLOT = re.compile(r"\bSLOT\s+(\d+)\b", re.I)
 _ADDRESS_HEADER = re.compile(r"^(/?\s*ADDRESS|CHANNEL)$", re.I)
 _CHANNEL = re.compile(r"^\d{2}$")
 _MODULE_TERMINAL = re.compile(r"^(IN|OUT)-\d+$", re.I)
+_TERMINAL_NUMBER = re.compile(r"^(?:IN|OUT)-(\d+)$", re.I)
+
+
+def rows_terminal(rows: list[dict], channel: int) -> str:
+    """The module terminal label (OUT-24) of the row now numbered channel."""
+    return next((t for row in rows if row["channel"] == channel for t in row["terminals"]), f"terminal {channel}")
 _ROWS = "ABCDEFGHJKLMNPQRSTUVWXYZ"
 
 
@@ -102,6 +108,9 @@ class SlotSheetReader(TemplateReader):
             if _MODULE_TERMINAL.match(text) and header.bbox[0] - 45 <= _cx(ln.bbox) <= header.bbox[2] + 45:
                 if (i := band_of(_cy(ln.bbox))) is not None:
                     rows[i]["terminals"].append(text.upper())
+
+        if issue := self._numbers_from_terminals(rows, drawing):
+            result.issues.append(issue)
 
         desc_header = next((ln for ln in body if ln.text.strip().upper() == "DESCRIPTION"), None)
         if desc_header is not None:
@@ -240,6 +249,38 @@ class SlotSheetReader(TemplateReader):
             return anchors
         best = max(columns, key=lambda col: (median(a.bbox[3] - a.bbox[1] for a in col), len(col)))
         return sorted(best, key=lambda ln: _cy(ln.bbox))
+
+    @staticmethod
+    def _numbers_from_terminals(rows: list[dict], drawing: Drawing) -> Issue | None:
+        """Check the address column against the module terminal labels (OUT-24, IN-8) in each row.
+
+        When most labelled rows disagree with their address, the column read is not the addresses: on 401104-151
+        read from its DWG, the only two-digit numbers there were the PLC terminal numbers (27, 28 ... under OUT-24,
+        OUT-25 ...). The labels then give the channel numbers, a row with no label is dropped, and the sheet gets an
+        issue. One row disagreeing is a drawing question, so the addresses are kept.
+        """
+        labelled = []
+        for i, row in enumerate(rows):
+            numbers = {int(m[1]) for t in row["terminals"] if (m := _TERMINAL_NUMBER.match(t))}
+            if len(numbers) == 1:
+                labelled.append((i, numbers.pop()))
+        disagree = [(i, n) for i, n in labelled if n != rows[i]["channel"]]
+        if not labelled or len(disagree) * 2 <= len(labelled):
+            return None
+        i0, n0 = disagree[0]
+        read = rows[i0]["channel"]
+        keep = {i for i, _ in labelled}
+        for i, n in labelled:
+            rows[i]["channel"] = n
+        rows[:] = [row for i, row in enumerate(rows) if i in keep]
+        return Issue(
+            code=IssueCode.ADDRESS_MISMATCH,
+            message=(f"{drawing.label}: the numbers read in the TERMINAL / ADDRESS column disagree with the module "
+                     f"terminals on {len(disagree)} of {len(labelled)} rows (e.g. {read:02d} beside "
+                     f"{rows_terminal(rows, n0)}), so the channel numbers were taken from the terminals"),
+            file_path=drawing.file_path,
+            drawing_id=drawing.id,
+        )
 
     @staticmethod
     def _bands(ys: list[float]) -> list[tuple[float, float]]:
